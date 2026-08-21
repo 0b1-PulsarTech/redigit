@@ -1,5 +1,7 @@
 package entities
 
+import "strings"
+
 // CommitShape says whether a commit was cut along a feature or along a layer.
 // Both are legitimate and the planner records which it chose, because a history
 // that mixes them silently is one nobody can audit.
@@ -29,6 +31,17 @@ type PlannedCommit struct {
 	Reason   string
 	IsWIP    bool
 }
+
+// DraftMarker prefixes every subject a planner invents. A generated subject is
+// evidence for a reviewer, not a commit message: the previous rebuild ended up
+// with 561 placeholder subjects that had to be authored afterwards, and the
+// ones that slipped through described work that had moved elsewhere. The marker
+// lives here, on the plan both stages meet through, rather than being spelled
+// out again in each of them.
+const DraftMarker = "DRAFT: "
+
+// IsDraft reports whether a subject still needs a human or an agent to write it.
+func IsDraft(subject string) bool { return strings.HasPrefix(subject, DraftMarker) }
 
 // Plan is the reviewable artifact. No history is ever written straight from
 // automatic clustering: the plan is emitted, a human or the operating agent

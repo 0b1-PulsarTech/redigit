@@ -7,31 +7,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-func TestIsDraft(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name    string
-		subject string
-		want    bool
-	}{
-		{"generated", DraftMarker + "feat(lead): Create", true},
-		{"authored", ":seedling: feat(lead): Register a lead", false},
-		{"empty", "", false},
-		{"the marker only counts at the start", "feat: " + DraftMarker, false},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := IsDraft(testCase.subject); got != testCase.want {
-				t.Fatalf("IsDraft(%q) = %v, want %v", testCase.subject, got, testCase.want)
-			}
-		})
-	}
-}
-
 func TestDraftSubject(t *testing.T) {
 	t.Parallel()
 
@@ -71,7 +46,7 @@ func TestDraftSubject(t *testing.T) {
 			t.Parallel()
 
 			got := draftSubject(testCase.shape, testCase.feature, testCase.keys)
-			if !IsDraft(got) {
+			if !entities.IsDraft(got) {
 				t.Fatalf("subject %q is not marked as a draft", got)
 			}
 

@@ -274,7 +274,7 @@ func TestPlannerMarksEverySubjectAsDraft(t *testing.T) {
 	}
 
 	for _, commit := range plan.Commits {
-		if !IsDraft(commit.Subject) {
+		if !entities.IsDraft(commit.Subject) {
 			t.Fatalf("subject %q is not marked as a draft", commit.Subject)
 		}
 	}
