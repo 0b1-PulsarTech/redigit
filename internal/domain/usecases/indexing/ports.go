@@ -6,6 +6,8 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
+//go:generate go tool -modfile=../../../../tools/go.mod mockgen -source=ports.go -destination=ports_mock_test.go -package=indexing
+
 // Resolver answers the semantic questions exactly. Text matching is what this
 // replaces: searching for the first consumer of 59 declarations by identifier
 // put 24 of 53 destinations in the wrong place, including a standard-library

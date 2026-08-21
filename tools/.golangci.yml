@@ -87,6 +87,7 @@ linters:
             - github.com/dave/dst
             - github.com/scip-code/scip
             - google.golang.org/protobuf
+            - go.uber.org/mock
         # The Dependency Rule as a fitness function: a domain package that
         # imports an adapter is the failure this whole layout exists to prevent,
         # and a rule nothing enforces is a suggestion.
