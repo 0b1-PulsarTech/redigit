@@ -1,0 +1,182 @@
+version: "2"
+
+linters:
+  default: fast
+  disable:
+    # Tests live in the same package as the code under test (see
+    # docs/rules/testing.md). Enforced repo-wide; never override per-file.
+    - testpackage
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - cyclop
+    - dupl
+    - exptostd
+    - funlen
+    - goconst
+    - godoclint
+    - gosec
+    - gosmopolitan
+    - importas
+    - interfacebloat
+    - ireturn
+    - modernize
+    - nakedret
+    - nestif
+    - noctx
+    - prealloc
+    - predeclared
+    - sloglint
+    - tagalign
+    - unconvert
+    - unparam
+    - whitespace
+    - wrapcheck
+
+  settings:
+    govet:
+      # Enable the shadow analyzer; docs/rules/effective-go.md forbids shadowing
+      # an outer err/ctx/variable with := in an inner scope.
+      enable:
+        - shadow
+    nakedret:
+      max-func-lines: 40
+    godoclint:
+      # Hand-written code carries no package doc (project rule), so a package's
+      # only godoc is the one mockgen emits in each generated _mock_test.go.
+      # Disable the single-package-doc rule so that unavoidable generated doc is
+      # never reported as a "duplicate" against the real source file.
+      disable:
+        - single-pkg-doc
+    funlen:
+      lines: 80
+      statements: 0
+    cyclop:
+      max-complexity: 15
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
+    wrapcheck:
+      # dberrmap.WrapSQLError is the repository error-wrapping seam (it maps raw
+      # sql/driver errors into the typed dberrs hierarchy), so returning its
+      # result is wrapping, not leaking an unwrapped external error.
+      #
+      # dberrmap.ParseOr shares that seam - it calls WrapSQLError internally on
+      # a parse failure, so its returned err is already wrapped even though the
+      # repository assigns it to a local `err` before returning it.
+      #
+      # aiconfread.ConfigOrZero already wraps the only error it can produce
+      # (a config-read failure); a caller re-wrapping its return would
+      # double-wrap that message and break the error-message contract the
+      # sinks share.
+    depguard:
+      rules:
+        Main:
+          list-mode: lax
+          allow:
+            - $gostd
+            - github.com/wrapped-owls/redigit
+            - golang.org/x/sync
+            - github.com/dave/dst
+            - github.com/scip-code/scip
+            - google.golang.org/protobuf
+        # The Dependency Rule as a fitness function: a domain package that
+        # imports an adapter is the failure this whole layout exists to prevent,
+        # and a rule nothing enforces is a suggestion.
+        Domain:
+          list-mode: lax
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: github.com/wrapped-owls/redigit/internal/infra
+              desc: the domain declares ports; adapters implement them
+            - pkg: github.com/wrapped-owls/redigit/internal/transport
+              desc: the domain never knows how it is invoked
+            - pkg: github.com/wrapped-owls/redigit/internal/bootstrap
+              desc: only the composition root chooses concretes
+            - pkg: os/exec
+              desc: shelling out is an adapter concern
+            - pkg: github.com/dave/dst
+              desc: a language-specific parser belongs in its language pack
+
+  exclusions:
+    generated: strict
+    warn-unused: true
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - dupl
+          - gosec
+          # Table-test names and fixture literals repeat by design ("empty",
+          # "zero", a currency code); deduping them into consts hurts readability.
+          - goconst
+
+      - path-except: _test\.go
+        linters:
+          - forbidigo
+
+      - linters:
+          - staticcheck
+        text: "SA1029:"
+
+      - linters:
+          - lll
+        source: "^//go:generate "
+
+      # goverter directives carry fully-qualified extend paths that cannot be
+      # wrapped, same as //go:generate above.
+      - linters:
+          - lll
+        source: "^// goverter:"
+
+      # Hand-written libraries whose constructors intentionally return an
+      # interface (deolho.Tracer, templatek.Engine, ruleflow.Rule) carry an
+      # inline //nolint:ireturn at the constructor site, so they need no path
+      # exclusion here. Only generated or declarative code is excluded below.
+
+      # database/entschema is the ent schema authoring package. Its files are
+      # near-declarative DDL: ent's API returns interfaces (ireturn), schema
+      # column sizes are literals (mnd), and the package must import ent
+      # itself (depguard). Excluding the path keeps the lint signal useful
+      # elsewhere without polluting the schema with nolint pragmas.
+      - path: go\.mod$
+        linters:
+          - gomoddirectives
+
+      # gomock-generated mocks. Generated by `go generate` next to their
+      # source interface; suppress style linters on them.
+      - path: _mock_test\.go
+        linters:
+          - depguard
+          - dupl
+          - wrapcheck
+          - wsl
+          - nlreturn
+          - lll
+          - ireturn
+          - revive
+          - stylecheck
+          - errcheck
+          - mnd
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+    - golines
+  exclusions:
+    warn-unused: true
+    generated: strict
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly

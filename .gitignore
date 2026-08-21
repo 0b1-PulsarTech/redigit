@@ -1,0 +1,10 @@
+# Installed by pulsarules_cli
+.mcp.json
+
+# Build artifacts
+/bin/
+/dist/
+*.test
+
+# Local run state
+/.redigit-cache/

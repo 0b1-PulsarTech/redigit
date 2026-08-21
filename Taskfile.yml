@@ -1,0 +1,47 @@
+version: '3'
+
+env:
+  CGO_ENABLED: '0'
+
+tasks:
+  default:
+    desc: Vet and test
+    cmds:
+      - task: test
+
+  build:
+    desc: Build the binary
+    cmds:
+      - go build -o bin/redigit ./cmd/redigit
+
+  test:
+    desc: Race tests
+    cmds:
+      - go vet ./...
+      - go test -race ./...
+
+  test:integration:
+    desc: Tests behind the integration tag
+    cmds:
+      - go test -race -tags=integration ./...
+
+  fmt:
+    desc: Format
+    cmds:
+      - gofumpt -w .
+      - goimports -w -local github.com/wrapped-owls/redigit .
+      - golines -w -m 100 .
+
+  lint:
+    desc: Lint with the house config
+    cmds:
+      - golangci-lint run --config tools/.golangci.yml ./...
+
+  gate:
+    desc: Everything that must be green before a commit
+    cmds:
+      - go build ./...
+      - go vet ./...
+      - go test -race ./...
+      - test -z "$(gofmt -l . | tee /dev/stderr)"
+      - task: lint
