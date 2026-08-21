@@ -1,0 +1,280 @@
+# redigit - plano de arquitetura
+
+Ferramenta que reconstroi a historia de um repositorio de modo que cada commit
+crie exatamente o que precisa: nada nasce antes de quem o usa, o teste nasce com
+a funcao que exercita, e os commits tem a forma que uma pessoa escreveria.
+
+A unidade e a DECLARACAO, nunca o arquivo. Um arquivo nasce com tres funcoes e
+ganha oito ao longo de meses; so uma declaracao pode carregar posicao propria.
+
+## 1. O que a pesquisa estabeleceu
+
+Seis frentes de investigacao, com o que cada uma decidiu.
+
+### 1.1 A lacuna e real
+
+Duas linhagens de trabalho anterior, nenhuma faz isto:
+
+- Untangling academico (ClusterChanges/Microsoft, Flexeme, UTango, SmartCommit,
+  Atomizer 2026) DIVIDE um diff existente em grupos. Nunca propoe ordem de
+  construcao nem sintetiza estados intermediarios.
+- Ferramentas de historia (git-absorb, hg absorb, jj absorb, git-deps,
+  git-explode, git-branchless, filter-repo) REORDENAM ou anexam commits que ja
+  fazem sentido isoladamente.
+
+O primo mais proximo e o CSlicer (ASE 2015), que fatia historia por teste, mas
+extrai fatia existente em vez de inventar commits, e opera em granularidade de
+commit, nao de declaracao.
+
+Ideias que valem roubar:
+
+- def-use como sinal primario (ClusterChanges relatou zero falsos positivos)
+- o delta-PDG multi-versao do Flexeme, que e o grafo que precisamos
+- a recusa explicita do `jj absorb` em agir quando a atribuicao e ambigua
+- o teste como unidade de intencao (CSlicer)
+
+Armadilha medida que nos atinge diretamente: o AtomicCommitBench (2026) mostra
+agentes com replay quase perfeito (PPAR > 0.988) e qualidade de agrupamento
+pessima (ARI 0.03 a 0.46). **"A arvore fecha" e "a historia faz sentido" sao
+duas metricas.** O invariante da arvore final nao diz nada sobre a segunda.
+
+### 1.2 Os dois motores de resolucao, medidos
+
+| | LSP ao vivo (gopls v0.23) | SCIP (scip-go) |
+|---|---|---|
+| `references` | ~10 ms quente -> ~100 s para 10k decls | incluso no indice |
+| modulo inteiro | n/a | 0,67 s (59 documentos, 419 implementacoes) |
+| `implementation` | funciona; custo em escala nao medido aqui | verificado: 54 relacoes cruzando modulo |
+| build tags | `{"buildFlags":["-tags=integration"]}` (verificado) | `GOFLAGS=-tags=integration` (verificado) |
+| multi-modulo | `go.work` funciona (testado com 2 modulos) | NAO suporta `go.work`; roda por modulo |
+| fronteira de declaracao | `documentSymbol` da `range` | `EnclosingRange` so em 119 de 986 |
+| papel Test / Generated | nao existe no protocolo | scip-go nao popula (ambos zero) |
+| por linguagem | qualquer servidor LSP | precisa de indexador, ou ponte lsp-to-scip |
+
+Os dois funcionam. Nao e bifurcacao, e um seam com dois adaptadores reais.
+Comeca pelo LSP.
+
+Armadilhas verificadas que teriam custado caro:
+
+- gopls **nunca anuncia `positionEncoding`** e opera sempre em UTF-16. A
+  conversao de offset e nossa.
+- As chaves de `initializationOptions` sao achatadas no ultimo ponto:
+  `build.buildFlags` == `buildFlags`. JSON aninhado nao funciona.
+- Metodos NAO vem aninhados sob o tipo receptor no `documentSymbol`.
+- `didOpen` nao e necessario para `documentSymbol`/`references`.
+- Um arquivo com build tag aberto por `didOpen` responde `documentSymbol` mesmo
+  sem a tag, mas fica invisivel a `references`/`workspace/symbol`. E o mecanismo
+  exato dos 194 arquivos invisiveis: a consulta sintatica mente que esta vendo.
+
+### 1.3 Escrita da historia
+
+`git fast-import` por larga margem. Medido em 300 commits x 200 arquivos
+(60 mil blobs):
+
+| mecanismo | tempo | `.git` resultante |
+|---|---|---|
+| `fast-import` | 4,7 s | 6,1 MB, um pack |
+| escritor Go de objetos soltos + `write-tree` | 10,9 s | 235 MB, 60k objetos soltos |
+| laco ingenuo `hash-object`+`update-index` | ~365 s (extrapolado) | - |
+
+Determinismo confirmado: o mesmo fluxo em dois repositorios limpos produziu ref
+bit-identica. Datas e identidade vao dentro do fluxo, nao em variaveis de
+ambiente.
+
+### 1.4 Mecanismo de plugin
+
+Registro em tempo de compilacao, como `go/analysis` e o golangci-lint. Nao
+`plugin`, nao subprocesso, nao WASM. Um binario estatico, CGO desligado.
+
+Tree-sitter foi avaliado e **recusado por ora**: o binding oficial exige CGO, e
+o unico runtime "puro Go" disponivel (`gotreesitter`) tem 523 arquivos num
+pacote plano, 330 deles de teste, funcoes `...ForTest` exportadas na API publica
+e um `func Add(a, b int) int` no topo. Para Go usamos `go/ast` mais
+`github.com/dave/dst`, que existe precisamente para resolver o problema de
+comentarios que se soltam do no.
+
+## 2. Arquitetura
+
+Seis estagios. A superficie especifica de linguagem e menor do que parece.
+
+```
+  historia de origem (opcional) ----+
+                                     |
+  arvore final --------------------- v
+                              [ Snapshot ]
+                                     |
+                    +----------------+----------------+
+                    v                                 v
+             [ Resolver ]                       [ LanguagePack ]
+        arestas semanticas exatas          declaracoes, spans, render,
+        (LSP ou SCIP; agnostico)           arestas invisiveis (por linguagem)
+                    |                                 |
+                    +----------------+----------------+
+                                     v
+                                 [ Graph ]
+                        declaracoes + arestas + motivos
+                                     |
+                                     v
+                              [ Orderer ]
+                  ponto fixo; ciclos NOMEADOS, nao escondidos
+                                     |
+                                     v
+                              [ Planner ]
+                 clusters de feature; kernel compartilhado por camada
+                                     |
+                                     v
+                          [ Plan ]  <-- REVISAO HUMANA/IA
+                          arquivo legivel e editavel
+                                     |
+                                     v
+                              [ Writer ]
+                     render por commit; git fast-import
+                                     |
+                                     v
+                    nova historia + [ Auditor ]
+```
+
+### 2.1 As tres portas
+
+Cada uma tem dois adaptadores reais ou um plano concreto para o segundo. Uma
+porta com um adaptador so seria seam hipotetico, e a skill de design proibe.
+
+**`Resolver`** - fatos semanticos, agnostico de linguagem.
+Adaptadores: gopls via LSP, e SCIP. Responde quem referencia o que, o que
+implementa o que, onde algo e declarado.
+
+**`Syntax`** - fronteiras de declaracao e renderizacao parcial, por linguagem.
+Adaptadores: Go (`go/ast` + `dst`), e um recuo generico que usa
+`documentSymbol` para as fronteiras e corte por linha para o render.
+
+**`RulePack`** - as arestas que nenhum grafo de referencia enxerga, por
+linguagem. Para Go: goverter, mockgen nos tres formatos de cabecalho, sqlc
+`-- name:`, a migracao entre o schema e a query, e a visibilidade por build tag.
+
+### 2.2 Por que o render fica com a linguagem
+
+`go/ast.FilterFile` documenta que nao mexe em `File.Comments`. Filtrar
+declaracoes de forma ingenua deixa comentarios orfaos em posicao velha, ou come
+a linha `//go:build` acima da primeira declaracao removida. O corpo de trabalho
+anterior encontrou esse bug em producao e o corrigiu ancorando o span no
+`Doc.Pos()` e nao no `decl.Pos()`. O `dst` resolve na raiz. Nenhum formato
+agnostico de indice substitui isto.
+
+## 3. A decisao vertical contra horizontal
+
+Ordenar por dependencia produz camadas horizontais. Quem escreve a mao produz
+vertical. Fundir vizinhos nao converte, porque o par vertical fica a centenas de
+commits de distancia. Teto medido pelo trabalho anterior: ~73% num diretorio so,
+contra alvo de 46-52%, com quatro auditorias independentes convergindo nele.
+
+**A regra, derivada do grafo e nao de um botao:**
+
+Para cada declaracao, contar em quantos clusters de feature distintos vivem os
+seus consumidores.
+
+- consumidores num cluster so -> nasce COM aquela feature (vertical)
+- consumidores atravessando muitos clusters -> e nucleo compartilhado e nasce
+  ANTES deles, num commit de camada (horizontal)
+
+E a mesma forma da regra 7 do documento de aprendizados (um pacote nasce quando
+alguem DE FORA precisa dele), contando features em vez de pacotes.
+
+Casos onde camada e a resposta honesta, e nao uma derrota:
+
+1. **Bootstrap do repositorio.** go.mod, config, logging, tipos de erro. Nao ha
+   feature a que pertencam.
+2. **Blocos gerados.** `dbgen` com 409 metodos sai de uma execucao do gerador.
+   Espalhar isso por 40 commits de feature e menos verdadeiro, nao mais.
+3. **Kernel compartilhado.** `Money`, `ID`, `Clock`. Atribuir a qualquer feature
+   e mentira.
+4. **Biblioteca pura.** Medido: `goremy-di` tem 5% de commits multicamada,
+   contra 32-33% em `jane` e `stark`. Uma biblioteca nao tem camadas para
+   atravessar, e perseguir o alvo de aplicacao nela e perseguir o numero errado.
+
+**A regua de forma nao e um numero global.** Ela depende do tipo de
+repositorio, e a ferramenta reporta a sua, nunca persegue a de outro.
+
+### 3.1 O plano e sempre revisado
+
+Nenhuma historia e escrita direto de agrupamento automatico. O `Planner` emite
+um arquivo de plano legivel; uma pessoa ou a IA que opera a ferramenta ajusta;
+so entao o `Writer` escreve.
+
+Isto nao e cautela vaga, e o que a evidencia manda: o AtomicCommitBench mediu
+ARI de 0,03 a 0,46 para agrupamento automatico, e o ChangeBeadsThreader existe
+precisamente porque agrupamento 100% automatico se mostrou inusavel na pratica.
+O `jj absorb` recusa-se a agir quando a atribuicao e ambigua, e essa recusa e
+uma feature.
+
+## 4. As duas entradas
+
+`base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.
+
+**Com historia de origem** (o caso do terectek): cada declaracao herda como
+`base` a primeira posicao que a continha. O ponto fixo so empurra para frente.
+
+**Sem historia** (arvore de um commit so): nao ha `base`. A ordem vem so da
+dependencia, e ai o emissor por feature deixa de ser refinamento e passa a ser o
+unico jeito de a historia nao sair puramente horizontal. Os clusters sao
+ordenados topologicamente entre si; dentro do cluster, por dependencia.
+
+Consequencia de projeto: `base` entra como um piso a mais, ao lado do piso de
+modulo e do piso de leitor. Nao como semente privilegiada.
+
+## 5. Verificacao: toda medida declara o que nao olha
+
+O aprendizado mais transferivel do trabalho anterior e que onze vezes o numero
+ruim veio do medidor, nao da arvore. Isso vira tipo, nao disciplina:
+
+```go
+// Measure e uma medicao e o que ela NAO olhou.
+type Measure struct {
+    Name     string
+    Value    int
+    Total    int
+    Excluded []string // o que este numero nao enxerga
+}
+```
+
+Uma medida sem `Excluded` preenchido nao passa na revisao. Os onze enganos
+catalogados viram casos de teste:
+
+- varredura que compila so o que o `go.work` daquele commit declara
+- `vet` sem `-tags integration` (194 arquivos fora de toda prova)
+- teste medido no arquivo em vez de na funcao
+- casamento teste/funcao que pega o tipo em vez do metodo
+- "primeiro uso" que ignora o uso no mesmo commit
+- comparacao de shas onde o que precisa bater sao arvores
+- prova de movibilidade contra um destino que depois mudou
+
+E, do AtomicCommitBench: **replay e agrupamento sao relatados separadamente.**
+A ferramenta nunca reporta so o invariante da arvore final.
+
+## 6. Layout
+
+Modulo unico, `github.com/wrapped-owls/redigit`, CGO desligado.
+
+```
+cmd/redigit/                 main fino
+internal/
+  bootstrap/                 raiz de composicao; unico lugar que escolhe adaptador
+  domain/
+    entities/                vocabulario compartilhado: Decl, Edge, Anchor, Plan, Measure
+    apperr/                  contrato de erro
+    usecases/
+      indexing/              monta o grafo a partir das portas
+      ordering/              ponto fixo, ciclos nomeados
+      planning/              clusters de feature, kernel por camada
+      rewriting/             render por commit, invariante da arvore
+      auditing/              as medidas, cada uma com Excluded
+  infra/
+    lsp/                     JSON-RPC 2.0 + subconjunto do protocolo (agnostico)
+    scip/                    leitor de indice SCIP (agnostico)
+    langpack/go/             sintaxe, render e regras invisiveis do Go
+    gitstore/                fast-import e leitura de historia
+  transport/cli/             verbos
+```
+
+Dependencias: `golang.org/x/sync` (errgroup, exigido pela skill de
+concorrencia), `github.com/dave/dst` (render), bindings SCIP e protobuf. Nada
+mais.
