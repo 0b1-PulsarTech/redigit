@@ -1,0 +1,37 @@
+package entities
+
+import "slices"
+
+// SourceTouch is one position of the source history and the paths it wrote.
+// It is the only thing the source history contributes: a floor per declaration,
+// alongside the module floor and the reader floor. Nothing privileged, because
+// the tool also has to work with no source history at all.
+type SourceTouch struct {
+	Position Position
+	Touched  []string
+}
+
+// Snapshot is what the run reads: the final tree, and the source history when
+// there is one. Files are repo-relative and already filtered to what the run
+// covers, so a stage never re-decides what is in scope.
+type Snapshot struct {
+	Root    string
+	Files   []string
+	History []SourceTouch
+}
+
+// HasHistory reports whether declarations can inherit a base position. Without
+// one the order comes from dependency alone, and the feature planner stops being
+// a refinement and becomes the only thing keeping the history from going flat.
+func (s Snapshot) HasHistory() bool { return len(s.History) > 0 }
+
+// FirstTouch reports the earliest position that wrote a path.
+func (s Snapshot) FirstTouch(path string) Position {
+	for _, touch := range s.History {
+		if slices.Contains(touch.Touched, path) {
+			return touch.Position
+		}
+	}
+
+	return NoPosition
+}
