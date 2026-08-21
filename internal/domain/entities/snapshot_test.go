@@ -47,6 +47,16 @@ func TestSnapshotFirstTouch(t *testing.T) {
 		{"earliest wins, not the latest", snap, "a.go", 4},
 		{"single touch", snap, "go.mod", 0},
 		{"never touched", snap, "c.go", NoPosition},
+		{
+			"an unsorted history still yields the true minimum, not the first match",
+			Snapshot{History: []SourceTouch{
+				{Position: 9, Touched: []string{"a.go"}},
+				{Position: 2, Touched: []string{"a.go"}},
+				{Position: 5, Touched: []string{"a.go"}},
+			}},
+			"a.go",
+			2,
+		},
 		{"no history at all", Snapshot{}, "a.go", NoPosition},
 	}
 

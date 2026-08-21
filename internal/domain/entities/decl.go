@@ -79,5 +79,4 @@ type Decl struct {
 	Span     Span
 	Selector Location
 	IsTest   bool
-	Base     Position
 }

@@ -26,12 +26,23 @@ type Snapshot struct {
 func (s Snapshot) HasHistory() bool { return len(s.History) > 0 }
 
 // FirstTouch reports the earliest position that wrote a path.
+//
+// It scans for the minimum rather than returning the first match, so it does
+// not depend on History being sorted. Leaving that as an unwritten contract
+// makes a caller correct by luck: an unsorted history would silently seed a
+// declaration at a later position than the one that really introduced it.
 func (s Snapshot) FirstTouch(path string) Position {
+	first := NoPosition
+
 	for _, touch := range s.History {
-		if slices.Contains(touch.Touched, path) {
-			return touch.Position
+		if !slices.Contains(touch.Touched, path) {
+			continue
+		}
+
+		if !first.IsSet() || touch.Position < first {
+			first = touch.Position
 		}
 	}
 
-	return NoPosition
+	return first
 }
