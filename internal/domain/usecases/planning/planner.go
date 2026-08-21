@@ -1,0 +1,281 @@
+package planning
+
+import (
+	"cmp"
+	"fmt"
+	"slices"
+
+	"github.com/wrapped-owls/redigit/internal/domain/apperr"
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+)
+
+// Config tunes where the planner cuts. Both knobs are deliberate: a tool that
+// hides them reports one shape and cannot say why it reached it.
+type Config struct {
+	// MaxFiles caps how many files one commit touches. A commit spanning sixty
+	// packages cannot be named truthfully.
+	MaxFiles int
+}
+
+const defaultMaxFiles = 12
+
+func (c Config) withDefaults() Config {
+	if c.MaxFiles < 1 {
+		c.MaxFiles = defaultMaxFiles
+	}
+
+	return c
+}
+
+type Planner struct {
+	cfg Config
+}
+
+func New(cfg Config) Planner {
+	return Planner{cfg: cfg.withDefaults()}
+}
+
+// Plan groups an ordering into commits, cutting along features where a feature
+// owns the work and along layers where none does.
+//
+// The result is never written straight to a history. Automatic grouping is
+// measurably the weak half of this problem: agents reach replay validity above
+// 0.988 while grouping quality sits between 0.03 and 0.46, so the plan exists to
+// be read and corrected before anything is committed.
+func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.Plan, error) {
+	if graph.Len() == 0 {
+		return entities.Plan{}, fmt.Errorf("%w: nothing to plan", apperr.ErrIncomplete)
+	}
+
+	own := assign(graph)
+
+	// No entry point means no declaration is unconsumed, which only happens
+	// when a cycle spans the whole graph. Emitting one flat layer commit
+	// would look like success and would throw away every vertical slice.
+	if len(own.order) == 0 {
+		return entities.Plan{}, fmt.Errorf(
+			"%w: no entry point in %d declarations; the graph is entirely cyclic",
+			apperr.ErrIncomplete, graph.Len(),
+		)
+	}
+
+	sorted, cyclic := sortFeatures(own.order, featureNeeds(graph, own), earliest(own, order))
+
+	// Reachability ownership should make this unreachable: if a declaration
+	// of feature A needs one of feature B, everything that reaches the first
+	// reaches the second, so the second is reached by both and becomes shared
+	// rather than B's. The guard stays because that argument is reasoning, not
+	// proof, and misordering silently is the worse failure.
+	if len(cyclic) > 0 {
+		return entities.Plan{}, fmt.Errorf(
+			"%w: %d features need each other, starting at %q",
+			apperr.ErrIncomplete, len(cyclic), cyclic[0],
+		)
+	}
+
+	return p.emit(graph, order, own, sorted), nil
+}
+
+func (p Planner) emit(
+	graph entities.Graph,
+	order entities.Ordering,
+	own ownership,
+	features []FeatureID,
+) entities.Plan {
+	byFeature := groupByFeature(graph, own)
+	born := map[entities.DeclKey]bool{}
+
+	var plan entities.Plan
+
+	for _, feature := range features {
+		members := byFeature[feature]
+
+		// Whatever this feature needs from the shared kernel is born first,
+		// in its own layer commit. That is what keeps vertical compatible
+		// with nothing being born before what needs it.
+		if shared := unbornProviders(graph, own, members, born); len(shared) > 0 {
+			plan.Commits = append(
+				plan.Commits,
+				p.cut(
+					order,
+					shared,
+					entities.ShapeLayer,
+					SharedFeature,
+					"shared by several features",
+				)...,
+			)
+
+			markBorn(born, shared)
+		}
+
+		plan.Commits = append(
+			plan.Commits,
+			p.cut(
+				order,
+				members,
+				entities.ShapeFeature,
+				feature,
+				"one feature, closed over its own dependencies",
+			)...,
+		)
+
+		markBorn(born, members)
+	}
+
+	// Anything no feature reached is still part of the final tree. Emitting it
+	// as a trailing layer commit is honest; dropping it would leave a hole the
+	// tree invariant only catches once every explanation is gone.
+	if rest := remaining(graph, born); len(rest) > 0 {
+		plan.Commits = append(
+			plan.Commits,
+			p.cut(order, rest, entities.ShapeLayer, SharedFeature, "reached by no entry point")...,
+		)
+
+		markBorn(born, rest)
+	}
+
+	for _, decl := range graph.Decls() {
+		if !born[decl.Key] {
+			plan.Unplaced = append(plan.Unplaced, decl.Key)
+		}
+	}
+
+	slices.SortFunc(plan.Unplaced, func(a, b entities.DeclKey) int {
+		return cmp.Compare(a.String(), b.String())
+	})
+
+	for index := range plan.Commits {
+		plan.Commits[index].Position = entities.Position(index)
+	}
+
+	return plan
+}
+
+// cut splits one bucket into commits no wider than MaxFiles, keeping the
+// declarations in the order the fixed point put them so a commit never carries
+// a reader ahead of what it reads.
+func (p Planner) cut(
+	order entities.Ordering,
+	keys []entities.DeclKey,
+	shape entities.CommitShape,
+	feature FeatureID,
+	reason string,
+) []entities.PlannedCommit {
+	keys = slices.Clone(keys)
+	slices.SortFunc(keys, func(a, b entities.DeclKey) int {
+		if left, right := order.Of(a), order.Of(b); left != right {
+			return cmp.Compare(left, right)
+		}
+
+		return cmp.Compare(a.String(), b.String())
+	})
+
+	var (
+		out     []entities.PlannedCommit
+		current []entities.DeclKey
+		files   = map[string]bool{}
+	)
+
+	flush := func() {
+		if len(current) == 0 {
+			return
+		}
+
+		out = append(out, entities.PlannedCommit{
+			Subject: draftSubject(shape, feature, current),
+			Shape:   shape,
+			Feature: string(feature),
+			Decls:   slices.Clone(current),
+			Reason:  reason,
+		})
+		current = current[:0]
+		files = map[string]bool{}
+	}
+
+	for _, key := range keys {
+		if !files[key.File] && len(files) >= p.cfg.MaxFiles {
+			flush()
+		}
+
+		files[key.File] = true
+
+		current = append(current, key)
+	}
+
+	flush()
+
+	return out
+}
+
+func groupByFeature(graph entities.Graph, own ownership) map[FeatureID][]entities.DeclKey {
+	out := map[FeatureID][]entities.DeclKey{}
+
+	for _, decl := range graph.Decls() {
+		feature := own.owner[decl.Key]
+		out[feature] = append(out[feature], decl.Key)
+	}
+
+	return out
+}
+
+// unbornProviders is what a feature's members wait on that no commit has
+// written yet.
+func unbornProviders(
+	graph entities.Graph,
+	own ownership,
+	members []entities.DeclKey,
+	born map[entities.DeclKey]bool,
+) []entities.DeclKey {
+	wanted := map[entities.DeclKey]bool{}
+	inFeature := map[entities.DeclKey]bool{}
+
+	for _, key := range members {
+		inFeature[key] = true
+	}
+
+	for _, key := range members {
+		for _, edge := range graph.Needs(key) {
+			if born[edge.Provider] || inFeature[edge.Provider] {
+				continue
+			}
+
+			if own.owner[edge.Provider] == SharedFeature {
+				wanted[edge.Provider] = true
+			}
+		}
+	}
+
+	return sortedKeys(wanted)
+}
+
+func remaining(graph entities.Graph, born map[entities.DeclKey]bool) []entities.DeclKey {
+	left := map[entities.DeclKey]bool{}
+
+	for _, decl := range graph.Decls() {
+		if !born[decl.Key] {
+			left[decl.Key] = true
+		}
+	}
+
+	return sortedKeys(left)
+}
+
+func sortedKeys(set map[entities.DeclKey]bool) []entities.DeclKey {
+	out := make([]entities.DeclKey, 0, len(set))
+	for key := range set {
+		out = append(out, key)
+	}
+
+	slices.SortFunc(
+		out,
+		func(a, b entities.DeclKey) int { return cmp.Compare(a.String(), b.String()) },
+	)
+
+	return out
+}
+
+func markBorn(born map[entities.DeclKey]bool, keys []entities.DeclKey) {
+	for _, key := range keys {
+		born[key] = true
+	}
+}
