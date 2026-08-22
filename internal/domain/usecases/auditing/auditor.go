@@ -56,7 +56,7 @@ func (a Auditor) Audit(graph entities.Graph, order entities.Ordering) (Result, e
 		Report: entities.Report{
 			Integrity: []entities.Measure{
 				a.placed(graph, order),
-				a.cyclesNamed(order),
+				a.cyclesNamed(graph, order),
 			},
 			Shape: []entities.Measure{
 				a.nearTheirReader(graph, order, found),
@@ -93,16 +93,23 @@ func (a Auditor) placed(graph entities.Graph, order entities.Ordering) entities.
 	}
 }
 
-func (a Auditor) cyclesNamed(order entities.Ordering) entities.Measure {
-	members := 0
+// cyclesNamed counts against the graph's declarations, the same population
+// every other measure here uses. Counting against the ordering's own map made
+// the total drift above the declaration count whenever a stray key crept in,
+// and two measures whose denominators disagree cannot be read together.
+func (a Auditor) cyclesNamed(graph entities.Graph, order entities.Ordering) entities.Measure {
+	members := map[entities.DeclKey]bool{}
+
 	for _, cycle := range order.Cycles {
-		members += len(cycle.Members)
+		for _, key := range cycle.Members {
+			members[key] = true
+		}
 	}
 
 	return entities.Measure{
 		Name:  "declarations free of a cycle",
-		Value: max(len(order.At)-members, 0),
-		Total: len(order.At),
+		Value: max(graph.Len()-len(members), 0),
+		Total: graph.Len(),
 		Excluded: []string{
 			"declarations the ordering never placed",
 			"a cycle the graph does not represent, which is the defect this cannot see",

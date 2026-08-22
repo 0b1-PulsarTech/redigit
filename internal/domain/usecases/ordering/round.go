@@ -49,12 +49,16 @@ func (e *engine) step() bool {
 	return changed
 }
 
-// simplification: an edge whose Provider or Dependent key names no
-// declaration in the graph (a dangling/malformed edge) is assumed not to
-// occur; building a Graph with such edges is the indexing stage's invariant
-// to uphold, not this package's to re-validate. Violating it currently means
-// the missing side is silently read as the zero Position rather than
-// surfaced.
+// dangling reports an edge naming a key no declaration in the graph carries.
+// Assuming these never occur was wrong: a rule pack can name a provider it
+// inferred from a comment header or a table name that no declaration matches,
+// and reading the missing side as position zero both invents a placement and
+// pins whatever waits on it to the very start.
+func (e *engine) dangling(key entities.DeclKey) bool {
+	_, known := e.graph.Decl(key)
+
+	return !known
+}
 
 // bound is the position a declaration cannot be born before: its base, every
 // provider it needs plus delay, and the floor its unit carries.
@@ -62,6 +66,10 @@ func (e *engine) bound(decl entities.Decl) entities.Position {
 	bound := e.base[decl.Key]
 
 	for _, edge := range e.graph.Needs(decl.Key) {
+		if e.dangling(edge.Provider) {
+			continue
+		}
+
 		bound = max(bound, e.assign[edge.Provider]+e.delay(decl.Key, edge.Provider))
 	}
 
@@ -105,6 +113,10 @@ func (e *engine) propagateEdges() bool {
 	changed := false
 
 	for _, edge := range e.graph.Edges() {
+		if e.dangling(edge.Dependent) || e.dangling(edge.Provider) {
+			continue
+		}
+
 		if e.raise(edge.Dependent, e.assign[edge.Provider]+e.delay(edge.Dependent, edge.Provider)) {
 			changed = true
 		}
@@ -125,6 +137,10 @@ func (e *engine) recomputeUnitFloor() bool {
 
 	for _, decl := range e.decls {
 		for _, edge := range e.graph.ExternalConsumers(decl.Key) {
+			if e.dangling(edge.Dependent) {
+				continue
+			}
+
 			// The reader's position is read back into the provider's frame by
 			// removing the insertion delay. Without that, the floor pulls the
 			// provider up to its reader while the delay pushes the reader one

@@ -255,3 +255,46 @@ func TestExternalFloorAgainstInsertionDelay(t *testing.T) {
 		})
 	}
 }
+
+// TestDanglingEdgeInventsNoPosition pins a case the package once assumed away.
+// A rule pack can name a provider it inferred from a comment header or a table
+// name that matches no declaration. Reading that missing side as position zero
+// both invents a placement for a key nothing declares and pins whatever waits
+// on it to the very start of the history.
+func TestDanglingEdgeInventsNoPosition(t *testing.T) {
+	t.Parallel()
+
+	present := entities.Decl{
+		Key:  entities.DeclKey{File: "a.go", Kind: entities.KindFunc, Name: "Real"},
+		Unit: "a",
+	}
+	ghost := entities.DeclKey{File: "nowhere.go", Kind: entities.KindType, Name: "Ghost"}
+
+	graph := entities.NewGraph(
+		[]entities.Decl{present},
+		[]entities.Edge{
+			{Dependent: present.Key, Provider: ghost, Reason: entities.ReasonMirrors},
+		},
+		nil,
+	)
+
+	got, err := New(Config{}).Order(graph, entities.Snapshot{
+		Files:   []string{"a.go"},
+		History: []entities.SourceTouch{{Position: 3, Touched: []string{"a.go"}}},
+	})
+	if err != nil {
+		t.Fatalf("Order() = %v", err)
+	}
+
+	if _, placed := got.At[ghost]; placed {
+		t.Fatalf("a key no declaration carries was given position %d", got.At[ghost])
+	}
+
+	if len(got.At) != 1 {
+		t.Fatalf("At holds %d entries, want only the one present declaration", len(got.At))
+	}
+
+	if at := got.Of(present.Key); at != 3 {
+		t.Fatalf("the present declaration landed at %d, want its own base of 3", at)
+	}
+}
