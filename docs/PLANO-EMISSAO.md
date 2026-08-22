@@ -25,24 +25,92 @@ ordenar por dependencia, e cortar arquivo por declaracao.
 A divisao fica: **a ferramenta responde ONDE cada declaracao nasce; o agente
 responde se aquilo compila e o que fazer quando nao compila.**
 
+## 1.1 O papel da ferramenta: pernas e bracos
+
+A ferramenta nao tem julgamento e nao deve ganhar nenhum. Ela e precisao
+mecanica a servico de um agente que tem contexto: resolve simbolo sem errar,
+recorta por declaracao sem quebrar sintaxe, monta blob sem perder modo de
+arquivo, e diz o que sabe que pode falhar.
+
+O agente tem o que a ferramenta nao tem: o fonte completo, `go build`, `go vet`,
+a suite, e a capacidade de ler um erro e consertar. Onde a ferramenta nao sabe
+uma coisa, ela **pergunta ao agente** em vez de adivinhar - e a secao 2.2 e o
+primeiro exemplo disso.
+
 ## 2. A ideia que unifica arquivo nao-fonte
 
 Um arquivo sem declaracoes - `go.mod`, uma query `.sql`, um `.md` - hoje nao
 entra no plano, porque o plano vem do grafo de declaracoes. Sao 237 arquivos na
 arvore alvo, incluindo `go.mod` e `go.sum`, sem os quais nada compila.
 
-**A solucao nao e maquinaria paralela: e tratar o arquivo inteiro como UMA
-declaracao.** Ja existe precedente no codigo - um `deps.go` que so tem clausula
-de pacote e imports em branco ja recebe uma declaracao `KindOther` chamada
-`<file>`, com span cobrindo o arquivo todo. Sem isso o arquivo sumia da arvore.
+**A solucao nao e maquinaria paralela: e tratar o arquivo nao-fonte com o mesmo
+vocabulario.** Ja existe precedente - um `deps.go` que so tem clausula de pacote
+e imports em branco recebe uma declaracao `KindOther` chamada `<file>`, com span
+cobrindo o arquivo todo. Sem isso o arquivo sumia da arvore.
 
-Estendendo a mesma ideia:
+Mas **arquivo inteiro e o RECUO, nao a regra.** Um `.sql` de sqlc com vinte
+queries e exatamente um `.go` com vinte funcoes: se o primeiro commit so usa
+tres, so essas tres devem nascer. Ver a secao 2.1.
 
-- todo arquivo nao-fonte recebe uma declaracao `KindOther`, span = arquivo todo
-- o pack de linguagem (ou um pack de dados) fornece as arestas dela
+- todo arquivo nao-fonte vira uma ou mais declaracoes `KindOther`
+- quando o formato tem estrutura conhecida, uma por pedaco; senao, uma so
+- o pack fornece as arestas de cada uma
 - dai em diante e tudo igual: mesmo grafo, mesmo ponto fixo, mesmo planejador
 
 Nada de estagio novo. O arquivo nao-fonte vira cidadao da mesma ordenacao.
+
+## 2.1 Recortar arquivo que nao e codigo
+
+Uma porta `Chunker` por formato, com arquivo-inteiro como implementacao padrao.
+Os que pagam o esforco, todos com precedente:
+
+**`.sql` de sqlc** - cada bloco `-- name: Nome :one` e uma declaracao. O
+comentario acima do bloco pertence a ele, pela mesma razao que o doc comment
+pertence a funcao em Go: soltar um sem o outro deixa comentario descrevendo o
+que nao esta la. O pack Go JA le essas linhas para ligar `dbgen` a query; hoje a
+informacao e lida e jogada fora depois de servir a uma aresta.
+
+O ganho e exato, nao cosmetico. Hoje o arquivo `.sql` inteiro tem de nascer
+quando a PRIMEIRA funcao gerada precisa dele, arrastando dezenove queries que
+ninguem le ainda. Com recorte, cada query nasce junto da funcao que ela gera.
+
+**`go.mod`** - cada linha `require` e `replace` e uma declaracao, ligada ao
+modulo que ela nomeia. Um modulo nao pode exigir um irmao que ainda nao existe,
+e a linha e peso morto ate la. Ha precedente direto: a dobra anterior tinha um
+passo `grow_modules` que fazia exatamente esse corte.
+
+**`go.work`** - cada linha `use`, ligada ao `go.mod` daquele diretorio. Mesmo
+precedente (`grow_workspace`): o arquivo lista os 33 modulos desde o comeco
+enquanto os `go.mod` chegam ao longo de 360 commits, e todo comando que le o
+workspace falha ate o ultimo chegar.
+
+**Onde arquivo inteiro continua certo**, e vale dizer para nao recortar por
+recortar: uma migracao e atomica por definicao - metade de um `CREATE TABLE` nao
+e nada. Um `.gitignore` ou um `LICENSE` nao tem consumidor por pedaco. Um `.md`
+poderia ser cortado por secao, mas documento pela metade le pior que documento
+ausente, e o dono ja manda prosa para o fim.
+
+## 2.2 Quando a ferramenta nao conhece o formato: perguntar ao agente
+
+Nao vamos escrever um recortador para todo formato que aparecer, e adivinhar
+seria pior que nao recortar. Entao a ferramenta aceita um **mapa de recorte
+externo**, que o agente fornece:
+
+```json
+{"database/queries/lead.sql": [
+   {"name": "GetLeadByID",   "span": [0, 240]},
+   {"name": "ListLeadsByOrg", "span": [241, 520]}
+ ]}
+```
+
+A ferramenta trata cada entrada como declaracao: ordena, liga e renderiza. O
+agente decidiu ONDE cortar; a ferramenta faz o corte sem errar um byte. E a
+divisao de trabalho da secao 1.1 aplicada ao caso concreto - julgamento dele,
+precisao nossa.
+
+Duas garantias que a ferramenta da sobre o mapa, porque mapa errado e pior que
+mapa ausente: os spans nao podem se sobrepor, e o que sobra fora deles vira uma
+declaracao residual do arquivo, para nada sumir em silencio.
 
 ### As arestas que cada tipo precisa
 
@@ -51,7 +119,9 @@ Boa parte ja existe como `EdgeReason`:
 | arquivo | regra | aresta |
 |---|---|---|
 | `go.mod`, `go.sum`, `go.work` | antes de qualquer declaracao do modulo | `hosts` |
-| `database/queries/*.sql` | antes do codigo gerado a partir dela | `query` (existe) |
+| `database/queries/*.sql` | cada query antes da funcao gerada dela | `query` (existe) |
+| linha `require`/`replace` | depois do `go.mod` do modulo que nomeia | `hosts` |
+| linha `use` do `go.work` | depois do `go.mod` daquele diretorio | `hosts` |
 | migracao | depois do schema, antes das queries | `schema` (existe) |
 | schema `ent` | nao tem consumidor Go; nasce pelo que gera | `generated-by` (existe) |
 | `testdata/`, fixture | com o teste que a le | `test-of` |
@@ -160,6 +230,10 @@ Deliberado, e vale escrever para nao voltar por engano:
 1. **Arquivo nao-fonte como declaracao** e as tres arestas novas (`hosts`,
    `describes`, `prose`). Sem isso o plano nao cobre 237 arquivos e nada
    compila. E o bloqueador.
+1a. **Recortadores** de `.sql`, `go.mod` e `go.work`, mais o mapa externo do
+   agente para o resto. Sem eles um `.sql` de vinte queries nasce inteiro na
+   primeira, o que e a granularidade de ARQUIVO que a ferramenta toda existe
+   para evitar.
 2. **Materializacao**: renderizar por commit e escrever blobs, com modo de
    arquivo, emitindo o manifesto.
 3. **`redigit emit`**: o comando, com `--blobs=git|dir`.
