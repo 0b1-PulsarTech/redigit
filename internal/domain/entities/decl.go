@@ -96,4 +96,10 @@ type Decl struct {
 	// A pack that leaves this false loses implementation edges rather than
 	// inventing backwards ones, which is the safe direction to fail in.
 	IsInterface bool
+	// GroupSize is how many declarations share this one's declaration block.
+	// A constant is not judged alone when it belongs to a group: an enum of
+	// two members is as indivisible as one of twenty-seven, and counting
+	// siblings per FILE gets that wrong whenever a file holds two enums or
+	// one enum plus a loose constant.
+	GroupSize int
 }

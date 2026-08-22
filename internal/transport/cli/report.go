@@ -58,8 +58,12 @@ type reportLine struct {
 	// required, because removing it stops its type from satisfying the
 	// interface, and the compiler says so at a conversion the file does not
 	// mention. Zero readers there is the opposite of safe to move.
-	InInterface bool       `json:"in_interface"`
-	Subject     *readerDTO `json:"subject"`
+	InInterface bool `json:"in_interface"`
+	// GroupSize is how many declarations share this one's block. Greater than
+	// one means the declaration is part of an enum or a bound group and does
+	// not travel alone, whatever its own reader count says.
+	GroupSize int        `json:"group_size"`
+	Subject   *readerDTO `json:"subject"`
 	// SubjectGap is how far after its subject a test was born. Negative means
 	// the test is born BEFORE what it exercises, which cannot compile.
 	SubjectGap int         `json:"subject_gap"`
@@ -139,6 +143,7 @@ func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 			InsideFanout: inside,
 			TestFanout:   byTests,
 			InInterface:  inInterface(satisfying, decl),
+			GroupSize:    decl.GroupSize,
 			Readers:      readers,
 			Gap:          0,
 		}

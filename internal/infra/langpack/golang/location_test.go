@@ -218,3 +218,68 @@ type Names []string
 		})
 	}
 }
+
+// TestGroupSizeCountsTheBlockNotTheFile pins the structural test that replaces
+// a count of siblings per file. A file holding two enums, or one enum beside a
+// loose constant, gets the per-file count wrong in both directions; only the
+// declaration block says what travels together.
+func TestGroupSizeCountsTheBlockNotTheFile(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(`package a
+
+type Kind uint8
+
+const (
+	KindFixed Kind = iota
+	KindPercentage
+)
+
+type Colour uint8
+
+const (
+	Red Colour = iota
+	Green
+	Blue
+)
+
+const Loose = 7
+
+var (
+	First  = 1
+	Second = 2
+)
+`)
+
+	decls, err := NewSyntax().Declarations(context.Background(), "a.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	size := map[string]int{}
+	for _, decl := range decls {
+		size[decl.Key.Name] = decl.GroupSize
+	}
+
+	testCases := []struct {
+		name string
+		decl string
+		want int
+	}{
+		{"an enum of two is still a group", "KindFixed", 2},
+		{"and its sibling agrees", "KindPercentage", 2},
+		{"a second enum in the same file counts its own block", "Red", 3},
+		{"a constant on its own is a group of one", "Loose", 1},
+		{"a var block counts too", "First", 2},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := size[testCase.decl]; got != testCase.want {
+				t.Fatalf("%s GroupSize = %d, want %d", testCase.decl, got, testCase.want)
+			}
+		})
+	}
+}

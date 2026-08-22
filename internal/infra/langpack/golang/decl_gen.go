@@ -76,6 +76,8 @@ func buildAtomicGroup(
 
 	var decls []entities.Decl
 
+	size := len(groupNames(decl))
+
 	for _, spec := range decl.Specs {
 		vs, ok := spec.(*ast.ValueSpec)
 		if !ok {
@@ -84,10 +86,11 @@ func buildAtomicGroup(
 
 		for _, name := range vs.Names {
 			decls = append(decls, entities.Decl{
-				Key:      entities.DeclKey{File: path, Kind: kind, Name: name.Name},
-				Unit:     unit,
-				Span:     span,
-				Selector: locationOf(fset, path, source, name.Pos()),
+				Key:       entities.DeclKey{File: path, Kind: kind, Name: name.Name},
+				Unit:      unit,
+				Span:      span,
+				Selector:  locationOf(fset, path, source, name.Pos()),
+				GroupSize: size,
 			})
 		}
 	}
@@ -154,6 +157,12 @@ func buildValueSpecs(
 ) []entities.Decl {
 	var decls []entities.Decl
 
+	// A grouped block is one thought even when it binds two names: an enum of
+	// two members is as indivisible as one of twenty-seven. Counting siblings
+	// per FILE gets that wrong the moment a file holds two enums, or one enum
+	// beside a loose constant.
+	size := len(groupNames(decl))
+
 	for _, spec := range decl.Specs {
 		vs, ok := spec.(*ast.ValueSpec)
 		if !ok {
@@ -169,9 +178,10 @@ func buildValueSpecs(
 					Kind: entities.KindValue,
 					Name: valueName(fset, source, vs, name),
 				},
-				Unit:     unit,
-				Span:     spanOf(fset, start, vs.End()),
-				Selector: locationOf(fset, path, source, name.Pos()),
+				Unit:      unit,
+				Span:      spanOf(fset, start, vs.End()),
+				Selector:  locationOf(fset, path, source, name.Pos()),
+				GroupSize: size,
 			})
 		}
 	}
