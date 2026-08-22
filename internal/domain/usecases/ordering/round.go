@@ -19,8 +19,8 @@ func (e *engine) converge(roundLimit int) (int, error) {
 	}
 
 	return roundLimit, fmt.Errorf(
-		"%w: fixed point did not converge within %d rounds",
-		apperr.ErrIncomplete, roundLimit,
+		"%w: %w within %d rounds",
+		apperr.ErrIncomplete, ErrNotConverged, roundLimit,
 	)
 }
 

@@ -19,6 +19,30 @@ type Config struct {
 	RoundLimit int
 }
 
+// defaultSlack and defaultRoundLimit are the values the previous rebuild
+// settled on: eight spare positions past the source history's end, and a
+// round guard far above the 109 to 467 rounds real runs converged in.
+const (
+	defaultSlack      = 8
+	defaultRoundLimit = 2000
+)
+
+// withDefaults fills a zero Config. Without it a caller that forgets to set
+// RoundLimit gets a loop that never executes and an ordering that is nothing
+// but its own seed - which still returns a full map of positions and so looks
+// exactly like a settled one.
+func (c Config) withDefaults() Config {
+	if c.Slack < 1 {
+		c.Slack = defaultSlack
+	}
+
+	if c.RoundLimit < 1 {
+		c.RoundLimit = defaultRoundLimit
+	}
+
+	return c
+}
+
 // Orderer turns a Graph plus a Snapshot into an Ordering by monotone fixed
 // point: a declaration only ever moves later inside the loop, never earlier.
 // Cycles are named with the reasons that formed them rather than hidden, and
@@ -30,8 +54,14 @@ type Orderer struct {
 
 // New builds an Orderer from its Config.
 func New(config Config) Orderer {
-	return Orderer{config: config}
+	return Orderer{config: config.withDefaults()}
 }
+
+// ErrNotConverged reports a fixed point that hit its round guard. It is fatal
+// where a cycle or an unresolved declaration is not: those come with a settled
+// ordering a caller can still act on, while this one comes with an ordering
+// that never settled at all.
+var ErrNotConverged = errors.New("fixed point did not converge")
 
 // UnresolvedError names the declarations still pinned at limit after
 // convergence: a real unresolved dependency, not a warning. Use errors.As to

@@ -278,3 +278,73 @@ func TestOrderIsMonotoneAboveBase(t *testing.T) {
 		}
 	}
 }
+
+// TestConfigDefaults pins the failure this package shipped once: a zero
+// RoundLimit makes converge's loop never execute, so the fixed point returns
+// its own seed. That still looks like a settled ordering from outside - a full
+// map of positions, every declaration placed - and every measure downstream
+// then describes nothing.
+func TestConfigDefaults(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		in             Config
+		wantSlack      int
+		wantRoundLimit int
+	}{
+		{"a zero config is filled, never left to disable the loop", Config{}, 8, 2000},
+		{"negative is filled too", Config{Slack: -1, RoundLimit: -1}, 8, 2000},
+		{"explicit values are kept", Config{Slack: 3, RoundLimit: 7}, 3, 7},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := testCase.in.withDefaults()
+			if got.Slack != testCase.wantSlack || got.RoundLimit != testCase.wantRoundLimit {
+				t.Fatalf("withDefaults() = %+v, want slack %d limit %d",
+					got, testCase.wantSlack, testCase.wantRoundLimit)
+			}
+		})
+	}
+}
+
+// TestOrderWithZeroConfigStillSettles is the end-to-end guard: a caller that
+// passes Config{} must get a real fixed point, not a seed wearing one's
+// clothes.
+func TestOrderWithZeroConfigStillSettles(t *testing.T) {
+	t.Parallel()
+
+	provider := entities.Decl{
+		Key:  entities.DeclKey{File: "a/lib.go", Kind: entities.KindFunc, Name: "Provide"},
+		Unit: "a",
+	}
+	dependent := entities.Decl{
+		Key:  entities.DeclKey{File: "b/app.go", Kind: entities.KindFunc, Name: "Use"},
+		Unit: "b",
+	}
+
+	graph := entities.NewGraph(
+		[]entities.Decl{provider, dependent},
+		[]entities.Edge{{
+			Dependent: dependent.Key,
+			Provider:  provider.Key,
+			Reason:    entities.ReasonReference,
+		}},
+		nil,
+	)
+
+	got, err := New(Config{}).Order(graph, entities.Snapshot{
+		Files:   []string{"a/lib.go", "b/app.go"},
+		History: []entities.SourceTouch{{Position: 0, Touched: []string{"a/lib.go", "b/app.go"}}},
+	})
+	if err != nil {
+		t.Fatalf("Order() = %v", err)
+	}
+
+	if got.Rounds < 1 {
+		t.Fatalf("Rounds = %d, want the fixed point to have actually run", got.Rounds)
+	}
+}
