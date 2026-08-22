@@ -40,9 +40,17 @@ type reportLine struct {
 	// alone cannot tell a declaration nothing reads from one its own package
 	// uses constantly, and the difference is what separates an ordering
 	// question from a declaration that maybe should not exist.
-	InsideFanout int         `json:"inside_fanout"`
-	TestFanout   int         `json:"test_fanout"`
-	Readers      []readerDTO `json:"readers"`
+	InsideFanout int `json:"inside_fanout"`
+	TestFanout   int `json:"test_fanout"`
+	// Subject is what a test exercises, and it is the ONLY thing a test may
+	// be placed by. A test has no meaningful reader: following first_read for
+	// one moves it away from the function it covers and leaves that function
+	// untested at the position it is born. Non-test rows carry null here.
+	Subject *readerDTO `json:"subject"`
+	// SubjectGap is how far after its subject a test was born. Negative means
+	// the test is born BEFORE what it exercises, which cannot compile.
+	SubjectGap int         `json:"subject_gap"`
+	Readers    []readerDTO `json:"readers"`
 }
 
 // runReport writes one JSON object per declaration, ordered by how far it sits
@@ -96,6 +104,7 @@ func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 
 func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 	lines := make([]reportLine, 0, graph.Len())
+	subjects := subjectsOf(graph, births)
 
 	for _, decl := range graph.Decls() {
 		born, dated := births.At[decl.Key]
@@ -122,6 +131,11 @@ func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 			first := readers[0]
 			line.FirstRead = &first
 			line.Gap = first.At - int(born)
+		}
+
+		if subject, anchored := subjects[decl.Key]; anchored {
+			line.Subject = &subject
+			line.SubjectGap = int(born) - subject.At
 		}
 
 		lines = append(lines, line)
@@ -209,4 +223,38 @@ func insideAndTestFanout(graph entities.Graph, decl entities.Decl) (inside, byTe
 	}
 
 	return inside, byTests
+}
+
+// subjectsOf maps a test declaration to the declaration it exercises, from the
+// anchors a language pack produced. The link exists because nothing else
+// establishes it: a test names its subject by convention, not by a reference a
+// resolver can follow, and pairing on the FILE instead dates every test in it
+// to whatever the file was born with.
+func subjectsOf(graph entities.Graph, births indexing.Births) map[entities.DeclKey]readerDTO {
+	out := map[entities.DeclKey]readerDTO{}
+
+	for _, anchor := range graph.Anchors() {
+		if anchor.Reason != entities.ReasonTestOf {
+			continue
+		}
+
+		at, dated := births.At[anchor.To]
+		if !dated {
+			at = entities.NoPosition
+		}
+
+		unit := ""
+		if subject, known := graph.Decl(anchor.To); known {
+			unit = string(subject.Unit)
+		}
+
+		out[anchor.Decl] = readerDTO{
+			Decl:   anchor.To.String(),
+			At:     int(at),
+			Reason: string(anchor.Reason),
+			Unit:   unit,
+		}
+	}
+
+	return out
 }
