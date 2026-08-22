@@ -58,33 +58,59 @@ func New(resolver Resolver, tree Tree, cfg Config) Indexer {
 }
 
 // Index reads every file the configured languages own and returns the graph.
-func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (entities.Graph, error) {
+// maxBlindRatio is how much of the graph may rest on an unanswered question
+// before the result is refused. Tolerating a few refusals keeps a run useful;
+// tolerating most of them hands back a graph that looks like code with almost
+// no edges, which is the shape of a confident wrong answer.
+const (
+	maxBlindRatio = 0.10
+	asPercent     = 100
+)
+
+func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, error) {
 	if len(i.langs) == 0 {
-		return entities.Graph{}, fmt.Errorf("%w: no language configured", apperr.ErrIncomplete)
+		return Result{}, fmt.Errorf("%w: no language configured", apperr.ErrIncomplete)
 	}
 
 	decls, where, err := i.read(ctx, snap)
 	if err != nil {
-		return entities.Graph{}, err
+		return Result{}, err
 	}
 
 	if len(decls) == 0 {
-		return entities.Graph{}, fmt.Errorf(
+		return Result{}, fmt.Errorf(
 			"%w: no declaration found in %d files", apperr.ErrIncomplete, len(snap.Files),
 		)
 	}
 
-	edges, err := i.resolve(ctx, decls, where)
+	edges, blind, err := i.resolve(ctx, decls, where)
 	if err != nil {
-		return entities.Graph{}, err
+		return Result{}, err
 	}
 
 	ruleEdges, anchors, err := i.applyRules(ctx, snap, decls)
 	if err != nil {
-		return entities.Graph{}, err
+		return Result{}, err
 	}
 
-	return entities.NewGraph(decls, append(edges, ruleEdges...), anchors), nil
+	result := Result{
+		Graph: entities.NewGraph(decls, append(edges, ruleEdges...), anchors),
+		Blind: blind,
+	}
+
+	if ratio := result.BlindRatio(); ratio > maxBlindRatio {
+		return result, fmt.Errorf(
+			"%w: the resolver could not answer for %d of %d declarations (%.0f%%), starting at %s: %s",
+			apperr.ErrUnresolved,
+			len(blind),
+			result.Graph.Len(),
+			ratio*asPercent,
+			blind[0].Decl,
+			blind[0].Reason,
+		)
+	}
+
+	return result, nil
 }
 
 // read parses every owned file into declarations. Files are independent, so

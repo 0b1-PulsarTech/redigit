@@ -88,7 +88,7 @@ func TestIndexerReadsOnlyOwnedFiles(t *testing.T) {
 		Declarations(gomock.Any(), "a.go", gomock.Any()).
 		Return([]entities.Decl{goDecl("a.go", "One", 11, 24)}, nil)
 
-	graph, err := New(
+	result, err := New(
 		quietResolver(ctrl),
 		tree,
 		Config{Languages: []Language{{Name: "go", Extensions: []string{".go"}, Syntax: syntax}}},
@@ -97,8 +97,8 @@ func TestIndexerReadsOnlyOwnedFiles(t *testing.T) {
 		t.Fatalf("Index() = %v", err)
 	}
 
-	if graph.Len() != 1 {
-		t.Fatalf("graph holds %d declarations, want 1", graph.Len())
+	if result.Graph.Len() != 1 {
+		t.Fatalf("graph holds %d declarations, want 1", result.Graph.Len())
 	}
 }
 
@@ -138,16 +138,6 @@ func unparsableFile(ctrl *gomock.Controller, boom error) failingParts {
 	return failingParts{tree: tree, syntax: syntax, resolver: quietResolver(ctrl)}
 }
 
-func silentResolver(ctrl *gomock.Controller, boom error) failingParts {
-	tree, syntax := onlyOneDecl(ctrl)
-
-	resolver := NewMockResolver(ctrl)
-	resolver.EXPECT().References(gomock.Any(), gomock.Any()).Return(nil, boom).AnyTimes()
-	resolver.EXPECT().Implementations(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-
-	return failingParts{tree: tree, syntax: syntax, resolver: resolver}
-}
-
 func failingRules(ctrl *gomock.Controller, boom error) failingParts {
 	tree, syntax := onlyOneDecl(ctrl)
 
@@ -168,7 +158,6 @@ func TestIndexerPropagatesFailures(t *testing.T) {
 	}{
 		{"a file that cannot be read stops the run", unreadableTree},
 		{"a file that cannot be parsed stops the run", unparsableFile},
-		{"a resolver that cannot answer stops the run rather than guessing", silentResolver},
 		{"a rule pack that fails stops the run", failingRules},
 	}
 
@@ -230,7 +219,7 @@ func TestIndexerAppliesRuleEdgesAndAnchors(t *testing.T) {
 		nil,
 	)
 
-	graph, err := New(quietResolver(ctrl), tree, Config{Languages: []Language{{
+	result, err := New(quietResolver(ctrl), tree, Config{Languages: []Language{{
 		Name:       "go",
 		Extensions: []string{".go"},
 		Syntax:     syntax,
@@ -246,12 +235,13 @@ func TestIndexerAppliesRuleEdgesAndAnchors(t *testing.T) {
 	// A mock satisfies its interface structurally, so nothing a resolver can
 	// see connects the two. If the rule pack's edge did not survive, the mock
 	// is free to be born before the port it mirrors.
-	needs := graph.Needs(mock.Key)
+	needs := result.Graph.Needs(mock.Key)
 	if len(needs) != 1 || needs[0].Reason != entities.ReasonMirrors {
 		t.Fatalf("mock needs %v, want one mirrors edge", needs)
 	}
 
-	if anchors := graph.Anchors(); len(anchors) != 1 || anchors[0].Reason != entities.ReasonTestOf {
+	if anchors := result.Graph.Anchors(); len(anchors) != 1 ||
+		anchors[0].Reason != entities.ReasonTestOf {
 		t.Fatalf("anchors = %v, want one test-of anchor", anchors)
 	}
 }

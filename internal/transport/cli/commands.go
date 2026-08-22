@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 )
 
 // settled runs the two stages every command needs. The ordering is returned
@@ -17,10 +19,14 @@ func settled(
 	ctx context.Context,
 	pipeline *bootstrap.Pipeline,
 ) (entities.Graph, entities.Ordering, error) {
-	graph, err := pipeline.Graph(ctx)
+	result, err := pipeline.Graph(ctx)
 	if err != nil {
 		return entities.Graph{}, entities.Ordering{}, fmt.Errorf("build graph: %w", err)
 	}
+
+	warnBlind(result)
+
+	graph := result.Graph
 
 	order, err := pipeline.Order(graph)
 	if err != nil && order.At == nil {
@@ -144,4 +150,22 @@ func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 			Unplaced: toKeys(plan.Unplaced),
 		})
 	})
+}
+
+// warnBlind names what the resolver could not answer. It goes to the log
+// rather than the output stream so a report stays machine-readable, but it is
+// never dropped: a graph missing edges looks exactly like code with fewer
+// edges, and only this line tells them apart.
+func warnBlind(result indexing.Result) {
+	if len(result.Blind) == 0 {
+		return
+	}
+
+	slog.Warn(
+		"the resolver could not answer for some declarations",
+		slog.Int("count", len(result.Blind)),
+		slog.Int("of", result.Graph.Len()),
+		slog.String("first", result.Blind[0].Decl.String()),
+		slog.String("query", result.Blind[0].Query),
+	)
 }

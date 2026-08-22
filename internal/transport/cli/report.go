@@ -48,10 +48,14 @@ type reportLine struct {
 // nearly empty, which is precisely the measurement that breaks a move.
 func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 	return withPipeline(ctx, cfg, func(pipeline *bootstrap.Pipeline) error {
-		graph, err := pipeline.Graph(ctx)
+		result, err := pipeline.Graph(ctx)
 		if err != nil {
 			return fmt.Errorf("build graph: %w", err)
 		}
+
+		warnBlind(result)
+
+		graph := result.Graph
 
 		births, err := pipeline.Births(ctx)
 		if err != nil {

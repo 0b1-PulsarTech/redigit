@@ -23,10 +23,11 @@ func (i Indexer) resolve(
 	ctx context.Context,
 	decls []entities.Decl,
 	where locator,
-) ([]entities.Edge, error) {
+) ([]entities.Edge, []Blind, error) {
 	var (
 		guard sync.Mutex
 		edges []entities.Edge
+		blind []Blind
 	)
 
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -34,29 +35,28 @@ func (i Indexer) resolve(
 
 	for _, decl := range decls {
 		group.Go(func() error {
-			found, err := i.edgesOf(groupCtx, decl, where)
-			if err != nil {
-				return err
-			}
+			found, missed := i.edgesOf(groupCtx, decl, where)
 
 			guard.Lock()
 			defer guard.Unlock()
 
 			edges = append(edges, found...)
+			blind = append(blind, missed...)
 
 			return nil
 		})
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, fmt.Errorf("resolve edges: %w", err)
+		return nil, nil, fmt.Errorf("resolve edges: %w", err)
 	}
 
 	slices.SortFunc(edges, compareEdges)
+	slices.SortFunc(blind, func(a, b Blind) int { return compareKeys(a.Decl, b.Decl) })
 
 	return slices.CompactFunc(edges, func(a, b entities.Edge) bool {
 		return compareEdges(a, b) == 0
-	}), nil
+	}), blind, nil
 }
 
 func compareEdges(a, b entities.Edge) int {
@@ -71,14 +71,22 @@ func compareEdges(a, b entities.Edge) int {
 	return cmp.Compare(string(a.Reason), string(b.Reason))
 }
 
+// edgesOf asks the resolver about one declaration. A query the server cannot
+// answer is recorded as a blind spot rather than ending the run: a language
+// server refuses individual symbols for reasons of its own (a test-variant
+// package, a file it never loaded), and letting one refusal discard the other
+// ten thousand answers is worse than saying which ten it could not give.
+// Silence would be worse still, which is why the misses are returned.
 func (i Indexer) edgesOf(
 	ctx context.Context,
 	decl entities.Decl,
 	where locator,
-) ([]entities.Edge, error) {
+) ([]entities.Edge, []Blind) {
+	var blind []Blind
+
 	readers, err := i.resolver.References(ctx, decl.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("find references to %s: %w", decl.Key, err)
+		blind = append(blind, Blind{Decl: decl.Key, Query: "references", Reason: err.Error()})
 	}
 
 	edges := i.edgesFrom(readers, decl.Key, entities.ReasonReference, where)
@@ -92,18 +100,20 @@ func (i Indexer) edgesOf(
 	// answers with an error rather than an empty list, so the question is not
 	// asked where it has no meaning.
 	if !canBeImplemented(decl.Key.Kind) {
-		return edges, nil
+		return edges, blind
 	}
 
 	implementors, err := i.resolver.Implementations(ctx, decl.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("find implementations of %s: %w", decl.Key, err)
+		blind = append(blind, Blind{Decl: decl.Key, Query: "implementations", Reason: err.Error()})
+
+		return edges, blind
 	}
 
 	return append(
 		edges,
 		i.edgesFrom(implementors, decl.Key, entities.ReasonImplements, where)...,
-	), nil
+	), blind
 }
 
 func canBeImplemented(kind entities.DeclKind) bool {

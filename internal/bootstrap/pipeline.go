@@ -114,13 +114,13 @@ func (p *Pipeline) Births(ctx context.Context) (indexing.Births, error) {
 }
 
 // Graph indexes the snapshot.
-func (p *Pipeline) Graph(ctx context.Context) (entities.Graph, error) {
-	graph, err := p.indexer.Index(ctx, p.snapshot)
+func (p *Pipeline) Graph(ctx context.Context) (indexing.Result, error) {
+	result, err := p.indexer.Index(ctx, p.snapshot)
 	if err != nil {
-		return entities.Graph{}, fmt.Errorf("index: %w", err)
+		return result, fmt.Errorf("index: %w", err)
 	}
 
-	return graph, nil
+	return result, nil
 }
 
 // Order settles the graph. The ordering is returned even alongside an error:

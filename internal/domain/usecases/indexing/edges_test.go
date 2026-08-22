@@ -90,9 +90,13 @@ func TestIndexerResolveDeduplicates(t *testing.T) {
 
 	indexer := New(resolver, nil, Config{Concurrency: 1})
 
-	edges, err := indexer.resolve(context.Background(), []entities.Decl{one, two}, where)
+	edges, blind, err := indexer.resolve(context.Background(), []entities.Decl{one, two}, where)
 	if err != nil {
 		t.Fatalf("resolve() = %v", err)
+	}
+
+	if len(blind) != 0 {
+		t.Fatalf("blind = %v, want none", blind)
 	}
 
 	if len(edges) != 1 {
