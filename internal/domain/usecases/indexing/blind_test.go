@@ -165,3 +165,67 @@ func TestImplementationsAskedOnlyOfInterfaces(t *testing.T) {
 		t.Fatalf("blind = %v, want none", blind)
 	}
 }
+
+// TestIdenticalInterfacesDoNotDependOnEachOther pins the artifact that turned
+// eleven groups of unrelated ports into cycles. A house style that declares
+// every port at the consumer ends up with the same small interface written in
+// a dozen packages; each satisfies all the others by method set alone, and
+// keeping those edges makes every copy appear to depend on every other.
+func TestIdenticalInterfacesDoNotDependOnEachOther(t *testing.T) {
+	t.Parallel()
+
+	first := entities.Decl{
+		Key:         entities.DeclKey{File: "a/port.go", Kind: entities.KindType, Name: "Coder"},
+		Unit:        "a",
+		Span:        entities.Span{Start: 0, End: 40},
+		Selector:    entities.Location{File: "a/port.go", Line: 0, Char: 5},
+		IsInterface: true,
+	}
+	second := entities.Decl{
+		Key:         entities.DeclKey{File: "b/port.go", Kind: entities.KindType, Name: "Coder"},
+		Unit:        "b",
+		Span:        entities.Span{Start: 0, End: 40},
+		Selector:    entities.Location{File: "b/port.go", Line: 0, Char: 5},
+		IsInterface: true,
+	}
+	impl := entities.Decl{
+		Key:      entities.DeclKey{File: "c/repo.go", Kind: entities.KindType, Name: "Repo"},
+		Unit:     "c",
+		Span:     entities.Span{Start: 0, End: 40},
+		Selector: entities.Location{File: "c/repo.go", Line: 0, Char: 5},
+	}
+
+	where := newLocator()
+	for _, decl := range []entities.Decl{first, second, impl} {
+		where.add(decl.Key.File, []byte("package x\n\ntype T interface{}\n"), []entities.Decl{decl})
+	}
+
+	ctrl := gomock.NewController(t)
+
+	resolver := NewMockResolver(ctrl)
+	resolver.EXPECT().References(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	// A server answering about one port names the identical port next door
+	// alongside the concrete type, because both satisfy it.
+	resolver.EXPECT().
+		Implementations(gomock.Any(), first.Selector).
+		Return([]entities.Location{second.Selector, impl.Selector}, nil)
+	resolver.EXPECT().
+		Implementations(gomock.Any(), second.Selector).
+		Return([]entities.Location{first.Selector, impl.Selector}, nil)
+
+	edges, _, err := New(resolver, nil, Config{Concurrency: 1}).
+		resolve(context.Background(), []entities.Decl{first, second, impl}, where)
+	if err != nil {
+		t.Fatalf("resolve() = %v", err)
+	}
+
+	for _, edge := range edges {
+		if edge.Dependent == first.Key || edge.Dependent == second.Key {
+			t.Fatalf("an interface was made to depend on another: %v", edge)
+		}
+	}
+
+	if len(edges) != 2 {
+		t.Fatalf("edges = %v, want only the concrete type depending on each port", edges)
+	}
+}

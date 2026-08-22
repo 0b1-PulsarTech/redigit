@@ -30,12 +30,20 @@ func (i Indexer) resolve(
 		blind []Blind
 	)
 
+	interfaces := make(map[entities.DeclKey]bool, len(decls))
+
+	for _, decl := range decls {
+		if decl.IsInterface {
+			interfaces[decl.Key] = true
+		}
+	}
+
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(i.limit)
 
 	for _, decl := range decls {
 		group.Go(func() error {
-			found, missed := i.edgesOf(groupCtx, decl, where)
+			found, missed := i.edgesOf(groupCtx, decl, where, interfaces)
 
 			guard.Lock()
 			defer guard.Unlock()
@@ -81,6 +89,7 @@ func (i Indexer) edgesOf(
 	ctx context.Context,
 	decl entities.Decl,
 	where locator,
+	interfaces map[entities.DeclKey]bool,
 ) ([]entities.Edge, []Blind) {
 	var blind []Blind
 
@@ -111,10 +120,34 @@ func (i Indexer) edgesOf(
 		return edges, blind
 	}
 
-	return append(
-		edges,
-		i.edgesFrom(implementors, decl.Key, entities.ReasonImplements, where)...,
-	), blind
+	satisfying := i.edgesFrom(implementors, decl.Key, entities.ReasonImplements, where)
+
+	return append(edges, dropInterfaceToInterface(satisfying, interfaces)...), blind
+}
+
+// dropInterfaceToInterface removes an edge whose dependent is itself an
+// interface. One interface satisfies another whenever their method sets match,
+// and a codebase that declares its ports at the consumer ends up with the same
+// small interface written in a dozen packages. Keeping those edges makes every
+// copy appear to depend on every other and fabricates a cycle out of types that
+// never reference each other at all. Real embedding is a different thing and is
+// already carried by a reference edge, because the embedding interface names
+// the embedded one.
+func dropInterfaceToInterface(
+	edges []entities.Edge,
+	interfaces map[entities.DeclKey]bool,
+) []entities.Edge {
+	kept := edges[:0:0]
+
+	for _, edge := range edges {
+		if interfaces[edge.Dependent] {
+			continue
+		}
+
+		kept = append(kept, edge)
+	}
+
+	return kept
 }
 
 // edgesFrom turns resolver locations into edges pointing at provider. A
