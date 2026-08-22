@@ -28,14 +28,21 @@ type readerDTO struct {
 // while one twelve scattered callers read is residue, and only the fan-out
 // tells them apart.
 type reportLine struct {
-	Decl      string      `json:"decl"`
-	Unit      string      `json:"unit"`
-	IsTest    bool        `json:"is_test"`
-	BornAt    int         `json:"born_at"`
-	FirstRead *readerDTO  `json:"first_read"`
-	Gap       int         `json:"gap"`
-	Fanout    int         `json:"fanout"`
-	Readers   []readerDTO `json:"readers"`
+	Decl      string     `json:"decl"`
+	Unit      string     `json:"unit"`
+	IsTest    bool       `json:"is_test"`
+	BornAt    int        `json:"born_at"`
+	FirstRead *readerDTO `json:"first_read"`
+	Gap       int        `json:"gap"`
+	Fanout    int        `json:"fanout"`
+	// InsideFanout counts readers in the declaration's OWN unit, and
+	// TestFanout counts readers that are tests, wherever they live. Fanout
+	// alone cannot tell a declaration nothing reads from one its own package
+	// uses constantly, and the difference is what separates an ordering
+	// question from a declaration that maybe should not exist.
+	InsideFanout int         `json:"inside_fanout"`
+	TestFanout   int         `json:"test_fanout"`
+	Readers      []readerDTO `json:"readers"`
 }
 
 // runReport writes one JSON object per declaration, ordered by how far it sits
@@ -97,15 +104,18 @@ func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 		}
 
 		readers := readersOf(graph, births, decl.Key)
+		inside, byTests := insideAndTestFanout(graph, decl)
 
 		line := reportLine{
-			Decl:    decl.Key.String(),
-			Unit:    string(decl.Unit),
-			IsTest:  decl.IsTest,
-			BornAt:  int(born),
-			Fanout:  len(readers),
-			Readers: readers,
-			Gap:     0,
+			Decl:         decl.Key.String(),
+			Unit:         string(decl.Unit),
+			IsTest:       decl.IsTest,
+			BornAt:       int(born),
+			Fanout:       len(readers),
+			InsideFanout: inside,
+			TestFanout:   byTests,
+			Readers:      readers,
+			Gap:          0,
 		}
 
 		if len(readers) > 0 {
@@ -168,4 +178,35 @@ func readersOf(
 	})
 
 	return out
+}
+
+// insideAndTestFanout counts, separately, the readers in a declaration's own
+// unit and the readers that are tests. A declaration with no reader of any
+// kind is a different finding from one its own package leans on, and neither
+// is visible from the external count alone.
+func insideAndTestFanout(graph entities.Graph, decl entities.Decl) (inside, byTests int) {
+	seen := map[entities.DeclKey]bool{}
+
+	for _, edge := range graph.Consumers(decl.Key) {
+		if seen[edge.Dependent] {
+			continue
+		}
+
+		seen[edge.Dependent] = true
+
+		reader, known := graph.Decl(edge.Dependent)
+		if !known {
+			continue
+		}
+
+		if reader.Unit == decl.Unit {
+			inside++
+		}
+
+		if reader.IsTest {
+			byTests++
+		}
+	}
+
+	return inside, byTests
 }
