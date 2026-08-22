@@ -8,9 +8,15 @@ import (
 )
 
 // buildGenDecl expands a const/var/type declaration into one Decl per bound
-// name, except a const group with an iota-implicit spec (no type, no value),
-// which stays one atomic Decl: splitting it would change what an untouched
-// constant evaluates to.
+// name. A const group with an iota-implicit spec (no type, no value) still
+// RENDERS whole, because splitting it would change what an untouched constant
+// evaluates to - but every name in it gets its own Decl anyway.
+//
+// Identity and rendering unit are not the same thing. Naming the group after
+// its first constant left every later one with no key at all: nothing asked
+// who referenced them, no birth was ever recorded for them, and a consumer
+// looking one up found nothing and fell back to the file's own birth. That put
+// a constant that appears late at the position where its file was created.
 func buildGenDecl(
 	fset *token.FileSet,
 	source []byte,
@@ -25,9 +31,7 @@ func buildGenDecl(
 		return buildTypeSpecs(fset, path, source, unit, decl)
 	case token.CONST:
 		if hasImplicitSpec(decl) {
-			return []entities.Decl{
-				buildAtomicGroup(fset, path, source, unit, entities.KindValue, decl),
-			}
+			return buildAtomicGroup(fset, path, source, unit, entities.KindValue, decl)
 		}
 
 		return buildValueSpecs(fset, source, path, unit, decl)
@@ -60,46 +64,54 @@ func buildAtomicGroup(
 	unit entities.UnitID,
 	kind entities.DeclKind,
 	decl *ast.GenDecl,
-) entities.Decl {
-	name := groupName(decl)
+) []entities.Decl {
 	start := decl.Pos()
-
 	if decl.Doc != nil {
 		start = decl.Doc.Pos()
 	}
 
-	return entities.Decl{
-		Key:      entities.DeclKey{File: path, Kind: kind, Name: name},
-		Unit:     unit,
-		Span:     spanOf(fset, start, decl.End()),
-		Selector: locationOf(fset, path, source, groupNamePos(decl)),
+	// Every name shares the group's span, so whichever one a plan names, the
+	// renderer emits the whole group and the constants keep their values.
+	span := spanOf(fset, start, decl.End())
+
+	var decls []entities.Decl
+
+	for _, spec := range decl.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+
+		for _, name := range vs.Names {
+			decls = append(decls, entities.Decl{
+				Key:      entities.DeclKey{File: path, Kind: kind, Name: name.Name},
+				Unit:     unit,
+				Span:     span,
+				Selector: locationOf(fset, path, source, name.Pos()),
+			})
+		}
 	}
+
+	return decls
 }
 
-func groupName(decl *ast.GenDecl) string {
-	if len(decl.Specs) == 0 {
-		return ""
+// groupNames lists every name an atomic group binds, so the renderer can keep
+// the group when a plan names any one of them.
+func groupNames(decl *ast.GenDecl) []string {
+	var names []string
+
+	for _, spec := range decl.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+
+		for _, name := range vs.Names {
+			names = append(names, name.Name)
+		}
 	}
 
-	vs, ok := decl.Specs[0].(*ast.ValueSpec)
-	if !ok || len(vs.Names) == 0 {
-		return ""
-	}
-
-	return vs.Names[0].Name
-}
-
-func groupNamePos(decl *ast.GenDecl) token.Pos {
-	if len(decl.Specs) == 0 {
-		return decl.Pos()
-	}
-
-	vs, ok := decl.Specs[0].(*ast.ValueSpec)
-	if !ok || len(vs.Names) == 0 {
-		return decl.Pos()
-	}
-
-	return vs.Names[0].Pos()
+	return names
 }
 
 func buildTypeSpecs(

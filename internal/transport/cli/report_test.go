@@ -168,3 +168,66 @@ func TestInTestFileIsWiderThanIsTest(t *testing.T) {
 		})
 	}
 }
+
+// TestInInterfaceMarksTheWholeMethodSet pins a field that changes what fanout
+// means. A method nobody references may still be required: removing it stops
+// its type from satisfying an interface, and the compiler complains at a
+// conversion the file itself does not mention. Zero readers there is the
+// opposite of safe to move.
+func TestInInterfaceMarksTheWholeMethodSet(t *testing.T) {
+	t.Parallel()
+
+	port := entities.Decl{
+		Key:         entities.DeclKey{File: "a/port.go", Kind: entities.KindType, Name: "Reader"},
+		Unit:        "a",
+		IsInterface: true,
+	}
+	// The type is declared in one file and its method in another, which is why
+	// the lookup keys on the unit rather than the file.
+	impl := entities.Decl{
+		Key:  entities.DeclKey{File: "b/repo.go", Kind: entities.KindType, Name: "Repo"},
+		Unit: "b",
+	}
+	method := entities.Decl{
+		Key:  entities.DeclKey{File: "b/read.go", Kind: entities.KindMethod, Name: "Repo.Read"},
+		Unit: "b",
+	}
+	loose := entities.Decl{
+		Key:  entities.DeclKey{File: "b/util.go", Kind: entities.KindFunc, Name: "Helper"},
+		Unit: "b",
+	}
+
+	graph := entities.NewGraph(
+		[]entities.Decl{port, impl, method, loose},
+		[]entities.Edge{
+			{Dependent: impl.Key, Provider: port.Key, Reason: entities.ReasonImplements},
+		},
+		nil,
+	)
+
+	byKey := map[string]reportLine{}
+	for _, line := range reportLines(graph, indexing.Births{}) {
+		byKey[line.Decl] = line
+	}
+
+	testCases := []struct {
+		name string
+		key  entities.DeclKey
+		want bool
+	}{
+		{"the satisfying type", impl.Key, true},
+		{"a method of it, declared in another file of the same unit", method.Key, true},
+		{"a loose function of the same unit", loose.Key, false},
+		{"the interface itself is not bound by anyone else's method set", port.Key, false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := byKey[testCase.key.String()].InInterface; got != testCase.want {
+				t.Fatalf("in_interface = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

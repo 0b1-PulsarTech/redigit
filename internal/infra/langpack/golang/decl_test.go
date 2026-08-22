@@ -2,6 +2,7 @@ package golang
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -281,7 +282,7 @@ var _ io.Reader = (*ReaderB)(nil)
 	}
 }
 
-func TestSyntaxDeclarationsGroupedConstStaysAtomic(t *testing.T) {
+func TestSyntaxDeclarationsNamesEveryIotaConstant(t *testing.T) {
 	t.Parallel()
 
 	const src = `package sample
@@ -295,27 +296,87 @@ const (
 )
 `
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := NewSyntax().Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
 
 	var values []entities.Decl
 
-	for _, d := range decls {
-		if d.Key.Kind == entities.KindValue {
-			values = append(values, d)
+	for _, decl := range decls {
+		if decl.Key.Kind == entities.KindValue {
+			values = append(values, decl)
 		}
 	}
 
-	if len(values) != 1 {
-		t.Fatalf("iota group should stay one atomic declaration, got %d: %v", len(values), values)
+	// Naming the group after its first constant left Monday and Tuesday with
+	// no key at all: nothing ever asked who referenced them, no birth was
+	// recorded, and a consumer looking one up fell back to the file's birth -
+	// which dates a constant that appears late to the day its file was made.
+	if len(values) != 3 {
+		t.Fatalf("got %d value declarations, want one per constant: %v", len(values), values)
 	}
 
-	if values[0].Key.Name != "Sunday" {
-		t.Fatalf("atomic group name = %q, want %q", values[0].Key.Name, "Sunday")
+	names := map[string]entities.Span{}
+	for _, decl := range values {
+		names[decl.Key.Name] = decl.Span
+	}
+
+	for _, want := range []string{"Sunday", "Monday", "Tuesday"} {
+		if _, found := names[want]; !found {
+			t.Fatalf("%s has no declaration of its own", want)
+		}
+	}
+
+	// They still share one span, which is what keeps the block whole when it
+	// is rendered: an unwritten iota constant takes its value from where it
+	// sits, so the block cannot be cut.
+	if names["Sunday"] != names["Tuesday"] {
+		t.Fatalf("spans differ (%v vs %v); the group would be splittable",
+			names["Sunday"], names["Tuesday"])
+	}
+}
+
+// TestRenderKeepsAnIotaGroupFromAnyMember pins the other half: naming any one
+// constant of the block renders the whole block.
+func TestRenderKeepsAnIotaGroupFromAnyMember(t *testing.T) {
+	t.Parallel()
+
+	const src = `package sample
+
+const (
+	Sunday int = iota
+	Monday
+	Tuesday
+)
+`
+
+	testCases := []struct {
+		name string
+		keep string
+	}{
+		{"the first constant", "Sunday"},
+		{"a middle one", "Monday"},
+		{"the last", "Tuesday"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			out, err := NewSyntax().Render(context.Background(), []byte(src), []entities.DeclKey{
+				{File: "sample.go", Kind: entities.KindValue, Name: testCase.keep},
+			})
+			if err != nil {
+				t.Fatalf("Render() = %v", err)
+			}
+
+			for _, want := range []string{"Sunday", "Monday", "Tuesday"} {
+				if !strings.Contains(string(out), want) {
+					t.Fatalf("keeping %s dropped %s:\n%s", testCase.keep, want, out)
+				}
+			}
+		})
 	}
 }
 

@@ -53,7 +53,13 @@ type reportLine struct {
 	// be placed by. A test has no meaningful reader: following first_read for
 	// one moves it away from the function it covers and leaves that function
 	// untested at the position it is born. Non-test rows carry null here.
-	Subject *readerDTO `json:"subject"`
+	// InInterface marks a declaration whose type satisfies some interface. It
+	// changes what fanout MEANS: a method nobody references may still be
+	// required, because removing it stops its type from satisfying the
+	// interface, and the compiler says so at a conversion the file does not
+	// mention. Zero readers there is the opposite of safe to move.
+	InInterface bool       `json:"in_interface"`
+	Subject     *readerDTO `json:"subject"`
 	// SubjectGap is how far after its subject a test was born. Negative means
 	// the test is born BEFORE what it exercises, which cannot compile.
 	SubjectGap int         `json:"subject_gap"`
@@ -112,6 +118,7 @@ func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 	lines := make([]reportLine, 0, graph.Len())
 	subjects := subjectsOf(graph, births)
+	satisfying := satisfyingTypes(graph)
 
 	for _, decl := range graph.Decls() {
 		born, dated := births.At[decl.Key]
@@ -131,6 +138,7 @@ func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 			Fanout:       len(readers),
 			InsideFanout: inside,
 			TestFanout:   byTests,
+			InInterface:  inInterface(satisfying, decl),
 			Readers:      readers,
 			Gap:          0,
 		}
@@ -265,4 +273,39 @@ func subjectsOf(graph entities.Graph, births indexing.Births) map[entities.DeclK
 	}
 
 	return out
+}
+
+// satisfyingTypes names every type that satisfies some interface, keyed by its
+// unit and name so a method can be matched to its receiver even when the type
+// is declared in another file of the same package.
+func satisfyingTypes(graph entities.Graph) map[string]bool {
+	out := map[string]bool{}
+
+	for _, edge := range graph.Edges() {
+		if edge.Reason != entities.ReasonImplements {
+			continue
+		}
+
+		if decl, known := graph.Decl(edge.Dependent); known {
+			out[string(decl.Unit)+"."+decl.Key.Name] = true
+		}
+	}
+
+	return out
+}
+
+// inInterface reports whether a declaration is bound to an interface: the type
+// itself, or a method of a type that satisfies one.
+func inInterface(satisfying map[string]bool, decl entities.Decl) bool {
+	name := decl.Key.Name
+	if decl.Key.Kind == entities.KindMethod {
+		receiver, _, found := strings.Cut(name, ".")
+		if !found {
+			return false
+		}
+
+		name = receiver
+	}
+
+	return satisfying[string(decl.Unit)+"."+name]
 }

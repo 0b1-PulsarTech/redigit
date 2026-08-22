@@ -25,8 +25,13 @@ func filterGenDecl(
 	}
 
 	if d.Tok == token.CONST && hasImplicitSpec(d) {
-		if keepSet[declIdent{entities.KindValue, groupName(d)}] {
-			return []ast.Decl{d}
+		// Any surviving name keeps the whole group: an iota constant that is
+		// not written down still takes its value from its position in the
+		// block, so the block cannot be cut.
+		for _, name := range groupNames(d) {
+			if keepSet[declIdent{entities.KindValue, name}] {
+				return []ast.Decl{d}
+			}
 		}
 
 		return nil
