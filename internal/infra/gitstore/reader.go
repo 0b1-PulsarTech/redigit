@@ -3,6 +3,7 @@ package gitstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,7 +14,13 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 )
 
-var _ indexing.Tree = Reader{}
+var (
+	_ indexing.Tree         = Reader{}
+	_ indexing.RevisionTree = Reader{}
+)
+
+// ErrAbsentAtRevision reports a path a revision does not hold.
+var ErrAbsentAtRevision = errors.New("path absent at revision")
 
 // Reader reads a Snapshot out of a real git repository at Ref: the final
 // tree's file list, the source history's per-position touch list, and a
@@ -64,6 +71,18 @@ func (r Reader) Modes(ctx context.Context) (map[string]FileMode, error) {
 	out := make(map[string]FileMode, len(entries))
 	for _, entry := range entries {
 		out[entry.path] = entry.mode
+	}
+
+	return out, nil
+}
+
+// ReadAt returns a path's content at one revision. A path the revision does
+// not hold reports ErrAbsentAtRevision rather than an empty file, so a caller
+// scanning history can tell "deleted here" from "empty here".
+func (r Reader) ReadAt(ctx context.Context, rev, path string) ([]byte, error) {
+	out, err := runGit(ctx, r.RepoPath, "cat-file", "-p", rev+":"+path)
+	if err != nil {
+		return nil, fmt.Errorf("%s at %s: %w", path, rev, ErrAbsentAtRevision)
 	}
 
 	return out, nil
@@ -153,10 +172,11 @@ func parseHistory(out []byte) []entities.SourceTouch {
 			continue
 		}
 
-		_, rest, _ := bytes.Cut(chunk, []byte{'\n'})
+		sha, rest, _ := bytes.Cut(chunk, []byte{'\n'})
 
 		history = append(history, entities.SourceTouch{
 			Position: entities.Position(len(history)),
+			Rev:      string(bytes.TrimSpace(sha)),
 			Touched:  splitNUL(rest),
 		})
 	}

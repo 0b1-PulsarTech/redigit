@@ -23,10 +23,6 @@ func TestSession_References_RequiresBuildTag(t *testing.T) {
 	dir := t.TempDir()
 	writeFixtureModule(t, dir)
 
-	rootURI, err := pathToURI(dir)
-	if err != nil {
-		t.Fatalf("pathToURI: %v", err)
-	}
 	// "func Target() {}" on the third line (0-based line 2); "Target"
 	// starts right after "func ".
 	at := entities.Location{File: filepath.Join(dir, "normal.go"), Line: 2, Char: 5}
@@ -58,7 +54,7 @@ func TestSession_References_RequiresBuildTag(t *testing.T) {
 			session, err := StartSession(ctx, ServerConfig{
 				Command:    "gopls",
 				Args:       []string{"-mode=stdio"},
-				RootURI:    rootURI,
+				RootPath:   dir,
 				BuildFlags: testCase.buildFlags,
 			})
 			if err != nil {

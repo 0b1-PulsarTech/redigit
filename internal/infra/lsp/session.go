@@ -9,6 +9,8 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -36,8 +38,11 @@ type ServerConfig struct {
 	// Command and Args launch the server, e.g. "gopls", []string{"-mode=stdio"}.
 	Command string
 	Args    []string
-	// RootURI is the file:// URI of the workspace root passed to initialize.
-	RootURI string
+	// RootPath is the workspace root directory. It is a plain path, not a
+	// URI: encoding one is this package's job, not a caller's, and a caller
+	// that has to build "file://..." by hand will eventually get a space or a
+	// drive letter wrong.
+	RootPath string
 	// BuildFlags is REQUIRED and explicit on purpose: gopls answers
 	// references/implementation/workspace-symbol only for files visible
 	// under these flags, silently and without error otherwise. Passing
@@ -82,6 +87,13 @@ type Session struct {
 	// cmd.Wait/cmd.Process.Kill, tests wire them to a fake transport.
 	wait func() error
 	kill func() error
+
+	// root is the workspace directory. Paths cross this package's boundary
+	// repo-relative, the way the rest of the tool names a file, and are
+	// absolute inside it, the way the protocol requires. Joining and
+	// un-joining here is the adapter absorbing the difference; a caller that
+	// had to remember which side it was on would eventually get it wrong.
+	root string
 
 	positionEncoding string
 }
@@ -201,7 +213,7 @@ func (s *Session) References(
 	ctx context.Context,
 	at entities.Location,
 ) ([]entities.Location, error) {
-	position, err := textDocumentPositionParams(at)
+	position, err := s.textDocumentPositionParams(at)
 	if err != nil {
 		return nil, fmt.Errorf("references: %w", err)
 	}
@@ -218,7 +230,7 @@ func (s *Session) References(
 		return nil, fmt.Errorf("references: %w", err)
 	}
 
-	return toEntityLocations(result)
+	return s.toEntityLocations(result)
 }
 
 // Implementations implements indexing.Resolver.
@@ -226,7 +238,7 @@ func (s *Session) Implementations(
 	ctx context.Context,
 	at entities.Location,
 ) ([]entities.Location, error) {
-	params, err := textDocumentPositionParams(at)
+	params, err := s.textDocumentPositionParams(at)
 	if err != nil {
 		return nil, fmt.Errorf("implementations: %w", err)
 	}
@@ -236,12 +248,12 @@ func (s *Session) Implementations(
 		return nil, fmt.Errorf("implementations: %w", err)
 	}
 
-	return toEntityLocations(result)
+	return s.toEntityLocations(result)
 }
 
 // Definition implements indexing.Resolver.
 func (s *Session) Definition(ctx context.Context, at entities.Location) (entities.Location, error) {
-	params, err := textDocumentPositionParams(at)
+	params, err := s.textDocumentPositionParams(at)
 	if err != nil {
 		return entities.Location{}, fmt.Errorf("definition: %w", err)
 	}
@@ -255,7 +267,7 @@ func (s *Session) Definition(ctx context.Context, at entities.Location) (entitie
 		return entities.Location{}, fmt.Errorf("definition: %w", ErrNoDefinition)
 	}
 
-	found, err := toEntityLocation(result[0])
+	found, err := s.toEntityLocation(result[0])
 	if err != nil {
 		return entities.Location{}, fmt.Errorf("definition: %w", err)
 	}
@@ -352,9 +364,25 @@ func (s *Session) waitOrKill(ctx context.Context) error {
 }
 
 func (s *Session) initialize(ctx context.Context, cfg ServerConfig) error {
+	s.root = cfg.RootPath
+
+	// rootUri is nullable in the protocol, so a session with no workspace
+	// root is legitimate. Only a non-empty path that is not absolute is a
+	// caller mistake worth refusing.
+	var rootURI string
+
+	if cfg.RootPath != "" {
+		encoded, err := pathToURI(cfg.RootPath)
+		if err != nil {
+			return fmt.Errorf("initialize: %w", err)
+		}
+
+		rootURI = encoded
+	}
+
 	params := InitializeParams{
 		ProcessID: os.Getpid(),
-		RootURI:   cfg.RootURI,
+		RootURI:   rootURI,
 		Capabilities: ClientCapabilities{
 			General: GeneralClientCapabilities{
 				PositionEncodings: []string{defaultPositionEncoding},
@@ -384,8 +412,10 @@ func (s *Session) initialize(ctx context.Context, cfg ServerConfig) error {
 	return nil
 }
 
-func textDocumentPositionParams(at entities.Location) (TextDocumentPositionParams, error) {
-	uri, err := pathToURI(at.File)
+func (s *Session) textDocumentPositionParams(
+	at entities.Location,
+) (TextDocumentPositionParams, error) {
+	uri, err := pathToURI(s.absolute(at.File))
 	if err != nil {
 		return TextDocumentPositionParams{}, err
 	}
@@ -396,24 +426,24 @@ func textDocumentPositionParams(at entities.Location) (TextDocumentPositionParam
 	}, nil
 }
 
-func toEntityLocation(l Location) (entities.Location, error) {
+func (s *Session) toEntityLocation(l Location) (entities.Location, error) {
 	path, err := uriToPath(l.URI)
 	if err != nil {
 		return entities.Location{}, err
 	}
 
 	return entities.Location{
-		File: path,
+		File: s.relative(path),
 		Line: l.Range.Start.Line,
 		Char: l.Range.Start.Character,
 	}, nil
 }
 
-func toEntityLocations(ls []Location) ([]entities.Location, error) {
+func (s *Session) toEntityLocations(ls []Location) ([]entities.Location, error) {
 	out := make([]entities.Location, 0, len(ls))
 
 	for _, l := range ls {
-		converted, err := toEntityLocation(l)
+		converted, err := s.toEntityLocation(l)
 		if err != nil {
 			return nil, err
 		}
@@ -437,4 +467,30 @@ func (w *stderrLog) Write(p []byte) (int, error) {
 	w.logger.Debug("lsp: server stderr", slog.String("message", string(p)))
 
 	return len(p), nil
+}
+
+// absolute resolves a repo-relative path against the workspace root. An
+// already-absolute path is returned unchanged, so a caller working outside a
+// workspace is not forced to invent one.
+func (s *Session) absolute(path string) string {
+	if s.root == "" || filepath.IsAbs(path) {
+		return path
+	}
+
+	return filepath.Join(s.root, path)
+}
+
+// relative is the inverse, so a location leaves this package named the way the
+// rest of the tool names files.
+func (s *Session) relative(path string) string {
+	if s.root == "" {
+		return path
+	}
+
+	rel, err := filepath.Rel(s.root, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return path
+	}
+
+	return rel
 }

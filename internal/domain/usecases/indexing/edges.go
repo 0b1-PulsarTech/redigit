@@ -87,6 +87,14 @@ func (i Indexer) edgesOf(
 	// implementation package need not import the package whose interface it
 	// satisfies, and the injector that resolves by method set is the reason
 	// that arrangement exists at all.
+	//
+	// Only a type or a method can have one, and a server asked about a value
+	// answers with an error rather than an empty list, so the question is not
+	// asked where it has no meaning.
+	if !canBeImplemented(decl.Key.Kind) {
+		return edges, nil
+	}
+
 	implementors, err := i.resolver.Implementations(ctx, decl.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("find implementations of %s: %w", decl.Key, err)
@@ -96,6 +104,10 @@ func (i Indexer) edgesOf(
 		edges,
 		i.edgesFrom(implementors, decl.Key, entities.ReasonImplements, where)...,
 	), nil
+}
+
+func canBeImplemented(kind entities.DeclKind) bool {
+	return kind == entities.KindType || kind == entities.KindMethod
 }
 
 // edgesFrom turns resolver locations into edges pointing at provider. A

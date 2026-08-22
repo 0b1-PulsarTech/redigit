@@ -8,7 +8,12 @@ import "slices"
 // the tool also has to work with no source history at all.
 type SourceTouch struct {
 	Position Position
-	Touched  []string
+	// Rev names the commit. It is kept because a declaration's real birth is
+	// the first commit whose version of the file already held it, and finding
+	// that means reading the file AT that commit - the file's first touch is
+	// only where its first few declarations were born.
+	Rev     string
+	Touched []string
 }
 
 // Snapshot is what the run reads: the final tree, and the source history when

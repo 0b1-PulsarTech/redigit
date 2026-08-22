@@ -17,6 +17,45 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockRevisionTree is a mock of RevisionTree interface.
+type MockRevisionTree struct {
+	ctrl     *gomock.Controller
+	recorder *MockRevisionTreeMockRecorder
+	isgomock struct{}
+}
+
+// MockRevisionTreeMockRecorder is the mock recorder for MockRevisionTree.
+type MockRevisionTreeMockRecorder struct {
+	mock *MockRevisionTree
+}
+
+// NewMockRevisionTree creates a new mock instance.
+func NewMockRevisionTree(ctrl *gomock.Controller) *MockRevisionTree {
+	mock := &MockRevisionTree{ctrl: ctrl}
+	mock.recorder = &MockRevisionTreeMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRevisionTree) EXPECT() *MockRevisionTreeMockRecorder {
+	return m.recorder
+}
+
+// ReadAt mocks base method.
+func (m *MockRevisionTree) ReadAt(ctx context.Context, rev, path string) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadAt", ctx, rev, path)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadAt indicates an expected call of ReadAt.
+func (mr *MockRevisionTreeMockRecorder) ReadAt(ctx, rev, path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAt", reflect.TypeOf((*MockRevisionTree)(nil).ReadAt), ctx, rev, path)
+}
+
 // MockResolver is a mock of Resolver interface.
 type MockResolver struct {
 	ctrl     *gomock.Controller

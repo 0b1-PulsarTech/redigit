@@ -122,7 +122,7 @@ func TestSession_Initialize(t *testing.T) {
 	session, server := fakeSession(t)
 	cfg := ServerConfig{
 		Command:    "fake",
-		RootURI:    "file:///repo",
+		RootPath:   "/repo",
 		BuildFlags: []string{"-tags=integration"},
 	}
 
@@ -488,5 +488,73 @@ func TestStartSession_EmptyCommand(t *testing.T) {
 	_, err := StartSession(context.Background(), ServerConfig{})
 	if !errors.Is(err, ErrEmptyCommand) {
 		t.Fatalf("err = %v, want ErrEmptyCommand", err)
+	}
+}
+
+func TestSession_Initialize_RootPath(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a relative root is refused before anything is sent", func(t *testing.T) {
+		t.Parallel()
+
+		session, _ := fakeSession(t)
+
+		err := session.initialize(
+			context.Background(),
+			ServerConfig{Command: "fake", RootPath: "repo"},
+		)
+		if !errors.Is(err, ErrRelativePath) {
+			t.Fatalf("initialize() = %v, want %v", err, ErrRelativePath)
+		}
+	})
+
+	testCases := []struct {
+		name    string
+		root    string
+		wantURI string
+	}{
+		{"an absolute root is encoded as a file uri", "/repo", "file:///repo"},
+		{
+			"a root with a space is encoded, not hand-built by the caller",
+			"/my repo",
+			"file:///my%20repo",
+		},
+		// rootUri is nullable in the protocol, so a session with no workspace
+		// root is legitimate rather than an error.
+		{"no root at all sends an empty uri", "", ""},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			session, server := fakeSession(t)
+
+			initDone := make(chan error, 1)
+			go func() {
+				initDone <- session.initialize(
+					context.Background(),
+					ServerConfig{Command: "fake", RootPath: testCase.root},
+				)
+			}()
+
+			req := server.next()
+
+			var params InitializeParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				t.Fatalf("unmarshal params: %v", err)
+			}
+
+			if params.RootURI != testCase.wantURI {
+				t.Fatalf("rootUri = %q, want %q", params.RootURI, testCase.wantURI)
+			}
+
+			server.respond(req.ID, InitializeResult{})
+			_ = server.next()
+
+			if err := <-initDone; err != nil {
+				t.Fatalf("initialize() = %v", err)
+			}
+		})
 	}
 }

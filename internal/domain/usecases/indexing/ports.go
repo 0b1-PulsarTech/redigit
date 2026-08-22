@@ -6,6 +6,15 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
+// RevisionTree reads a path's content at one revision of the source history.
+// It is separate from Tree because the two answer different questions: Tree
+// reads the FINAL text every intermediate version is rendered from, while this
+// reads what a commit actually held, which is how a declaration's real birth
+// is found.
+type RevisionTree interface {
+	ReadAt(ctx context.Context, rev, path string) ([]byte, error)
+}
+
 //go:generate go tool -modfile=../../../../tools/go.mod mockgen -source=ports.go -destination=ports_mock_test.go -package=indexing
 
 // Resolver answers the semantic questions exactly. Text matching is what this
