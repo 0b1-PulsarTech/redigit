@@ -1,3 +1,4 @@
 # Installed by pulsarules_cli
 /bin/
 /hooks/
+/worktrees/
