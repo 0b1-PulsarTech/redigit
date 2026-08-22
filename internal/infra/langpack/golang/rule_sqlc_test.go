@@ -1,0 +1,126 @@
+package golang
+
+import (
+	"context"
+	"path/filepath"
+	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+)
+
+func TestSqlcRuleEdges(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	writeFile(t, root, filepath.Join("database", "queries", "user.sql"), `-- name: GetUser :one
+SELECT id FROM users WHERE id = ?;
+
+-- name: ListUsers :many
+SELECT id FROM users;
+`)
+	writeFile(t, root, filepath.Join("dbgen", "user.sql.go"), `package dbgen
+
+func GetUser(id int) (User, error) { return User{}, nil }
+
+func ListUsers() ([]User, error) { return nil, nil }
+
+func Unrelated() {}
+`)
+
+	snap := entities.Snapshot{
+		Root:  root,
+		Files: []string{filepath.Join("database", "queries", "user.sql")},
+	}
+	syntax := NewSyntax()
+
+	decls := declareAll(t, syntax, root, []string{filepath.Join("dbgen", "user.sql.go")})
+
+	edges, err := sqlcRule{}.Edges(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() error = %v", err)
+	}
+
+	want := map[string]bool{"GetUser": false, "ListUsers": false}
+
+	for _, edge := range edges {
+		if edge.Reason != entities.ReasonQuery {
+			t.Fatalf("Reason = %v, want %v", edge.Reason, entities.ReasonQuery)
+		}
+
+		if _, tracked := want[edge.Dependent.Name]; tracked {
+			want[edge.Dependent.Name] = true
+		}
+
+		if edge.Provider.Kind != entities.KindOther ||
+			edge.Provider.File != filepath.Join("database", "queries", "user.sql") {
+			t.Fatalf("Provider = %+v, want a KindOther node in the query file", edge.Provider)
+		}
+	}
+
+	for name, found := range want {
+		if !found {
+			t.Fatalf("no edge for generated function %q", name)
+		}
+	}
+}
+
+func TestSqlcRuleNoQueryFilesNoEdges(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	writeFile(t, root, filepath.Join("dbgen", "user.sql.go"), `package dbgen
+
+func GetUser(id int) (User, error) { return User{}, nil }
+`)
+
+	snap := entities.Snapshot{Root: root}
+	syntax := NewSyntax()
+
+	decls := declareAll(t, syntax, root, []string{filepath.Join("dbgen", "user.sql.go")})
+
+	edges, err := sqlcRule{}.Edges(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() error = %v", err)
+	}
+
+	if len(edges) != 0 {
+		t.Fatalf("got %d edges with no query files, want 0", len(edges))
+	}
+}
+
+func TestExtractQueryNames(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{
+			"two queries",
+			"-- name: GetUser :one\nSELECT 1;\n\n-- name: ListUsers :many\nSELECT 1;\n",
+			[]string{"GetUser", "ListUsers"},
+		},
+		{"no queries", "SELECT 1;\n", nil},
+		{"indented marker is not matched (must be at line start)", "  -- name: Nope :one\n", nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := extractQueryNames([]byte(testCase.source))
+			if len(got) != len(testCase.want) {
+				t.Fatalf("extractQueryNames() = %v, want %v", got, testCase.want)
+			}
+
+			for i, name := range got {
+				if name != testCase.want[i] {
+					t.Fatalf("extractQueryNames()[%d] = %q, want %q", i, name, testCase.want[i])
+				}
+			}
+		})
+	}
+}

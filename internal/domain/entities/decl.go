@@ -60,9 +60,16 @@ type Span struct {
 	End   int
 }
 
-// Location addresses a point in a file the way a language server does. Char is
-// an offset within the line whose unit depends on the encoding negotiated with
-// the server, so it is never treated as a byte offset.
+// Location addresses a point in a file the way a language server does: Line is
+// zero-based, and Char counts UTF-16 CODE UNITS from the start of the line, not
+// bytes and not runes.
+//
+// The unit is stated here because it is invisible at the call site and wrong
+// silently: a server asked at a byte column answers about a different character
+// on any line holding a non-ASCII one, and reports nothing amiss. gopls never
+// advertises positionEncoding at all, so there is no handshake to read it from.
+// Whoever produces a Location converts; whoever consumes one may not assume
+// bytes.
 type Location struct {
 	File string
 	Line int
