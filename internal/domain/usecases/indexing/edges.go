@@ -96,10 +96,11 @@ func (i Indexer) edgesOf(
 	// satisfies, and the injector that resolves by method set is the reason
 	// that arrangement exists at all.
 	//
-	// Only a type or a method can have one, and a server asked about a value
-	// answers with an error rather than an empty list, so the question is not
-	// asked where it has no meaning.
-	if !canBeImplemented(decl.Key.Kind) {
+	// The question is asked ONLY of an interface. A server answers it in both
+	// directions - implementations of an interface, and interfaces a concrete
+	// type satisfies - and keeping the answer either way inverts half the
+	// edges: the interface would come out depending on whatever implements it.
+	if !decl.IsInterface {
 		return edges, blind
 	}
 
@@ -114,10 +115,6 @@ func (i Indexer) edgesOf(
 		edges,
 		i.edgesFrom(implementors, decl.Key, entities.ReasonImplements, where)...,
 	), blind
-}
-
-func canBeImplemented(kind entities.DeclKind) bool {
-	return kind == entities.KindType || kind == entities.KindMethod
 }
 
 // edgesFrom turns resolver locations into edges pointing at provider. A

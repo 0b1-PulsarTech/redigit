@@ -118,3 +118,50 @@ func TestResultBlindRatio(t *testing.T) {
 		})
 	}
 }
+
+// TestImplementationsAskedOnlyOfInterfaces pins the direction of an
+// implementation edge. A server answers the question both ways; keeping the
+// answer for a concrete type would emit an edge saying the interface depends
+// on whatever satisfies it, which is backwards and puts a stable library
+// behind a test stub in another module.
+func TestImplementationsAskedOnlyOfInterfaces(t *testing.T) {
+	t.Parallel()
+
+	port := entities.Decl{
+		Key:         entities.DeclKey{File: "a.go", Kind: entities.KindType, Name: "Reader"},
+		Unit:        "a",
+		Selector:    entities.Location{File: "a.go", Line: 2, Char: 5},
+		IsInterface: true,
+	}
+	impl := entities.Decl{
+		Key:      entities.DeclKey{File: "b.go", Kind: entities.KindType, Name: "Repo"},
+		Unit:     "b",
+		Selector: entities.Location{File: "b.go", Line: 2, Char: 5},
+	}
+
+	ctrl := gomock.NewController(t)
+
+	resolver := NewMockResolver(ctrl)
+	resolver.EXPECT().References(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	// Only the interface may be asked. Any call for the concrete type fails
+	// the expectation, which is the point of the test.
+	resolver.EXPECT().
+		Implementations(gomock.Any(), port.Selector).
+		Return(nil, nil).
+		Times(1)
+
+	indexer := New(resolver, nil, Config{Concurrency: 1})
+
+	_, blind, err := indexer.resolve(
+		context.Background(),
+		[]entities.Decl{port, impl},
+		newLocator(),
+	)
+	if err != nil {
+		t.Fatalf("resolve() = %v", err)
+	}
+
+	if len(blind) != 0 {
+		t.Fatalf("blind = %v, want none", blind)
+	}
+}

@@ -86,4 +86,14 @@ type Decl struct {
 	Span     Span
 	Selector Location
 	IsTest   bool
+	// IsInterface marks a declaration whose implementations can be asked for.
+	// The question is only meaningful in one direction: a type that satisfies
+	// an interface depends on it, never the reverse. A language server answers
+	// implementation queries BOTH ways, so asking about a concrete type and
+	// keeping the answer inverts the relationship and makes a stable library
+	// look like it depends on a test stub.
+	//
+	// A pack that leaves this false loses implementation edges rather than
+	// inventing backwards ones, which is the safe direction to fail in.
+	IsInterface bool
 }

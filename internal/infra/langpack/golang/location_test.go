@@ -162,3 +162,59 @@ func TestDeclarationlessFileRendersEmptyBeforeItIsBorn(t *testing.T) {
 		t.Fatalf("Render() = %q, want nothing", rendered)
 	}
 }
+
+// TestInterfaceIsMarked pins the flag that decides which way an implementation
+// edge points. Asking a language server about a concrete type answers with the
+// interfaces it satisfies, and keeping that answer as though the concrete type
+// were the provider makes a stable library depend on whatever implements it.
+func TestInterfaceIsMarked(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(`package a
+
+type Reader interface{ Read() error }
+
+type Repo struct{}
+
+func (Repo) Read() error { return nil }
+
+type Alias = Reader
+
+type Names []string
+`)
+
+	decls, err := NewSyntax().Declarations(context.Background(), "a.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	marked := map[string]bool{}
+	for _, decl := range decls {
+		marked[decl.Key.Name] = decl.IsInterface
+	}
+
+	testCases := []struct {
+		name string
+		decl string
+		want bool
+	}{
+		{"an interface is marked", "Reader", true},
+		{"a struct is not", "Repo", false},
+		{"a named slice is not", "Names", false},
+		{
+			"an alias to an interface is not marked; the server answers about the alias",
+			"Alias",
+			false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := marked[testCase.decl]; got != testCase.want {
+				t.Fatalf("%s IsInterface = %v, want %v", testCase.decl, got, testCase.want)
+			}
+		})
+	}
+}

@@ -119,11 +119,14 @@ func buildTypeSpecs(
 
 		start := specStart(decl, ts.Doc, ts.Pos())
 
+		_, isInterface := ts.Type.(*ast.InterfaceType)
+
 		decls = append(decls, entities.Decl{
-			Key:      entities.DeclKey{File: path, Kind: entities.KindType, Name: ts.Name.Name},
-			Unit:     unit,
-			Span:     spanOf(fset, start, ts.End()),
-			Selector: locationOf(fset, path, source, ts.Name.Pos()),
+			Key:         entities.DeclKey{File: path, Kind: entities.KindType, Name: ts.Name.Name},
+			Unit:        unit,
+			Span:        spanOf(fset, start, ts.End()),
+			Selector:    locationOf(fset, path, source, ts.Name.Pos()),
+			IsInterface: isInterface,
 		})
 	}
 
