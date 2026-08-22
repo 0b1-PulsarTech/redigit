@@ -98,6 +98,8 @@ func (i Indexer) edgesOf(
 		blind = append(blind, Blind{Decl: decl.Key, Query: "references", Reason: err.Error()})
 	}
 
+	readers = i.directCallsOnly(ctx, decl, readers)
+
 	edges := i.edgesFrom(readers, decl.Key, entities.ReasonReference, where)
 
 	// Structural satisfaction is invisible to an import graph: an
@@ -176,4 +178,52 @@ func (i Indexer) edgesFrom(
 	}
 
 	return edges
+}
+
+// directCallsOnly drops the call sites that reach a method through an
+// interface rather than through this concrete type.
+//
+// A server asked who references a concrete method answers with every call
+// written against an interface the method satisfies, because any of the
+// implementations could be the one that runs. For ordering that is wrong in
+// both directions: it inflates how many things read the method, and it makes
+// sibling implementations appear to reference each other, which fabricates a
+// cycle out of types that never mention one another. The seven Error methods
+// of one package all "referenced" each other for exactly this reason, through
+// a single `e.Err.Error()` written against the error interface.
+//
+// The test is not a name heuristic: ask what the call site actually resolves
+// to. Resolving back to this declaration means the call names it; resolving
+// anywhere else means the call names an interface, and the edge belongs to
+// that interface, not here.
+func (i Indexer) directCallsOnly(
+	ctx context.Context,
+	decl entities.Decl,
+	readers []entities.Location,
+) []entities.Location {
+	// Only a method can be reached through an interface. A function, a type
+	// or a value is named directly or not at all.
+	if decl.Key.Kind != entities.KindMethod || len(readers) == 0 {
+		return readers
+	}
+
+	kept := readers[:0:0]
+
+	for _, at := range readers {
+		target, err := i.resolver.Definition(ctx, at)
+		if err != nil {
+			// An unanswerable definition is not evidence of dispatch, so the
+			// call site is kept. Losing a real edge is worse than keeping a
+			// doubtful one here, because the doubtful one only delays.
+			kept = append(kept, at)
+
+			continue
+		}
+
+		if target.File == decl.Selector.File && target.Line == decl.Selector.Line {
+			kept = append(kept, at)
+		}
+	}
+
+	return kept
 }

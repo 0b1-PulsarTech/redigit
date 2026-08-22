@@ -229,3 +229,108 @@ func TestIdenticalInterfacesDoNotDependOnEachOther(t *testing.T) {
 		t.Fatalf("edges = %v, want only the concrete type depending on each port", edges)
 	}
 }
+
+// TestInterfaceDispatchDoesNotLinkSiblings pins the criterion a peer working
+// this data proved out: a call written against an interface must not become an
+// edge to every concrete method that satisfies it. Seven sibling Error methods
+// all appeared to reference each other because one line called e.Err.Error()
+// on an error-typed field.
+func TestInterfaceDispatchDoesNotLinkSiblings(t *testing.T) {
+	t.Parallel()
+
+	method := entities.Decl{
+		Key: entities.DeclKey{
+			File: "a/err.go",
+			Kind: entities.KindMethod,
+			Name: "Conflict.Error",
+		},
+		Unit:     "a",
+		Span:     entities.Span{Start: 0, End: 60},
+		Selector: entities.Location{File: "a/err.go", Line: 3, Char: 20},
+	}
+
+	direct := entities.Location{File: "b/use.go", Line: 9, Char: 4}
+	viaInterface := entities.Location{File: "a/other.go", Line: 12, Char: 8}
+
+	ctrl := gomock.NewController(t)
+
+	resolver := NewMockResolver(ctrl)
+	// The direct call resolves back to this method.
+	resolver.EXPECT().Definition(gomock.Any(), direct).Return(method.Selector, nil)
+	// The interface call resolves to the interface's own method, elsewhere.
+	resolver.EXPECT().
+		Definition(gomock.Any(), viaInterface).
+		Return(entities.Location{File: "builtin/error.go", Line: 1, Char: 1}, nil)
+
+	indexer := New(resolver, nil, Config{Concurrency: 1})
+
+	got := indexer.directCallsOnly(context.Background(), method, []entities.Location{
+		direct, viaInterface,
+	})
+
+	if len(got) != 1 || got[0] != direct {
+		t.Fatalf("directCallsOnly() = %v, want only the direct call", got)
+	}
+}
+
+func TestDirectCallsOnlyLeavesOtherKindsAlone(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	// A resolver with no Definition expectation: calling it would fail the
+	// test, which is how "not asked" is asserted.
+	resolver := NewMockResolver(ctrl)
+	indexer := New(resolver, nil, Config{Concurrency: 1})
+
+	at := entities.Location{File: "b/use.go", Line: 9, Char: 4}
+
+	testCases := []struct {
+		name string
+		kind entities.DeclKind
+	}{
+		{"a function is named directly or not at all", entities.KindFunc},
+		{"so is a type", entities.KindType},
+		{"so is a value", entities.KindValue},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decl := entities.Decl{
+				Key: entities.DeclKey{File: "a.go", Kind: testCase.kind, Name: "X"},
+			}
+
+			got := indexer.directCallsOnly(context.Background(), decl, []entities.Location{at})
+			if len(got) != 1 {
+				t.Fatalf("directCallsOnly() = %v, want the reference untouched", got)
+			}
+		})
+	}
+}
+
+func TestDirectCallsOnlyKeepsWhatItCannotResolve(t *testing.T) {
+	t.Parallel()
+
+	method := entities.Decl{
+		Key:      entities.DeclKey{File: "a.go", Kind: entities.KindMethod, Name: "T.Do"},
+		Selector: entities.Location{File: "a.go", Line: 1, Char: 1},
+	}
+	at := entities.Location{File: "b.go", Line: 2, Char: 2}
+
+	ctrl := gomock.NewController(t)
+
+	resolver := NewMockResolver(ctrl)
+	resolver.EXPECT().
+		Definition(gomock.Any(), at).
+		Return(entities.Location{}, errors.New("no definition"))
+
+	got := New(resolver, nil, Config{Concurrency: 1}).
+		directCallsOnly(context.Background(), method, []entities.Location{at})
+
+	// An unanswerable definition is not evidence of dispatch. Dropping the
+	// edge here would move a declaration ahead of something that does read it.
+	if len(got) != 1 {
+		t.Fatalf("directCallsOnly() = %v, want the doubtful reference kept", got)
+	}
+}
