@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -28,13 +29,19 @@ type readerDTO struct {
 // while one twelve scattered callers read is residue, and only the fan-out
 // tells them apart.
 type reportLine struct {
-	Decl      string     `json:"decl"`
-	Unit      string     `json:"unit"`
-	IsTest    bool       `json:"is_test"`
-	BornAt    int        `json:"born_at"`
-	FirstRead *readerDTO `json:"first_read"`
-	Gap       int        `json:"gap"`
-	Fanout    int        `json:"fanout"`
+	Decl string `json:"decl"`
+	Unit string `json:"unit"`
+	// IsTest marks a test FUNCTION. InTestFile marks anything living in a
+	// test file, which is a wider and more dangerous class: a stub method on
+	// a fake is not a test function, has no subject to follow, and is read
+	// only by its own package. Judging it by an external reader moves it away
+	// from the tests that use it.
+	IsTest     bool       `json:"is_test"`
+	InTestFile bool       `json:"in_test_file"`
+	BornAt     int        `json:"born_at"`
+	FirstRead  *readerDTO `json:"first_read"`
+	Gap        int        `json:"gap"`
+	Fanout     int        `json:"fanout"`
 	// InsideFanout counts readers in the declaration's OWN unit, and
 	// TestFanout counts readers that are tests, wherever they live. Fanout
 	// alone cannot tell a declaration nothing reads from one its own package
@@ -119,6 +126,7 @@ func reportLines(graph entities.Graph, births indexing.Births) []reportLine {
 			Decl:         decl.Key.String(),
 			Unit:         string(decl.Unit),
 			IsTest:       decl.IsTest,
+			InTestFile:   strings.HasSuffix(decl.Key.File, "_test.go"),
 			BornAt:       int(born),
 			Fanout:       len(readers),
 			InsideFanout: inside,
