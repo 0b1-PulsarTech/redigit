@@ -15,6 +15,20 @@ type RevisionTree interface {
 	ReadAt(ctx context.Context, rev, path string) ([]byte, error)
 }
 
+// Chunker splits a file that is not source code into the pieces that can be
+// born apart. A query file holding twenty statements is a Go file holding
+// twenty functions: if the first commit reads three, three is what should be
+// born, and the file-shaped alternative drags seventeen nobody reads yet.
+//
+// Handles reports whether this chunker claims a path. A path no chunker claims
+// still becomes one whole-file piece, because a file with no reader for its
+// format is still a file the final tree needs.
+type Chunker interface {
+	Name() string
+	Handles(path string) bool
+	Chunks(ctx context.Context, path string, source []byte) ([]entities.Decl, error)
+}
+
 //go:generate go tool -modfile=../../../../tools/go.mod mockgen -source=ports.go -destination=ports_mock_test.go -package=indexing
 
 // Resolver answers the semantic questions exactly. Text matching is what this

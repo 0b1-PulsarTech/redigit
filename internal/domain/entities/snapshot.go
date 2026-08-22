@@ -51,3 +51,19 @@ func (s Snapshot) FirstTouch(path string) Position {
 
 	return first
 }
+
+// ChunkSpan is one piece a caller carved out of a file the tool has no reader
+// for. Name identifies the piece the way a declaration name does.
+type ChunkSpan struct {
+	Name string
+	Span Span
+}
+
+// ChunkMap is a chunking supplied from outside, keyed by repo-relative path.
+//
+// It exists because guessing how to split an unknown format is worse than not
+// splitting it, and because whoever operates this tool knows things it does
+// not. The caller says WHERE the cuts go; the tool makes them without missing a
+// byte. Anything a map leaves uncovered becomes a piece of its own, so nothing
+// disappears because a span forgot it.
+type ChunkMap map[string][]ChunkSpan

@@ -38,8 +38,16 @@ const (
 	// from, which lives in a file the language graph does not cover at all.
 	ReasonQuery EdgeReason = "query"
 	// ReasonHosts keeps a declaration behind the manifest that makes its unit
-	// importable at all.
+	// importable at all: a module file, a workspace entry, a build file.
 	ReasonHosts EdgeReason = "hosts"
+	// ReasonDescribes keeps prose beside what it describes, for the case where
+	// a document belongs to one unit - a package README - rather than to the
+	// finished tree.
+	ReasonDescribes EdgeReason = "describes"
+	// ReasonProse holds back what is only true of the finished tree: general
+	// documentation, a pipeline definition, an agent instruction. Written about
+	// a whole that does not exist until the end, it belongs at the end.
+	ReasonProse EdgeReason = "prose"
 )
 
 // Edge records that Dependent cannot be born before Provider. The field names

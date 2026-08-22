@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockRevisionTree is a mock of RevisionTree interface.
@@ -55,6 +54,73 @@ func (m *MockRevisionTree) ReadAt(ctx context.Context, rev, path string) ([]byte
 func (mr *MockRevisionTreeMockRecorder) ReadAt(ctx, rev, path any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAt", reflect.TypeOf((*MockRevisionTree)(nil).ReadAt), ctx, rev, path)
+}
+
+// MockChunker is a mock of Chunker interface.
+type MockChunker struct {
+	ctrl     *gomock.Controller
+	recorder *MockChunkerMockRecorder
+	isgomock struct{}
+}
+
+// MockChunkerMockRecorder is the mock recorder for MockChunker.
+type MockChunkerMockRecorder struct {
+	mock *MockChunker
+}
+
+// NewMockChunker creates a new mock instance.
+func NewMockChunker(ctrl *gomock.Controller) *MockChunker {
+	mock := &MockChunker{ctrl: ctrl}
+	mock.recorder = &MockChunkerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockChunker) EXPECT() *MockChunkerMockRecorder {
+	return m.recorder
+}
+
+// Chunks mocks base method.
+func (m *MockChunker) Chunks(ctx context.Context, path string, source []byte) ([]entities.Decl, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Chunks", ctx, path, source)
+	ret0, _ := ret[0].([]entities.Decl)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Chunks indicates an expected call of Chunks.
+func (mr *MockChunkerMockRecorder) Chunks(ctx, path, source any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chunks", reflect.TypeOf((*MockChunker)(nil).Chunks), ctx, path, source)
+}
+
+// Handles mocks base method.
+func (m *MockChunker) Handles(path string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Handles", path)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Handles indicates an expected call of Handles.
+func (mr *MockChunkerMockRecorder) Handles(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handles", reflect.TypeOf((*MockChunker)(nil).Handles), path)
+}
+
+// Name mocks base method.
+func (m *MockChunker) Name() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Name")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Name indicates an expected call of Name.
+func (mr *MockChunkerMockRecorder) Name() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockChunker)(nil).Name))
 }
 
 // MockResolver is a mock of Resolver interface.
