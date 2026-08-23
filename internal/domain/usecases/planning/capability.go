@@ -8,13 +8,10 @@ import (
 )
 
 // Capabilities is a caller-supplied answer to which slice each declaration
-// belongs to, replacing the reachability walk.
-//
-// It exists because reachability answers a different question than the one a
-// history needs. Walking back from entry points asks "what does this handler
-// need", and on a real repository that left 28% of declarations reached by no
-// entry point at all and another 14% reached by several, so 42% landed in
-// layer commits with no slice of their own.
+// belongs to, replacing the reachability walk. Reachability asks "what does
+// this handler need", which on a real repository left 28% of declarations
+// reached by no entry point and 14% reached by several: 42% in layer commits
+// with no slice of their own.
 type Capabilities map[entities.DeclKey]FeatureID
 
 // ownershipFrom builds the ownership a caller supplied. Every declaration the
@@ -50,14 +47,11 @@ func ownershipFrom(capabilities Capabilities, graph entities.Graph) ownership {
 	return own
 }
 
-// emitByCapability walks every declaration once, in the order the fixed point
-// put them, and starts a new commit whenever the slice changes or MaxFiles is
-// reached.
-//
-// One pass, not a loop over slices: a slice's own members and what it pulls
-// from elsewhere have to interleave by position, because a declaration pulled
-// forward may itself need a member of the slice that pulled it. Emitting all
-// the pulled ones first put a provider after its dependent.
+// emitByCapability walks every declaration once in birth order, starting a new
+// commit whenever the slice changes or MaxFiles is reached. One pass, not a
+// loop over slices: a slice's members and what it pulls from elsewhere have to
+// interleave by position, because a pulled declaration may itself need a
+// member of the slice that pulled it.
 func (p Planner) emitByCapability(
 	graph entities.Graph,
 	order entities.Ordering,
@@ -68,13 +62,7 @@ func (p Planner) emitByCapability(
 		keys = append(keys, decl.Key)
 	}
 
-	slices.SortFunc(keys, func(a, b entities.DeclKey) int {
-		if left, right := order.Of(a), order.Of(b); left != right {
-			return cmp.Compare(left, right)
-		}
-
-		return cmp.Compare(a.String(), b.String())
-	})
+	keys = sortForBirth(graph, order, keys)
 
 	var plan entities.Plan
 

@@ -105,6 +105,7 @@ func (p Planner) emit(
 			plan.Commits = append(
 				plan.Commits,
 				p.cut(
+					graph,
 					order,
 					shared,
 					entities.ShapeLayer,
@@ -119,6 +120,7 @@ func (p Planner) emit(
 		plan.Commits = append(
 			plan.Commits,
 			p.cut(
+				graph,
 				order,
 				members,
 				entities.ShapeFeature,
@@ -136,7 +138,9 @@ func (p Planner) emit(
 	if rest := remaining(graph, born); len(rest) > 0 {
 		plan.Commits = append(
 			plan.Commits,
-			p.cut(order, rest, entities.ShapeLayer, SharedFeature, "reached by no entry point")...,
+			p.cut(
+				graph, order, rest, entities.ShapeLayer, SharedFeature, "reached by no entry point",
+			)...,
 		)
 
 		markBorn(born, rest)
@@ -163,20 +167,14 @@ func (p Planner) emit(
 // declarations in the order the fixed point put them so a commit never carries
 // a reader ahead of what it reads.
 func (p Planner) cut(
+	graph entities.Graph,
 	order entities.Ordering,
 	keys []entities.DeclKey,
 	shape entities.CommitShape,
 	feature FeatureID,
 	reason string,
 ) []entities.PlannedCommit {
-	keys = slices.Clone(keys)
-	slices.SortFunc(keys, func(a, b entities.DeclKey) int {
-		if left, right := order.Of(a), order.Of(b); left != right {
-			return cmp.Compare(left, right)
-		}
-
-		return cmp.Compare(a.String(), b.String())
-	})
+	keys = sortForBirth(graph, order, keys)
 
 	var (
 		out     []entities.PlannedCommit

@@ -51,11 +51,8 @@ func TestPlannerKeepsACapabilityInItsOwnCommits(t *testing.T) {
 }
 
 // straddling builds the shape a caller's slicing can produce and reachability
-// cannot: the slice sequenced FIRST holds a declaration that reads one the
-// caller put in a LATER slice.
-//
-// base(0) and top(2) are one capability, mid(1) is another. The first slice
-// starts at 0, so it is emitted first, and its top reads a mid that no commit
+// cannot: base(0) and top(2) are one capability, mid(1) is another. The first
+// slice starts at 0 and is emitted first, and its top reads a mid no commit
 // has produced yet.
 func straddling() (entities.Graph, entities.Ordering, Capabilities, entities.Decl) {
 	base := decl("base/id.go", "NewID", "base")
@@ -193,5 +190,51 @@ func TestPlannerDoesNotRefuseMutuallyNeedingCapabilities(t *testing.T) {
 
 	if len(plan.Commits) == 0 {
 		t.Fatal("Plan() returned no commit")
+	}
+}
+
+// Two declarations the fixed point put at the SAME position, in different
+// capabilities, one needing the other. Falling back to the key inverts a real
+// dependency about half the time: this put "use ./modules/wabapi" nineteen
+// commits before its go.mod, because "go.work" sorts before "modules/".
+func TestPlannerOrdersATieByDependencyNotByName(t *testing.T) {
+	t.Parallel()
+
+	// The reader's key sorts BEFORE the provider's, so a name-ordered tie
+	// puts it first.
+	reader := decl("go.work", "use", "root")
+	provider := decl("modules/wabapi/go.mod", "module", "modules/wabapi")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{reader, provider},
+		[]entities.Edge{needs(reader, provider)},
+		nil,
+	)
+
+	order := entities.Ordering{At: map[entities.DeclKey]entities.Position{
+		reader.Key:   4,
+		provider.Key: 4,
+	}}
+
+	capabilities := Capabilities{reader.Key: "workspace", provider.Key: "wabapi"}
+
+	plan, err := New(Config{Capabilities: capabilities}).Plan(graph, order)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+	for _, commit := range plan.Commits {
+		for _, key := range commit.Decls {
+			bornAt[key] = int(commit.Position)
+		}
+	}
+
+	if bornAt[reader.Key] < bornAt[provider.Key] {
+		t.Fatalf(
+			"the reader is born at commit %d and what it needs at %d: a tie was ordered by "+
+				"name, and the name inverted the dependency",
+			bornAt[reader.Key], bornAt[provider.Key],
+		)
 	}
 }
