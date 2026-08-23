@@ -89,3 +89,63 @@ func TestOrderingLast(t *testing.T) {
 		})
 	}
 }
+
+func TestCycleSpansFiles(t *testing.T) {
+	t.Parallel()
+
+	inOneFile := func(names ...string) Cycle {
+		members := make([]DeclKey, 0, len(names))
+		for _, name := range names {
+			members = append(members, DeclKey{File: "mock_test.go", Kind: KindType, Name: name})
+		}
+
+		return Cycle{Members: members}
+	}
+
+	testCases := []struct {
+		name  string
+		cycle Cycle
+		want  bool
+	}{
+		{
+			// mockgen writes MockX and MockXMockRecorder into one file, each
+			// naming the other. It is mutual recursion, not an ordering
+			// failure: both land at the same position, in the same file.
+			name:  "a generated mock and its recorder",
+			cycle: inOneFile("MockRepo", "MockRepoMockRecorder"),
+			want:  false,
+		},
+		{
+			name:  "one member, no cycle to speak of",
+			cycle: inOneFile("Alone"),
+			want:  false,
+		},
+		{
+			name: "two files waiting on each other",
+			cycle: Cycle{Members: []DeclKey{
+				{File: "a.go", Kind: KindType, Name: "A"},
+				{File: "b.go", Kind: KindType, Name: "B"},
+			}},
+			want: true,
+		},
+		{
+			name: "a third member in another file",
+			cycle: Cycle{Members: []DeclKey{
+				{File: "a.go", Kind: KindType, Name: "A"},
+				{File: "a.go", Kind: KindType, Name: "B"},
+				{File: "c.go", Kind: KindType, Name: "C"},
+			}},
+			want: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := testCase.cycle.SpansFiles(); got != testCase.want {
+				t.Fatalf("SpansFiles() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

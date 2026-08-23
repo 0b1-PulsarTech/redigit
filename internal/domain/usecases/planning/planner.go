@@ -15,6 +15,10 @@ type Config struct {
 	// MaxFiles caps how many files one commit touches. A commit spanning sixty
 	// packages cannot be named truthfully.
 	MaxFiles int
+
+	// Capabilities replaces the reachability walk with a slicing the caller
+	// read out of the published history. Empty means derive it.
+	Capabilities Capabilities
 }
 
 const defaultMaxFiles = 12
@@ -45,6 +49,10 @@ func New(cfg Config) Planner {
 func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.Plan, error) {
 	if graph.Len() == 0 {
 		return entities.Plan{}, fmt.Errorf("%w: nothing to plan", apperr.ErrIncomplete)
+	}
+
+	if len(p.cfg.Capabilities) > 0 {
+		return p.emitByCapability(graph, order, ownershipFrom(p.cfg.Capabilities, graph)), nil
 	}
 
 	own := assign(graph)

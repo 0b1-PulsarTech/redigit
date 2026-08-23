@@ -20,6 +20,22 @@ type Cycle struct {
 	Reasons []EdgeReason
 }
 
+// SpansFiles reports whether the cycle reaches across more than one file.
+//
+// One inside a single file is mutual recursion: the members share a position
+// and the file is written with all of them. One that crosses files is the real
+// hazard, and reporting both alike buries it - a real repository produced 240
+// single-file cycles, every one a generated mock and its recorder.
+func (c Cycle) SpansFiles() bool {
+	for _, member := range c.Members[1:] {
+		if member.File != c.Members[0].File {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Ordering is where every declaration landed, plus what could not be resolved.
 // Cycles are returned rather than logged so a caller can refuse to write a
 // history that still holds one.

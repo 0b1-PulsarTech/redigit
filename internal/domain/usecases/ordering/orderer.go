@@ -105,10 +105,16 @@ func (o Orderer) Order(graph entities.Graph, snap entities.Snapshot) (entities.O
 
 	var errs []error
 
-	if len(cycles) > 0 {
+	// Only a cycle that crosses files is reported as incomplete. Every cycle
+	// stays in the Ordering either way: a caller that wants to see the mutual
+	// recursion still can, it just is not told the run failed because of it.
+	if crossing := spanningFiles(cycles); crossing > 0 {
 		errs = append(
 			errs,
-			fmt.Errorf("%w: ordering holds %d cycle(s)", apperr.ErrIncomplete, len(cycles)),
+			fmt.Errorf(
+				"%w: ordering holds %d cycle(s) across files, of %d",
+				apperr.ErrIncomplete, crossing, len(cycles),
+			),
 		)
 	}
 
@@ -121,4 +127,16 @@ func (o Orderer) Order(graph entities.Graph, snap entities.Snapshot) (entities.O
 	}
 
 	return result, nil
+}
+
+func spanningFiles(cycles []entities.Cycle) int {
+	count := 0
+
+	for _, cycle := range cycles {
+		if cycle.SpansFiles() {
+			count++
+		}
+	}
+
+	return count
 }

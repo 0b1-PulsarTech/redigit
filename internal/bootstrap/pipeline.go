@@ -133,11 +133,20 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, err
 	}
 
+	scanner := indexing.NewScanner(reader, indexCfg)
+
+	if err = loadCapabilities(ctx, &cfg, scanner, snapshot); err != nil {
+		_ = session.Close(ctx)
+		_ = checkout.Close(ctx)
+
+		return nil, err
+	}
+
 	return &Pipeline{
 		checkout: checkout,
 		session:  session,
 		indexer:  indexing.New(session, reader, indexCfg),
-		scanner:  indexing.NewScanner(reader, indexCfg),
+		scanner:  scanner,
 		orderer:  ordering.New(cfg.Ordering),
 		planner:  planning.New(cfg.Planning),
 		auditor:  auditing.New(cfg.Auditing),
