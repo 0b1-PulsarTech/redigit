@@ -8,6 +8,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning"
@@ -32,6 +33,8 @@ type Pipeline struct {
 	planner  planner
 	auditor  auditor
 	snapshot entities.Snapshot
+	source   emitting.Source
+	renderer emitting.Renderer
 }
 
 // closer is what Pipeline.Close needs from the language server session and
@@ -114,6 +117,14 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		Rules:      golang.NewRulePack(),
 	}}
 
+	source, err := newTreeSource(ctx, reader)
+	if err != nil {
+		_ = session.Close(ctx)
+		_ = checkout.Close(ctx)
+
+		return nil, err
+	}
+
 	return &Pipeline{
 		checkout: checkout,
 		session:  session,
@@ -123,6 +134,8 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		planner:  planning.New(cfg.Planning),
 		auditor:  auditing.New(cfg.Auditing),
 		snapshot: snapshot,
+		source:   source,
+		renderer: golang.NewSyntax(),
 	}, nil
 }
 

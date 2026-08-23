@@ -32,6 +32,11 @@ type Config struct {
 	Auditing auditing.Config
 	Rewrite  rewriting.Config
 
+	// BlobDir, when set, writes blobs to a plain directory instead of the
+	// repository's object database. It costs duplication and buys the promise
+	// that nothing is written into a repository somebody else is using.
+	BlobDir string
+
 	Author AuthorConfig
 }
 

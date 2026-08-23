@@ -159,8 +159,8 @@ func TestEmitterCarriesFileModeUnchanged(t *testing.T) {
 
 			sink := NewMockSink(ctrl)
 			sink.EXPECT().
-				Write(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, _ []byte, mode FileMode) (Handle, error) {
+				Write(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, _ []byte, mode FileMode) (Handle, error) {
 					gotMode = mode
 
 					return "handle", nil
@@ -323,7 +323,7 @@ func TestEmitterPropagatesFailures(t *testing.T) {
 
 				sink := NewMockSink(ctrl)
 				sink.EXPECT().
-					Write(gomock.Any(), gomock.Any(), gomock.Any()).
+					Write(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(Handle(""), errBoom)
 
 				return source, growingRenderer(ctrl), sink

@@ -122,16 +122,16 @@ func (m *MockSink) EXPECT() *MockSinkMockRecorder {
 }
 
 // Write mocks base method.
-func (m *MockSink) Write(ctx context.Context, content []byte, mode FileMode) (Handle, error) {
+func (m *MockSink) Write(ctx context.Context, path string, content []byte, mode FileMode) (Handle, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Write", ctx, content, mode)
+	ret := m.ctrl.Call(m, "Write", ctx, path, content, mode)
 	ret0, _ := ret[0].(Handle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Write indicates an expected call of Write.
-func (mr *MockSinkMockRecorder) Write(ctx, content, mode any) *gomock.Call {
+func (mr *MockSinkMockRecorder) Write(ctx, path, content, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockSink)(nil).Write), ctx, content, mode)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockSink)(nil).Write), ctx, path, content, mode)
 }

@@ -47,8 +47,8 @@ func growingRenderer(ctrl *gomock.Controller) *MockRenderer {
 func countingSink(ctrl *gomock.Controller) *MockSink {
 	sink := NewMockSink(ctrl)
 	sink.EXPECT().
-		Write(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, content []byte, _ FileMode) (Handle, error) {
+		Write(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, content []byte, _ FileMode) (Handle, error) {
 			return Handle(content), nil
 		}).
 		AnyTimes()

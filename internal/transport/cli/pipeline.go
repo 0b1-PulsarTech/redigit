@@ -7,6 +7,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 )
 
@@ -24,6 +25,12 @@ type pipeline interface {
 	Order(graph entities.Graph) (entities.Ordering, error)
 	Plan(graph entities.Graph, order entities.Ordering) (entities.Plan, error)
 	Audit(graph entities.Graph, order entities.Ordering) (auditing.Result, error)
+	Emit(
+		ctx context.Context,
+		plan entities.Plan,
+		graph entities.Graph,
+		sink emitting.Sink,
+	) ([]emitting.Commit, error)
 	Close(ctx context.Context) error
 }
 

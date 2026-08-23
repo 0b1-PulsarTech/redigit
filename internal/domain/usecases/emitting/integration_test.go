@@ -74,7 +74,12 @@ func (r spanRenderer) Render(
 // git object store, minus git itself.
 type contentStore struct{ blobs map[string][]byte }
 
-func (s *contentStore) Write(_ context.Context, content []byte, _ FileMode) (Handle, error) {
+func (s *contentStore) Write(
+	_ context.Context,
+	_ string,
+	content []byte,
+	_ FileMode,
+) (Handle, error) {
 	sum := sha256.Sum256(content)
 	id := hex.EncodeToString(sum[:])
 	s.blobs[id] = content

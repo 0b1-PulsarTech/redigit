@@ -36,8 +36,12 @@ type Renderer interface {
 // Handle for it. Whether that handle names a loose git object or a path on
 // disk is a decision the sink's owner makes; the emitter neither knows nor
 // cares.
+//
+// The path travels even though a content-addressed sink ignores it: a sink
+// that addresses BY path cannot work at all without it, and a port that only
+// serves one of its two implementations is not a seam.
 type Sink interface {
-	Write(ctx context.Context, content []byte, mode FileMode) (Handle, error)
+	Write(ctx context.Context, path string, content []byte, mode FileMode) (Handle, error)
 }
 
 //go:generate go tool -modfile=../../../../tools/go.mod mockgen -source=ports.go -destination=ports_mock_test.go -package=emitting

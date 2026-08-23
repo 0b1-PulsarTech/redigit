@@ -60,7 +60,7 @@ func (e Emitter) renderTouched(
 			continue
 		}
 
-		handle, err := e.sink.Write(ctx, rendered, file.mode)
+		handle, err := e.sink.Write(ctx, path, rendered, file.mode)
 		if err != nil {
 			return nil, fmt.Errorf("write %s: %w", path, err)
 		}

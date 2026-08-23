@@ -15,6 +15,7 @@ import (
 
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
 	auditing "github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
+	emitting "github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	indexing "github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -85,6 +86,21 @@ func (m *Mockpipeline) Close(ctx context.Context) error {
 func (mr *MockpipelineMockRecorder) Close(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*Mockpipeline)(nil).Close), ctx)
+}
+
+// Emit mocks base method.
+func (m *Mockpipeline) Emit(ctx context.Context, plan entities.Plan, graph entities.Graph, sink emitting.Sink) ([]emitting.Commit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Emit", ctx, plan, graph, sink)
+	ret0, _ := ret[0].([]emitting.Commit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Emit indicates an expected call of Emit.
+func (mr *MockpipelineMockRecorder) Emit(ctx, plan, graph, sink any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Emit", reflect.TypeOf((*Mockpipeline)(nil).Emit), ctx, plan, graph, sink)
 }
 
 // Graph mocks base method.

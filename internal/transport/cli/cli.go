@@ -15,10 +15,11 @@ import (
 // a run failure so a caller can print usage instead of a stack of wrapping.
 var ErrUsage = errors.New("usage")
 
-// The four command names dispatch recognises, named once so the switch below
-// and its tests never drift from each other on a typo.
+// The command names dispatch recognises, named once so the switch below and
+// its tests never drift from each other on a typo.
 const (
 	cmdAudit  = "audit"
+	cmdEmit   = "emit"
 	cmdGraph  = "graph"
 	cmdPlan   = "plan"
 	cmdReport = "report"
@@ -29,6 +30,13 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
   redigit audit  --repo PATH [--rev REF] [--tags TAGS] [--far N]
       Index, order, and report. Says which declarations are born far from
       whatever reads them, and what each number does not look at.
+
+  redigit emit   --repo PATH [--rev REF] [--tags TAGS] [--blob-dir DIR]
+      Materialise the plan: one JSON object per commit with the declarations
+      born there, the full content of every file it changes, and the forward
+      references it can see. Writes no commit and no ref - that is the calling
+      agent's to do. Blobs go into the repository's object database unless
+      --blob-dir names a directory to write them to instead.
 
   redigit report --repo PATH [--rev REF] [--tags TAGS]
       One JSON object per line, per declaration: where it was born in this
@@ -90,6 +98,8 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, star
 		return runPlan(ctx, cfg, stdout, start)
 	case cmdReport:
 		return runReport(ctx, cfg, stdout, start)
+	case cmdEmit:
+		return runEmit(ctx, cfg, start, stdout)
 	}
 
 	_, _ = fmt.Fprint(stderr, usage)
@@ -111,6 +121,12 @@ func parse(args []string) (bootstrap.Config, int, error) {
 	set.StringVar(&cfg.Rev, "rev", cfg.Rev, "revision to read")
 	set.StringVar(&tags, "tags", "", "comma-separated build tags")
 	set.IntVar(&far, "far", 0, "positions before a declaration counts as adrift")
+	set.StringVar(
+		&cfg.BlobDir,
+		"blob-dir",
+		"",
+		"write blobs to this directory instead of the object database",
+	)
 	set.StringVar(&cfg.ServerCommand, "server", cfg.ServerCommand, "language server command")
 
 	if err := set.Parse(args); err != nil {
