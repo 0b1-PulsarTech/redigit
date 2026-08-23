@@ -48,10 +48,16 @@ func (r byExtension) Render(
 	return r.fallback.Render(ctx, source, keep)
 }
 
-// configExtensions are the files the config pack reads. Extension is how the
-// indexer decides ownership, so a file with none is not covered here.
+// configExtensions are the files the config pack reads. The first four carry
+// a chunker that splits them; the rest reach the tree as one whole-file piece.
+// The empty string claims a file with NO extension - a Dockerfile, a LICENSE -
+// which extension-keyed ownership would leave out with nothing reporting it.
 func configExtensions() []string {
-	return slices.Clone([]string{".mod", ".work", ".sum", ".sql"})
+	return slices.Clone([]string{
+		".mod", ".work", ".sum", ".sql",
+		".md", ".yml", ".yaml", ".xml", ".json", ".toml", ".nix", ".lock",
+		".env", ".iml", ".mmd", ".gitignore", ".containerignore", "",
+	})
 }
 
 // configRenderers maps every extension the config pack owns to it, so the
