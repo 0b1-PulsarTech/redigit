@@ -18,16 +18,57 @@ import (
 
 // Pipeline holds the stages wired for one run, plus the language server that
 // answers for them. Close stops that server; nothing else here owns a process.
+//
+// Each stage is held through a small local interface, not the concrete
+// domain type, so a test can drive Pipeline's own error-wrapping - Graph,
+// Order, Plan, Audit, Births, Close - with a fake stage instead of a real
+// language server, git worktree, or parsed source tree.
 type Pipeline struct {
-	checkout *gitstore.Checkout
-	session  *lsp.Session
-	indexer  indexing.Indexer
-	scanner  indexing.Scanner
-	orderer  ordering.Orderer
-	planner  planning.Planner
-	auditor  auditing.Auditor
+	checkout closer
+	session  closer
+	indexer  indexer
+	scanner  scanner
+	orderer  orderer
+	planner  planner
+	auditor  auditor
 	snapshot entities.Snapshot
 }
+
+// closer is what Pipeline.Close needs from the language server session and
+// the checkout it made.
+type closer interface {
+	Close(ctx context.Context) error
+}
+
+type indexer interface {
+	Index(ctx context.Context, snap entities.Snapshot) (indexing.Result, error)
+}
+
+type scanner interface {
+	Scan(ctx context.Context, snap entities.Snapshot) (indexing.Births, error)
+}
+
+type orderer interface {
+	Order(graph entities.Graph, snap entities.Snapshot) (entities.Ordering, error)
+}
+
+type planner interface {
+	Plan(graph entities.Graph, order entities.Ordering) (entities.Plan, error)
+}
+
+type auditor interface {
+	Audit(graph entities.Graph, order entities.Ordering) (auditing.Result, error)
+}
+
+var (
+	_ closer  = (*gitstore.Checkout)(nil)
+	_ closer  = (*lsp.Session)(nil)
+	_ indexer = indexing.Indexer{}
+	_ scanner = indexing.Scanner{}
+	_ orderer = ordering.Orderer{}
+	_ planner = planning.Planner{}
+	_ auditor = auditing.Auditor{}
+)
 
 // Start builds the pipeline: it reads the snapshot, launches the language
 // server, and wires each stage to the ports it consumes. This is the only

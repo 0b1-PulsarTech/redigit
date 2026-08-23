@@ -15,6 +15,15 @@ import (
 // a run failure so a caller can print usage instead of a stack of wrapping.
 var ErrUsage = errors.New("usage")
 
+// The four command names dispatch recognises, named once so the switch below
+// and its tests never drift from each other on a typo.
+const (
+	cmdAudit  = "audit"
+	cmdGraph  = "graph"
+	cmdPlan   = "plan"
+	cmdReport = "report"
+)
+
 const usage = `redigit rebuilds a repository's history so every commit creates exactly what it needs.
 
   redigit audit  --repo PATH [--rev REF] [--tags TAGS] [--far N]
@@ -48,6 +57,13 @@ Flags:
 // Run executes one command line. It returns ErrUsage for anything it cannot
 // parse, so main can tell a mistake from a failure.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	return dispatch(ctx, args, stdout, stderr, realStart)
+}
+
+// dispatch is Run's body, parameterised over how a pipeline gets built. Run
+// wires that to bootstrap.Start; a test wires it to a fake pipeline so
+// dispatch can be proven without a language server or a git worktree.
+func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, start starter) error {
 	if len(args) < 1 {
 		_, _ = fmt.Fprint(stderr, usage)
 
@@ -66,14 +82,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	cfg.Auditing.FarApart = far
 
 	switch command {
-	case "audit":
-		return runAudit(ctx, cfg, stdout)
-	case "graph":
-		return runGraph(ctx, cfg, stdout)
-	case "plan":
-		return runPlan(ctx, cfg, stdout)
-	case "report":
-		return runReport(ctx, cfg, stdout)
+	case cmdAudit:
+		return runAudit(ctx, cfg, stdout, start)
+	case cmdGraph:
+		return runGraph(ctx, cfg, stdout, start)
+	case cmdPlan:
+		return runPlan(ctx, cfg, stdout, start)
+	case cmdReport:
+		return runReport(ctx, cfg, stdout, start)
 	}
 
 	_, _ = fmt.Fprint(stderr, usage)

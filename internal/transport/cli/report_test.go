@@ -1,8 +1,15 @@
 package cli
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
 	"testing"
 
+	"go.uber.org/mock/gomock"
+
+	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 )
@@ -230,4 +237,106 @@ func TestInInterfaceMarksTheWholeMethodSet(t *testing.T) {
 			}
 		})
 	}
+}
+
+// reportGraph and reportStart give runReport a fake pipeline whose Graph and
+// Births return controllable, deterministic data.
+func reportStart(
+	ctrl *gomock.Controller,
+	graphErr, birthsErr error,
+) starter {
+	pl := NewMockpipeline(ctrl)
+	pl.EXPECT().Close(gomock.Any()).Return(nil)
+
+	if graphErr != nil {
+		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, graphErr)
+
+		return func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+	}
+
+	subject := fn("lead/create.go", "Create", "lead")
+	graph := entities.NewGraph([]entities.Decl{subject}, nil, nil)
+	pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{Graph: graph}, nil)
+
+	if birthsErr != nil {
+		pl.EXPECT().Births(gomock.Any()).Return(indexing.Births{}, birthsErr)
+	} else {
+		pl.EXPECT().Births(gomock.Any()).Return(indexing.Births{
+			At: map[entities.DeclKey]entities.Position{subject.Key: 3},
+		}, nil)
+	}
+
+	return func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+}
+
+func TestRunReport(t *testing.T) {
+	t.Parallel()
+
+	errBoom := errors.New("boom")
+
+	t.Run("the graph stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start := reportStart(ctrl, errBoom, nil)
+
+		var out bytes.Buffer
+
+		err := runReport(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("the births stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start := reportStart(ctrl, nil, errBoom)
+
+		var out bytes.Buffer
+
+		err := runReport(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("a write failure surfaces instead of being swallowed", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start := reportStart(ctrl, nil, nil)
+
+		errWrite := errors.New("disk full")
+
+		err := runReport(context.Background(), bootstrap.Config{}, failWriter{err: errWrite}, start)
+		if !errors.Is(err, errWrite) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errWrite)
+		}
+	})
+
+	t.Run("success emits one decoded, well-shaped line per declaration", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start := reportStart(ctrl, nil, nil)
+
+		var out bytes.Buffer
+
+		if err := runReport(context.Background(), bootstrap.Config{}, &out, start); err != nil {
+			t.Fatalf("runReport() = %v", err)
+		}
+
+		var got reportLine
+		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		wantDecl := fn("lead/create.go", "Create", "lead").Key.String()
+
+		if got.Decl != wantDecl || got.BornAt != 3 {
+			t.Fatalf("got = %+v", got)
+		}
+	})
 }

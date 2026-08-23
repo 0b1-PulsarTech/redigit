@@ -1,0 +1,518 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"testing"
+
+	"go.uber.org/mock/gomock"
+
+	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/apperr"
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
+)
+
+// failWriter always fails, so a test can prove a command's output-write
+// error path without a real broken pipe.
+type failWriter struct{ err error }
+
+func (w failWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func declKey(name string) entities.DeclKey {
+	return entities.DeclKey{File: "a.go", Kind: entities.KindFunc, Name: name}
+}
+
+func declGraph() entities.Graph {
+	return entities.NewGraph([]entities.Decl{{Key: declKey("A"), Unit: "a"}}, nil, nil)
+}
+
+// TestSettled pins settled's own switch: it must fail when the ordering
+// never converged or carries no positions, must fail when the fixed point
+// ran no rounds, and must NOT fail on a cycle or an unresolved declaration -
+// those come with a usable ordering and are warnings, not failures.
+func TestSettled(t *testing.T) {
+	t.Parallel()
+
+	errGraph := errors.New("resolver unreachable")
+	graph := declGraph()
+
+	testCases := []settledTestCase{
+		{
+			name:       "the graph stage fails, order is never called",
+			graphErr:   errGraph,
+			callsOrder: false,
+			wantErr:    errGraph,
+		},
+		{
+			name:       "a fixed point that did not converge is fatal",
+			order:      entities.Ordering{At: map[entities.DeclKey]entities.Position{}, Rounds: 0},
+			orderErr:   ordering.ErrNotConverged,
+			callsOrder: true,
+			wantErr:    ordering.ErrNotConverged,
+		},
+		{
+			name:       "no positions at all is fatal even with no error",
+			order:      entities.Ordering{At: nil, Rounds: 5},
+			callsOrder: true,
+			wantErr:    apperr.ErrIncomplete,
+		},
+		{
+			name: "a fixed point that ran zero rounds is fatal",
+			order: entities.Ordering{
+				At:     map[entities.DeclKey]entities.Position{declKey("A"): 0},
+				Rounds: 0,
+			},
+			callsOrder: true,
+			wantErr:    apperr.ErrIncomplete,
+		},
+		{
+			name: "a cycle comes with a usable ordering and is a warning",
+			order: entities.Ordering{
+				At:     map[entities.DeclKey]entities.Position{declKey("A"): 0},
+				Rounds: 3,
+				Cycles: []entities.Cycle{{Members: []entities.DeclKey{declKey("A")}}},
+			},
+			orderErr:    apperr.ErrIncomplete,
+			callsOrder:  true,
+			wantSuccess: true,
+		},
+		{
+			name: "an unresolved declaration comes with a usable ordering and is a warning",
+			order: entities.Ordering{
+				At:     map[entities.DeclKey]entities.Position{declKey("A"): 0},
+				Rounds: 3,
+			},
+			orderErr:    &ordering.UnresolvedError{Declarations: []entities.DeclKey{declKey("A")}},
+			callsOrder:  true,
+			wantSuccess: true,
+		},
+		{
+			name: "a clean convergence succeeds with no complaint",
+			order: entities.Ordering{
+				At:     map[entities.DeclKey]entities.Position{declKey("A"): 0},
+				Rounds: 3,
+			},
+			callsOrder:  true,
+			wantSuccess: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			runSettledTestCase(t, graph, testCase)
+		})
+	}
+}
+
+type settledTestCase struct {
+	name        string
+	graphErr    error
+	order       entities.Ordering
+	orderErr    error
+	callsOrder  bool
+	wantErr     error
+	wantSuccess bool
+}
+
+func runSettledTestCase(t *testing.T, graph entities.Graph, testCase settledTestCase) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	pl := NewMockpipeline(ctrl)
+
+	if testCase.graphErr != nil {
+		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, testCase.graphErr)
+	} else {
+		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{Graph: graph}, nil)
+	}
+
+	if testCase.callsOrder {
+		pl.EXPECT().Order(gomock.Any()).Return(testCase.order, testCase.orderErr)
+	}
+
+	_, order, err := settled(context.Background(), pl)
+
+	if testCase.wantSuccess {
+		if err != nil {
+			t.Fatalf("settled() err = %v, want nil", err)
+		}
+
+		if order.Rounds != testCase.order.Rounds {
+			t.Fatalf("Rounds = %d, want %d", order.Rounds, testCase.order.Rounds)
+		}
+
+		return
+	}
+
+	if !errors.Is(err, testCase.wantErr) {
+		t.Fatalf("settled() err = %v, want it to wrap %v", err, testCase.wantErr)
+	}
+}
+
+// TestWithPipeline covers the three things withPipeline can do: fail to
+// start, run the caller's function and hand back its error, or succeed and
+// still close the pipeline it started.
+func TestWithPipeline(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a start failure is wrapped and run is never called", func(t *testing.T) {
+		t.Parallel()
+
+		errStart := errors.New("gopls would not launch")
+		start := func(context.Context, bootstrap.Config) (pipeline, error) {
+			return nil, errStart
+		}
+
+		called := false
+
+		err := withPipeline(context.Background(), bootstrap.Config{}, start, func(pipeline) error {
+			called = true
+
+			return nil
+		})
+
+		if !errors.Is(err, errStart) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errStart)
+		}
+
+		if called {
+			t.Fatal("run must not be called when start fails")
+		}
+	})
+
+	t.Run("the pipeline is closed even when run fails", func(t *testing.T) {
+		t.Parallel()
+
+		errRun := errors.New("boom")
+
+		ctrl := gomock.NewController(t)
+		pl := NewMockpipeline(ctrl)
+		pl.EXPECT().Close(gomock.Any()).Return(nil)
+
+		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+
+		err := withPipeline(context.Background(), bootstrap.Config{}, start, func(pipeline) error {
+			return errRun
+		})
+
+		if !errors.Is(err, errRun) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errRun)
+		}
+	})
+
+	t.Run("success closes the pipeline too", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		pl := NewMockpipeline(ctrl)
+		pl.EXPECT().Close(gomock.Any()).Return(nil)
+
+		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+
+		err := withPipeline(context.Background(), bootstrap.Config{}, start, func(pipeline) error {
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("err = %v, want nil", err)
+		}
+	})
+}
+
+func settledStart(ctrl *gomock.Controller, graphErr error) (starter, *Mockpipeline) {
+	pl := NewMockpipeline(ctrl)
+
+	if graphErr != nil {
+		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, graphErr)
+	} else {
+		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{Graph: declGraph()}, nil)
+		pl.EXPECT().Order(gomock.Any()).Return(entities.Ordering{
+			At:     map[entities.DeclKey]entities.Position{declKey("A"): 0},
+			Rounds: 1,
+		}, nil)
+	}
+
+	pl.EXPECT().Close(gomock.Any()).Return(nil)
+
+	start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+
+	return start, pl
+}
+
+func TestRunAudit(t *testing.T) {
+	t.Parallel()
+
+	errBoom := errors.New("boom")
+
+	t.Run("the graph stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, _ := settledStart(ctrl, errBoom)
+
+		var out bytes.Buffer
+
+		err := runAudit(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("the audit stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, pl := settledStart(ctrl, nil)
+		pl.EXPECT().Audit(gomock.Any(), gomock.Any()).Return(auditing.Result{}, errBoom)
+
+		var out bytes.Buffer
+
+		err := runAudit(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("a write failure surfaces instead of being swallowed", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, pl := settledStart(ctrl, nil)
+		pl.EXPECT().Audit(gomock.Any(), gomock.Any()).Return(auditing.Result{}, nil)
+
+		errWrite := errors.New("disk full")
+
+		err := runAudit(context.Background(), bootstrap.Config{}, failWriter{err: errWrite}, start)
+		if !errors.Is(err, errWrite) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errWrite)
+		}
+	})
+}
+
+// TestRunAuditSuccess is split out from TestRunAudit's error-path table so
+// neither function grows past the project's function-length budget.
+func TestRunAuditSuccess(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	start, pl := settledStart(ctrl, nil)
+	pl.EXPECT().Audit(gomock.Any(), gomock.Any()).Return(auditing.Result{
+		Report: entities.Report{
+			Integrity: []entities.Measure{
+				{Name: "placed", Value: 1, Total: 1, Excluded: []string{"x"}},
+			},
+		},
+		Drifts: []auditing.Drift{
+			{Decl: declKey("A"), Reader: declKey("B"), Reason: entities.ReasonReference},
+		},
+	}, nil)
+
+	var out bytes.Buffer
+
+	cfg := bootstrap.Config{Repo: "/repo", Rev: "HEAD"}
+	if err := runAudit(context.Background(), cfg, &out, start); err != nil {
+		t.Fatalf("runAudit() = %v", err)
+	}
+
+	var got auditDTO
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if got.Repo != "/repo" || got.Declarations != 1 || len(got.Integrity) != 1 ||
+		len(got.Drift) != 1 || got.Integrity[0].Percent != 100 {
+		t.Fatalf("got = %+v", got)
+	}
+}
+
+func TestRunGraph(t *testing.T) {
+	t.Parallel()
+
+	errBoom := errors.New("boom")
+
+	t.Run("the graph stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, _ := settledStart(ctrl, errBoom)
+
+		var out bytes.Buffer
+
+		err := runGraph(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("a write failure surfaces instead of being swallowed", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, _ := settledStart(ctrl, nil)
+
+		errWrite := errors.New("disk full")
+
+		err := runGraph(context.Background(), bootstrap.Config{}, failWriter{err: errWrite}, start)
+		if !errors.Is(err, errWrite) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errWrite)
+		}
+	})
+
+	t.Run("success emits decoded, well-shaped JSON", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, _ := settledStart(ctrl, nil)
+
+		var out bytes.Buffer
+
+		cfg := bootstrap.Config{Repo: "/repo", Rev: "HEAD"}
+		if err := runGraph(context.Background(), cfg, &out, start); err != nil {
+			t.Fatalf("runGraph() = %v", err)
+		}
+
+		var got graphDTO
+		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if got.Repo != "/repo" || len(got.Decls) != 1 || got.Decls[0].Key != declKey("A").String() {
+			t.Fatalf("got = %+v", got)
+		}
+	})
+}
+
+func TestRunPlan(t *testing.T) {
+	t.Parallel()
+
+	errBoom := errors.New("boom")
+
+	t.Run("the graph stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, _ := settledStart(ctrl, errBoom)
+
+		var out bytes.Buffer
+
+		err := runPlan(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("the plan stage failing fails the command", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, pl := settledStart(ctrl, nil)
+		pl.EXPECT().Plan(gomock.Any(), gomock.Any()).Return(entities.Plan{}, errBoom)
+
+		var out bytes.Buffer
+
+		err := runPlan(context.Background(), bootstrap.Config{}, &out, start)
+		if !errors.Is(err, errBoom) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
+		}
+	})
+
+	t.Run("a write failure surfaces instead of being swallowed", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, pl := settledStart(ctrl, nil)
+		pl.EXPECT().Plan(gomock.Any(), gomock.Any()).Return(entities.Plan{}, nil)
+
+		errWrite := errors.New("disk full")
+
+		err := runPlan(context.Background(), bootstrap.Config{}, failWriter{err: errWrite}, start)
+		if !errors.Is(err, errWrite) {
+			t.Fatalf("err = %v, want it to wrap %v", err, errWrite)
+		}
+	})
+
+	t.Run("success emits decoded, well-shaped JSON", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		start, pl := settledStart(ctrl, nil)
+		pl.EXPECT().Plan(gomock.Any(), gomock.Any()).Return(entities.Plan{
+			Commits: []entities.PlannedCommit{
+				{Position: 0, Subject: "DRAFT: x", Decls: []entities.DeclKey{declKey("A")}},
+			},
+			Unplaced: []entities.DeclKey{declKey("B")},
+		}, nil)
+
+		var out bytes.Buffer
+
+		cfg := bootstrap.Config{Repo: "/repo", Rev: "HEAD"}
+		if err := runPlan(context.Background(), cfg, &out, start); err != nil {
+			t.Fatalf("runPlan() = %v", err)
+		}
+
+		var got planDTO
+		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+
+		if len(got.Commits) != 1 || got.Commits[0].Subject != "DRAFT: x" || len(got.Unplaced) != 1 {
+			t.Fatalf("got = %+v", got)
+		}
+	})
+}
+
+// TestWarnBlind pins that a blind spot is logged (not dropped) when the
+// resolver could not answer, and that nothing is logged when there is none.
+// It runs outside t.Parallel(): it swaps the package-global slog default for
+// the duration of the call, and that state is process-wide.
+func TestWarnBlind(t *testing.T) {
+	testCases := []struct {
+		name      string
+		blind     []indexing.Blind
+		wantLines int
+	}{
+		{"no blind spot logs nothing", nil, 0},
+		{
+			"a blind spot is logged",
+			[]indexing.Blind{{Decl: declKey("A"), Query: "references", Reason: "timed out"}},
+			1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		var buf bytes.Buffer
+
+		restore := slog.Default()
+		slog.SetDefault(
+			slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})),
+		)
+
+		warnBlind(indexing.Result{Graph: declGraph(), Blind: testCase.blind})
+
+		slog.SetDefault(restore)
+
+		got := 0
+		if buf.Len() > 0 {
+			got = 1
+		}
+
+		if got != testCase.wantLines {
+			t.Errorf(
+				"%s: logged = %d lines, want %d (output: %q)",
+				testCase.name,
+				got,
+				testCase.wantLines,
+				buf.String(),
+			)
+		}
+	}
+}
+
+var _ io.Writer = failWriter{}

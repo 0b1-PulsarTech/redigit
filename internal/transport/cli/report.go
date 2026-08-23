@@ -78,9 +78,9 @@ type reportLine struct {
 // each file as it stood at each commit that touched it: a file's own first
 // touch dates every declaration it ever gains to the moment it was created
 // nearly empty, which is precisely the measurement that breaks a move.
-func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
-	return withPipeline(ctx, cfg, func(pipeline *bootstrap.Pipeline) error {
-		result, err := pipeline.Graph(ctx)
+func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
+	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+		result, err := pl.Graph(ctx)
 		if err != nil {
 			return fmt.Errorf("build graph: %w", err)
 		}
@@ -89,7 +89,7 @@ func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 
 		graph := result.Graph
 
-		births, err := pipeline.Births(ctx)
+		births, err := pl.Births(ctx)
 		if err != nil {
 			return fmt.Errorf("scan births: %w", err)
 		}

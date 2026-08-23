@@ -18,11 +18,8 @@ import (
 // settled runs the two stages every command needs. The ordering is returned
 // even when it carries a complaint: a cycle or an unresolved declaration is
 // what the caller asked to see, not a reason to print nothing.
-func settled(
-	ctx context.Context,
-	pipeline *bootstrap.Pipeline,
-) (entities.Graph, entities.Ordering, error) {
-	result, err := pipeline.Graph(ctx)
+func settled(ctx context.Context, pl pipeline) (entities.Graph, entities.Ordering, error) {
+	result, err := pl.Graph(ctx)
 	if err != nil {
 		return entities.Graph{}, entities.Ordering{}, fmt.Errorf("build graph: %w", err)
 	}
@@ -31,7 +28,7 @@ func settled(
 
 	graph := result.Graph
 
-	order, err := pipeline.Order(graph)
+	order, err := pl.Order(graph)
 
 	// A fixed point that never settled is fatal: it still hands back a full
 	// map of positions, so every measure downstream reads as complete while
@@ -59,16 +56,17 @@ func settled(
 func withPipeline(
 	ctx context.Context,
 	cfg bootstrap.Config,
-	run func(*bootstrap.Pipeline) error,
+	start starter,
+	run func(pipeline) error,
 ) error {
-	pipeline, err := bootstrap.Start(ctx, cfg)
+	pl, err := start(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("start pipeline: %w", err)
 	}
 
-	defer func() { _ = pipeline.Close(context.WithoutCancel(ctx)) }()
+	defer func() { _ = pl.Close(context.WithoutCancel(ctx)) }()
 
-	return run(pipeline)
+	return run(pl)
 }
 
 func encode(out io.Writer, value any) error {
@@ -82,14 +80,14 @@ func encode(out io.Writer, value any) error {
 	return nil
 }
 
-func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
-	return withPipeline(ctx, cfg, func(pipeline *bootstrap.Pipeline) error {
-		graph, order, err := settled(ctx, pipeline)
+func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
+	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err
 		}
 
-		result, err := pipeline.Audit(graph, order)
+		result, err := pl.Audit(graph, order)
 		if err != nil {
 			return fmt.Errorf("audit: %w", err)
 		}
@@ -109,9 +107,9 @@ func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 	})
 }
 
-func runGraph(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
-	return withPipeline(ctx, cfg, func(pipeline *bootstrap.Pipeline) error {
-		graph, order, err := settled(ctx, pipeline)
+func runGraph(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
+	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err
 		}
@@ -139,14 +137,14 @@ func runGraph(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
 	})
 }
 
-func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer) error {
-	return withPipeline(ctx, cfg, func(pipeline *bootstrap.Pipeline) error {
-		graph, order, err := settled(ctx, pipeline)
+func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
+	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err
 		}
 
-		plan, err := pipeline.Plan(graph, order)
+		plan, err := pl.Plan(graph, order)
 		if err != nil {
 			return fmt.Errorf("build plan: %w", err)
 		}
