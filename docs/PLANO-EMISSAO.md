@@ -79,6 +79,26 @@ modulo que ela nomeia. Um modulo nao pode exigir um irmao que ainda nao existe,
 e a linha e peso morto ate la. Ha precedente direto: a dobra anterior tinha um
 passo `grow_modules` que fazia exatamente esse corte.
 
+**`go.sum`** - cada par de linhas `modulo versao h1:` e `modulo versao/go.mod
+h1:` e uma declaracao, ligada a linha `require` que nomeia aquele modulo naquela
+versao. As duas linhas do par andam JUNTAS: o build precisa das duas.
+
+Sem este recortador o de `go.mod` nao entrega ganho nenhum - o primeiro
+`require` arrastaria o `go.sum` inteiro, e com ele o hash de toda dependencia
+que ainda nao foi usada. Sao 26 arquivos e 668 linhas no repositorio medido.
+
+**E ele erra em um so sentido, o que decide o desenho.** Uma linha a MAIS no
+`go.sum` e inofensiva; uma linha a MENOS quebra `go build` com erro de hash
+faltando. Entao a peca residual - as linhas transitivas que nao casam com
+nenhum `require`, e nao ha `require` a que ligar - nasce CEDO, com o cabecalho
+do modulo, e nao tarde. E o unico recortador onde o residuo vai para a frente
+da fila em vez do fim, e a razao e que errar cedo aqui nao custa nada e errar
+tarde quebra o build.
+
+Isso tambem torna a garantia de "o que sobra vira peca propria" carregante
+neste formato especifico: uma linha que suma silenciosamente nao aparece como
+arquivo faltando, aparece como build quebrado varios commits depois.
+
 **`go.work`** - cada linha `use`, ligada ao `go.mod` daquele diretorio. Mesmo
 precedente (`grow_workspace`): o arquivo lista os 33 modulos desde o comeco
 enquanto os `go.mod` chegam ao longo de 360 commits, e todo comando que le o
