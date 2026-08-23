@@ -52,11 +52,12 @@ func (e Emitter) renderTouched(
 			return nil, fmt.Errorf("render %s: %w", path, err)
 		}
 
-		// A file whose every declaration is still unborn renders as nothing.
-		// Writing it anyway would create a file holding only a package
-		// clause and imports, which is a defect the rewrite this replaces
-		// actually shipped once.
-		if len(rendered) == 0 {
+		// A file whose declarations are all still unborn renders as nothing,
+		// and writing it would leave only a package clause and imports.
+		// A file the final tree holds EMPTY renders as nothing too, and that
+		// one must be written: git tracks it, so skipping leaves the tree
+		// short by one path.
+		if len(rendered) == 0 && len(file.content) > 0 {
 			continue
 		}
 

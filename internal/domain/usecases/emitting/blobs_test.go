@@ -205,3 +205,61 @@ func TestSinkReceivesThePath(t *testing.T) {
 		}
 	}
 }
+
+// git tracks an empty file, so a path that is empty in the FINAL tree has to
+// be written even though it renders as nothing. Skipping it leaves the final
+// tree short by one path, and the tree invariant catches that only at the very
+// end, once every explanation is gone.
+func TestEmitterWritesAFileThatIsEmptyInTheFinalTree(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	source := NewMockSource(ctrl)
+	source.EXPECT().Read(gomock.Any(), "database/go.sum").Return([]byte{}, FileMode("100644"), nil)
+
+	renderer := NewMockRenderer(ctrl)
+	renderer.EXPECT().
+		Render(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return([]byte{}, nil).
+		AnyTimes()
+
+	var written []string
+
+	sink := NewMockSink(ctrl)
+	sink.EXPECT().
+		Write(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, path string, _ []byte, _ FileMode) (Handle, error) {
+			written = append(written, path)
+
+			return Handle("empty"), nil
+		}).
+		AnyTimes()
+
+	key := entities.DeclKey{
+		File: "database/go.sum",
+		Kind: entities.KindOther,
+		Name: "<file>",
+	}
+	graph := entities.NewGraph(
+		[]entities.Decl{{Key: key, Unit: "database", Span: entities.Span{}}},
+		nil,
+		nil,
+	)
+	plan := entities.Plan{Commits: []entities.PlannedCommit{
+		{Position: 0, Subject: "chore: the sum file", Decls: []entities.DeclKey{key}},
+	}}
+
+	commits, err := New(source, renderer, sink).Emit(t.Context(), plan, graph)
+	if err != nil {
+		t.Fatalf("Emit() = %v", err)
+	}
+
+	if len(written) != 1 || written[0] != "database/go.sum" {
+		t.Fatalf("the empty file reached the sink %d time(s): %v", len(written), written)
+	}
+
+	if len(commits) != 1 || len(commits[0].Blobs) != 1 {
+		t.Fatalf("the commit carries %d blob(s), want the empty file", len(commits[0].Blobs))
+	}
+}
