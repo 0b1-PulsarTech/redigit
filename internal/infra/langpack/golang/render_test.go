@@ -299,3 +299,82 @@ func TestRenderParseError(t *testing.T) {
 		t.Fatal("Render() error = nil, want a parse error")
 	}
 }
+
+// TestRenderKeepsAVersionedImport pins the defect that survived a 283-file
+// round trip and only surfaced when a real repository was rendered: a module
+// path carrying a major version is reached by the element BEFORE it, so taking
+// the last segment yields "v2" or "v5", matches nothing the code writes, and
+// the import is pruned. Every affected file then fails to compile.
+//
+// This repository's own dependencies happen to carry no version suffix, which
+// is exactly why its corpus test passed while the tool produced six broken
+// files out of 2484.
+func TestRenderKeepsAVersionedImport(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{
+			"a standard library path with a major version",
+			"package a\n\nimport \"math/rand/v2\"\n\nfunc Roll() int { return rand.N(6) }\n",
+			"math/rand/v2",
+		},
+		{
+			"a module path with a major version",
+			"package a\n\nimport \"github.com/golang-jwt/jwt/v5\"\n\nfunc New() *jwt.Token { return nil }\n",
+			"github.com/golang-jwt/jwt/v5",
+		},
+		{
+			"a version riding on the element itself",
+			"package a\n\nimport \"gopkg.in/yaml.v3\"\n\nfunc Parse(b []byte) error { return yaml.Unmarshal(b, nil) }\n",
+			"gopkg.in/yaml.v3",
+		},
+		{
+			"an alias still wins over any guess",
+			"package a\n\nimport jwtlib \"github.com/golang-jwt/jwt/v5\"\n\nfunc New() *jwtlib.Token { return nil }\n",
+			"github.com/golang-jwt/jwt/v5",
+		},
+		{
+			"an element that merely starts with v is not a version",
+			"package a\n\nimport \"example.com/pkg/vendor\"\n\nfunc Use() { vendor.Do() }\n",
+			"example.com/pkg/vendor",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			source := []byte(testCase.source)
+
+			decls, err := NewSyntax().Declarations(context.Background(), "a.go", source)
+			if err != nil {
+				t.Fatalf("Declarations() = %v", err)
+			}
+
+			keys := make([]entities.DeclKey, 0, len(decls))
+			for _, decl := range decls {
+				keys = append(keys, decl.Key)
+			}
+
+			out, err := NewSyntax().Render(context.Background(), source, keys)
+			if err != nil {
+				t.Fatalf("Render() = %v", err)
+			}
+
+			if !strings.Contains(string(out), testCase.want) {
+				t.Fatalf("keeping every declaration dropped %q:\n%s", testCase.want, out)
+			}
+
+			// Keeping everything must reproduce the file exactly; an import
+			// block that merely still holds the path but moved groups is also
+			// a defect.
+			if string(out) != testCase.source {
+				t.Fatalf("round trip diverged:\nwant %q\ngot  %q", testCase.source, out)
+			}
+		})
+	}
+}

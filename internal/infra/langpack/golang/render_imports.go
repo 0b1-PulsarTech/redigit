@@ -72,6 +72,19 @@ func importIsUsed(spec *ast.ImportSpec, used map[string]bool) bool {
 
 // importLocalName reports the identifier code in this file uses to reach the
 // import: its alias, or the last segment of its path.
+//
+// A trailing major-version element is NOT that identifier: "math/rand/v2" is
+// reached as rand and "github.com/golang-jwt/jwt/v5" as jwt. Taking the last
+// segment blindly yields v2 and v5, matches nothing the code writes, and the
+// import is pruned as unused - which produces a file that does not compile,
+// found only by rendering a real repository whose dependencies carry versions.
+//
+// simplification: the local name is still a GUESS from the path. A package
+// whose name differs from its final element and carries no alias
+// ("gopkg.in/yaml.v3" is handled below, but "example.com/go-thing" declaring
+// package thing is not) would still be pruned. Resolving it properly needs the
+// imported package's own name, which means loading it; the upgrade path is to
+// ask the resolver, which already has that information loaded.
 func importLocalName(spec *ast.ImportSpec) string {
 	if spec.Name != nil {
 		return spec.Name.Name
@@ -83,8 +96,38 @@ func importLocalName(spec *ast.ImportSpec) string {
 	}
 
 	if i := strings.LastIndexByte(path, '/'); i >= 0 {
-		path = path[i+1:]
+		last := path[i+1:]
+		if isMajorVersion(last) {
+			path = path[:i]
+			if j := strings.LastIndexByte(path, '/'); j >= 0 {
+				path = path[j+1:]
+			}
+		} else {
+			path = last
+		}
+	}
+
+	// "gopkg.in/yaml.v3" is reached as yaml: the version rides on the element
+	// itself rather than on one of its own.
+	if dot := strings.LastIndexByte(path, '.'); dot > 0 && isMajorVersion(path[dot+1:]) {
+		path = path[:dot]
 	}
 
 	return path
+}
+
+// isMajorVersion reports the "v2", "v5" form a module path uses for its major
+// version. "v" alone is not one, and neither is "v2beta".
+func isMajorVersion(part string) bool {
+	if len(part) < 2 || part[0] != 'v' {
+		return false
+	}
+
+	for _, digit := range part[1:] {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+
+	return true
 }
