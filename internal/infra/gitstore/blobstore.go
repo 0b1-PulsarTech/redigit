@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 )
 
@@ -268,21 +268,6 @@ func (s *BlobStore) stage(content []byte) (string, error) {
 	return path, nil
 }
 
-// PathEscapesDirError is a path that resolves outside a DirSink's base
-// directory once joined and cleaned (e.g. via "../" segments). BlobSink is a
-// public interface taking a caller-supplied path with no documented trust
-// boundary, and a manifest is exactly the kind of artifact that could come
-// from another tool or be hand-edited before being fed to a DirSink.
-type PathEscapesDirError struct {
-	Path string
-}
-
-func (e *PathEscapesDirError) Error() string { return "path escapes sink directory" }
-
-func (e *PathEscapesDirError) Unwrap() error { return errPathEscapesDir }
-
-var errPathEscapesDir = errors.New("path escapes directory")
-
 // DirSink writes a plan's blobs onto disk under Dir instead of into a git
 // object database, so a caller who does not want the tool touching a
 // repository's objects at all still gets the same manifest, minus the oid.
@@ -310,43 +295,41 @@ func (s DirSink) Put(
 	mode FileMode,
 	content []byte,
 ) (string, error) {
+	// Content-addressed, exactly like the object database this is the
+	// alternative to. Addressing by path collapses every commit's version of a
+	// file onto the last one written, which is silent and total: the plan looks
+	// complete and every blob but the final one is gone. The path stays in the
+	// manifest, where it says where the content BELONGS; the handle says where
+	// it IS.
+	sum := sha256.Sum256(content)
+	name := hex.EncodeToString(sum[:])
+
+	// No escape guard here on purpose: the name is 64 hex characters this
+	// function just computed, so a caller's path can no longer reach the
+	// filesystem at all. A guard that cannot fire reads as protection and is
+	// not; the path is now only carried for the error message below.
+	base := filepath.Clean(s.Dir)
+	full := filepath.Join(base, name)
+
 	if !mode.Valid() {
 		return "", &UnsupportedModeError{Path: path, Mode: mode}
 	}
 
-	base := filepath.Clean(s.Dir)
-	full := filepath.Join(base, filepath.FromSlash(path))
-
-	// A path lexically equal to base ("", ".", "sub/..") must be refused too:
-	// letting it through turns the RemoveAll below into RemoveAll(base).
-	//
-	// simplification: lexical only, does not resolve a symlink an earlier
-	// Put planted; upgrade path: resolve via filepath.EvalSymlinks first.
-	if !strings.HasPrefix(full, base+string(filepath.Separator)) {
-		return "", &PathEscapesDirError{Path: path}
+	if _, err := os.Stat(full); err == nil {
+		// Identical content is already stored under this name; writing it
+		// again would only cost the write.
+		return name, nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(full), dirSinkDirPerm); err != nil {
+	if err := os.MkdirAll(base, dirSinkDirPerm); err != nil {
 		return "", fmt.Errorf("create blob directory: %w", err)
-	}
-
-	if err := os.RemoveAll(full); err != nil {
-		return "", fmt.Errorf("remove existing blob: %w", err)
-	}
-
-	if mode == ModeSymlink {
-		if err := os.Symlink(string(content), full); err != nil {
-			return "", fmt.Errorf("symlink blob: %w", err)
-		}
-
-		return "", nil
 	}
 
 	if err := os.WriteFile(full, content, filePermission(mode)); err != nil {
 		return "", fmt.Errorf("write blob: %w", err)
 	}
 
-	return "", nil
+	return name, nil
 }
 
 func filePermission(mode FileMode) os.FileMode {
