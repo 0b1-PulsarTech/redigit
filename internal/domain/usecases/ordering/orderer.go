@@ -8,15 +8,26 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// Config configures the fixed point. Slack is how many spare positions the
-// order carries past the source history's last touched position (or past 0
-// with no history) for tail commits that read each other back; the prior
-// work used 8. RoundLimit bounds how many rounds the fixed point may take
-// before the guard treats it as a runaway instead of a slow convergence; the
-// prior work used 2000 and observed real runs converging in 109-467 rounds.
+// Config configures the fixed point.
 type Config struct {
-	Slack      int
+	// Slack is how many spare positions the order carries past the source
+	// history's last touched position, for tail commits that read each other
+	// back. The prior work used 8.
+	Slack int
+
+	// RoundLimit bounds the rounds the fixed point may take before the guard
+	// calls it a runaway. The prior work used 2000, and saw real runs settle
+	// in 109 to 467.
 	RoundLimit int
+
+	// Layers pulls an early layer's seed forward when the graph is
+	// indifferent. It is empty by default, and an empty one changes nothing.
+	Layers entities.Layers
+
+	// Features bounds where Layers may pull. Without it a layer reaches across
+	// the whole history and builds the repository horizontally; with it, a
+	// layer only orders the pieces of one vertical slice.
+	Features entities.Features
 }
 
 // defaultSlack and defaultRoundLimit are the values the previous rebuild
@@ -81,7 +92,7 @@ func (e *UnresolvedError) Unwrap() error { return apperr.ErrIncomplete }
 // non-nil error: a cycle or an unresolved declaration is data a caller acts
 // on, not merely a reason to discard the result.
 func (o Orderer) Order(graph entities.Graph, snap entities.Snapshot) (entities.Ordering, error) {
-	eng := newEngine(graph, snap, o.config.Slack)
+	eng := newEngine(graph, snap, o.config.Slack, o.config.Layers, o.config.Features)
 
 	rounds, err := eng.converge(o.config.RoundLimit)
 	if err != nil {

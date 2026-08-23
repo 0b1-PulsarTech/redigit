@@ -20,11 +20,18 @@ type engine struct {
 	limit     entities.Position
 }
 
-func newEngine(graph entities.Graph, snap entities.Snapshot, slack int) *engine {
+func newEngine(
+	graph entities.Graph,
+	snap entities.Snapshot,
+	slack int,
+	layers entities.Layers,
+	features entities.Features,
+) *engine {
 	decls := graph.Decls()
 	slices.SortFunc(decls, func(a, b entities.Decl) int { return compareKeys(a.Key, b.Key) })
 
 	base, inserted := seed(decls, snap)
+	applyLayers(decls, base, layers, features)
 	applyAnchors(graph, base)
 
 	assign := make(map[entities.DeclKey]entities.Position, len(base))

@@ -129,7 +129,7 @@ func TestEngineConvergeReturnsErrorOnRunaway(t *testing.T) {
 		History: []entities.SourceTouch{{Position: 0, Touched: []string{root.File}}},
 	}
 
-	eng := newEngine(graph, snap, 100)
+	eng := newEngine(graph, snap, 100, entities.Layers{}, entities.Features{})
 
 	_, err := eng.converge(1)
 	if !errors.Is(err, apperr.ErrIncomplete) {

@@ -26,50 +26,6 @@ const (
 	cmdReport = "report"
 )
 
-const usage = `redigit rebuilds a repository's history so every commit creates exactly what it needs.
-
-  redigit audit  --repo PATH [--rev REF] [--tags TAGS] [--far N]
-      Index, order, and report. Says which declarations are born far from
-      whatever reads them, and what each number does not look at.
-
-  redigit emit   --repo PATH [--rev REF] [--tags TAGS] [--blob-dir DIR]
-      Materialise the plan: one JSON object per commit with the declarations
-      born there, the full content of every file it changes, and the forward
-      references it can see. Writes no commit and no ref - that is the calling
-      agent's to do. Blobs go into the repository's object database unless
-      --blob-dir names a directory to write them to instead.
-
-  redigit chunks --repo PATH [--rev REF]
-      One JSON object per line, per piece of every file a chunker claims: a
-      sqlc "-- name:" block, a go.mod require or replace line, a go.work use
-      line. born_at is the position of the published history that first held
-      the piece, read by re-cutting the file at each commit that touched it,
-      and -1 for a piece that history never held. Starts no language server.
-
-  redigit report --repo PATH [--rev REF] [--tags TAGS]
-      One JSON object per line, per declaration: where it was born in this
-      history, every reader outside its own unit with the reason, and the gap
-      to the nearest one. Birth is read per declaration, not per file.
-
-  redigit graph  --repo PATH [--rev REF] [--tags TAGS]
-      Emit the declaration graph: every declaration and every edge, with the
-      reason each edge exists.
-
-  redigit plan   --repo PATH [--rev REF] [--tags TAGS]
-      Emit a commit plan, cut along features where a feature owns the work and
-      along layers where none does. Subjects come out marked DRAFT: nothing
-      writes a history from an unreviewed plan.
-
-Flags:
-  --repo PATH   repository to read (required)
-  --rev  REF    revision holding the tree to read (default HEAD)
-  --tags TAGS   comma-separated build tags. Passing none is a real choice:
-                a file behind a build constraint is invisible to reference
-                queries, and nothing reports that it was skipped.
-  --far  N      positions a declaration may sit ahead of its first outside
-                reader before audit reports it (default 25)
-`
-
 // Run executes one command line. It returns ErrUsage for anything it cannot
 // parse, so main can tell a mistake from a failure.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -121,8 +77,10 @@ func parse(args []string) (bootstrap.Config, int, error) {
 	cfg := bootstrap.Defaults()
 
 	var (
-		tags string
-		far  int
+		tags        string
+		layerFile   string
+		featureFile string
+		far         int
 	)
 
 	set := flag.NewFlagSet("redigit", flag.ContinueOnError)
@@ -138,6 +96,8 @@ func parse(args []string) (bootstrap.Config, int, error) {
 		"write blobs to this directory instead of the object database",
 	)
 	set.StringVar(&cfg.ServerCommand, "server", cfg.ServerCommand, "language server command")
+	set.StringVar(&layerFile, "layers", "", "layer file: which path prefixes come first")
+	set.StringVar(&featureFile, "features", "", "feature file: the vertical slices layers act inside")
 
 	if err := set.Parse(args); err != nil {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: %s", ErrUsage, err)
@@ -149,7 +109,35 @@ func parse(args []string) (bootstrap.Config, int, error) {
 
 	cfg.BuildTags = splitTags(tags)
 
+	if err := loadSlicing(&cfg, layerFile, featureFile); err != nil {
+		return bootstrap.Config{}, 0, err
+	}
+
 	return cfg, far, nil
+}
+
+// loadSlicing reads the two files that decide how a layer may reorder: the
+// layers themselves, and the features they act inside.
+func loadSlicing(cfg *bootstrap.Config, layerFile, featureFile string) error {
+	if layerFile != "" {
+		layers, err := bootstrap.LoadLayers(layerFile)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrUsage, err)
+		}
+
+		cfg.Ordering.Layers = layers
+	}
+
+	if featureFile != "" {
+		features, err := bootstrap.LoadFeatures(featureFile)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrUsage, err)
+		}
+
+		cfg.Ordering.Features = features
+	}
+
+	return nil
 }
 
 func splitTags(tags string) []string {

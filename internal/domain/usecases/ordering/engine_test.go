@@ -15,7 +15,7 @@ func TestNewEngineSeedsAssignFromBase(t *testing.T) {
 	}
 	graph := entities.NewGraph([]entities.Decl{touched}, nil, nil)
 
-	eng := newEngine(graph, snap, 8)
+	eng := newEngine(graph, snap, 8, entities.Layers{}, entities.Features{})
 
 	if got := eng.assign[touched.Key]; got != 4 {
 		t.Fatalf("assign seeded from base = %d, want 4", got)
