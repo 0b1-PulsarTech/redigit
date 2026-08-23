@@ -267,3 +267,43 @@ Deliberado, e vale escrever para nao voltar por engano:
 Os itens 1 a 3 fazem o caminho funcionar. O 4 e o 5 fazem o agente conseguir
 trabalhar sem a ferramenta. O 6 e o que o dono pediu explicitamente e depende
 dos anteriores.
+
+## 8. A restricao que nao vem do grafo: `replace` precisa do diretorio
+
+Descoberta pela sessao que reconstruiu `terectek_comms`, quebrando 53 arvores,
+e registrada aqui porque o planejador desta ferramenta a reencontraria do mesmo
+jeito.
+
+Uma linha `replace github.com/org/lib => ../lib` num `go.mod` **nao pode nascer
+antes do diretorio `../lib` existir**. O Go tenta ler o diretorio substituido
+mesmo quando nada no modulo usa aquele import, entao o build quebra por uma
+linha que ninguem exercita.
+
+A consequencia e que essa restricao **nao vem do grafo de referencias**. Nenhuma
+consulta ao language server a enxerga: nao ha simbolo, nao ha leitor, nao ha
+aresta. Ela vem da existencia de um caminho no sistema de arquivos.
+
+O que isso exige do pacote de regras:
+
+- A peca de uma linha `replace` carrega o span da linha inteira, entao o
+  construtor de arestas le o destino (`../lib`) dos proprios bytes. O
+  recortador nao precisa expor o destino num campo.
+- A aresta e da linha `replace` para **o que cria o diretorio destino** - na
+  pratica, o `go.mod` daquele modulo, que e a primeira coisa a existir la.
+- Quando uma linha `replace` tem varios destinos possiveis ao longo da
+  historia, o piso e o **ultimo** deles a nascer, nao o primeiro: uma linha
+  precisa de todos os seus destinos, nao de um.
+
+Nao confundir com "o ponto em que o arquivo foi editado pela ultima vez". Foi
+exatamente essa a tentativa que quebrou as 53 arvores: `libs/engines/flowrun`
+nasce na posicao 131 e sete arquivos que o referenciam eram editados pela
+ultima vez entre 78 e 117.
+
+### Um sinal que caiu de graca
+
+Corrigidos os pousos, os 9 pontos resultantes cairam **todos** em commits
+`chore(...): Wire ... into the workspace`. Isso nao e coincidencia: se o pouso
+correto de um `go.mod` e sempre um commit que ja mexe em `go.work`, entao o
+commit de fiacao e o dono natural da linha `replace`. E uma regra que a
+ferramenta pode aplicar em vez de um piso que ela precisa calcular, e o assunto
+do commit ja descreve o que a linha faz.
