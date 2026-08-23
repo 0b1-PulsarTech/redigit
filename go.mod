@@ -10,4 +10,8 @@ require (
 	google.golang.org/protobuf v1.36.12
 )
 
-require github.com/sourcegraph/beaut v0.0.0-20240611013027-627e4c25335a // indirect
+require (
+	github.com/sourcegraph/beaut v0.0.0-20240611013027-627e4c25335a // indirect
+	golang.org/x/mod v0.40.0 // indirect
+	golang.org/x/tools v0.49.0 // indirect
+)

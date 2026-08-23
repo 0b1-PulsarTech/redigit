@@ -2,7 +2,10 @@ package config
 
 import (
 	"context"
+	"strings"
 	"testing"
+
+	"golang.org/x/mod/modfile"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/chunk"
@@ -60,9 +63,52 @@ func TestSyntaxRendersOnlyTheKeptPieces(t *testing.T) {
 		t.Fatalf("Render() = %v", err)
 	}
 
-	want := "module github.com/org/app\n\ngo 1.26\n\nrequire (\n\tgithub.com/a/a v1.0.0\n"
+	// The kept require survives and the dropped one does not, and the result
+	// is what `go mod edit` would write - not the kept lines concatenated,
+	// which would leave the require block's header without its closing paren.
+	want := "module github.com/org/app\n\ngo 1.26\n\nrequire github.com/a/a v1.0.0\n"
 	if string(got) != want {
 		t.Fatalf("Render() =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The defect a full-set round trip cannot reach: a go.mod's require and
+// replace lines sit inside block headers that belong to no single line, so a
+// SUBSET concatenated textually puts a replace inside the require block and
+// the file stops parsing. On a real repository that broke 91 of 97 trees.
+func TestSyntaxRendersAParsableSubsetOfABlockStructuredFile(t *testing.T) {
+	t.Parallel()
+
+	source := []byte("module github.com/org/app\n\ngo 1.26\n\n" +
+		"require (\n\tgithub.com/a/a v1.0.0\n\tgithub.com/b/b v1.0.0\n)\n\n" +
+		"replace (\n\tgithub.com/a/a => ../a\n\tgithub.com/b/b => ../b\n)\n")
+
+	syntax := NewSyntax(chunkers())
+
+	decls, err := syntax.Declarations(t.Context(), "go.mod", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	keep := keysOf(decls,
+		"github.com/org/app", "require github.com/a/a", "replace github.com/a/a")
+	if len(keep) != 3 {
+		t.Fatalf("the chunking produced %d of the 3 expected pieces", len(keep))
+	}
+
+	got, err := syntax.Render(t.Context(), source, keep)
+	if err != nil {
+		t.Fatalf("Render() = %v", err)
+	}
+
+	if _, err = modfile.Parse("go.mod", got, nil); err != nil {
+		t.Fatalf("the rendered subset does not parse: %v\n%s", err, got)
+	}
+
+	for _, dropped := range []string{"github.com/b/b"} {
+		if strings.Contains(string(got), dropped) {
+			t.Fatalf("%s was not kept and is still in the file:\n%s", dropped, got)
+		}
 	}
 }
 
@@ -80,7 +126,8 @@ func TestSyntaxRenderingEveryPieceReproducesTheFile(t *testing.T) {
 		{
 			name: "a go.mod with a require block and a replace",
 			path: "go.mod",
-			source: "module m\n\ngo 1.26\n\nrequire (\n\tgithub.com/a/a v1.0.0\n)\n\n" +
+			source: "module m\n\ngo 1.26\n\n" +
+				"require (\n\tgithub.com/a/a v1.0.0\n\tgithub.com/b/b v1.0.0\n)\n\n" +
 				"replace github.com/a/a => ../a\n",
 		},
 		{
@@ -99,9 +146,9 @@ func TestSyntaxRenderingEveryPieceReproducesTheFile(t *testing.T) {
 			source: "github.com/a/a v1.0.0 h1:abc=\n",
 		},
 		{
-			name:   "a file with no trailing newline",
-			path:   "go.work",
-			source: "go 1.26\n\nuse ./a",
+			name:   "a file no chunker splits, with no trailing newline",
+			path:   "go.sum",
+			source: "github.com/a/a v1.0.0 h1:abc=",
 		},
 	}
 

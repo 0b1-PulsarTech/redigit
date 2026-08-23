@@ -30,8 +30,8 @@ func (GoMod) Chunks(_ context.Context, path string, source []byte) ([]entities.D
 	unit := entities.UnitID(filepath.Dir(path))
 
 	entries := mergeDirectiveEntries(
-		scanDirective(source, lines, "require"),
-		scanDirective(source, lines, "replace"),
+		scanDirective(source, lines, requireDirective),
+		scanDirective(source, lines, replaceDirective),
 	)
 
 	header := moduleDirectiveEntry(source, lines)

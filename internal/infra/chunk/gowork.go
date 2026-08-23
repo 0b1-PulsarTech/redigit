@@ -28,7 +28,7 @@ func (GoWork) Chunks(_ context.Context, path string, source []byte) ([]entities.
 	lines := splitLines(source)
 	unit := entities.UnitID(filepath.Dir(path))
 
-	entries := scanDirective(source, lines, "use")
+	entries := scanDirective(source, lines, useDirective)
 	starts := entryStarts(entries, len(source))
 
 	decls := make([]entities.Decl, 0, len(entries)+1)

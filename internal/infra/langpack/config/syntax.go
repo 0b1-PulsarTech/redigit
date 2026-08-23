@@ -18,6 +18,12 @@ type Chunker interface {
 	Chunks(ctx context.Context, path string, source []byte) ([]entities.Decl, error)
 }
 
+// Renderer is the chunker that writes its own file back, for a format where
+// concatenating a subset of the spans does not produce a valid file.
+type Renderer interface {
+	Render(source []byte, keep []entities.DeclKey) ([]byte, error)
+}
+
 // Syntax reads the files a repository needs to build but that no language
 // server understands - go.mod, go.work, query files - answering Declarations
 // by chunking and Render by concatenating the pieces a commit keeps.
@@ -55,13 +61,10 @@ func (s Syntax) Declarations(
 	return nil, nil
 }
 
-// Render writes back the file holding only keep, by concatenating those
-// pieces' spans in file order.
-//
-// The pieces of a chunked file tile it end to end, so concatenating a subset
-// in span order is the whole of the rendering: there is no comment to move and
-// no import to prune, unlike a language where a declaration's text is not the
-// whole story.
+// Render writes back the file holding only keep. A chunker implementing
+// Renderer writes its own file, because a format with BLOCK structure cannot
+// be rebuilt by concatenation. Everything else tiles end to end, so
+// concatenating the kept spans in order is the whole of it.
 func (s Syntax) Render(
 	_ context.Context,
 	source []byte,
@@ -69,6 +72,15 @@ func (s Syntax) Render(
 ) ([]byte, error) {
 	if len(keep) == 0 {
 		return nil, nil
+	}
+
+	if renderer, own := s.rendererFor(keep[0].File); own {
+		out, err := renderer.Render(source, keep)
+		if err != nil {
+			return nil, fmt.Errorf("render %s: %w", keep[0].File, err)
+		}
+
+		return out, nil
 	}
 
 	spans, err := s.spansOf(source, keep)
@@ -86,12 +98,10 @@ func (s Syntax) Render(
 	return out, nil
 }
 
-// spansOf re-chunks source and returns the span of each kept key.
-//
-// Re-chunking rather than trusting a span handed in: the caller's spans were
-// measured against the FINAL file, and Render is given that same final file,
-// so the two agree - but only re-chunking proves it. A key the chunking does
-// not produce is dropped rather than guessed at.
+// spansOf re-chunks source and returns the span of each kept key. Re-chunking
+// rather than trusting a span handed in: the caller's spans were measured
+// against the FINAL file, which is the file Render is given, and only
+// re-chunking proves the two agree.
 func (s Syntax) spansOf(source []byte, keep []entities.DeclKey) ([]entities.Span, error) {
 	if len(keep) == 0 {
 		return nil, nil
@@ -116,4 +126,19 @@ func (s Syntax) spansOf(source []byte, keep []entities.DeclKey) ([]entities.Span
 	}
 
 	return spans, nil
+}
+
+// rendererFor reports the chunker that claims path and writes its own file.
+func (s Syntax) rendererFor(path string) (Renderer, bool) {
+	for _, chunker := range s.chunkers {
+		if !chunker.Handles(path) {
+			continue
+		}
+
+		renderer, writes := chunker.(Renderer)
+
+		return renderer, writes
+	}
+
+	return nil, false
 }
