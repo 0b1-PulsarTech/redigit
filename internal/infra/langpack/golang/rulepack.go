@@ -35,6 +35,7 @@ var rules = []rule{
 	migrationRule{},
 	testAnchorRule{},
 	enclosesRule{},
+	assertionRule{},
 	buildTagsRule{},
 }
 
