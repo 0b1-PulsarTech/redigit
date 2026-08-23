@@ -28,6 +28,7 @@ func (workspaceRule) Edges(
 	}
 
 	sources := map[string][]byte{}
+	replaced := map[string]string{}
 
 	var edges []entities.Edge
 
@@ -42,6 +43,10 @@ func (workspaceRule) Edges(
 			continue
 		}
 
+		if module, isReplace := strings.CutPrefix(decl.Key.Name, replacePrefix); isReplace {
+			replaced[decl.Key.File+"\x00"+module] = target
+		}
+
 		edges = append(edges, entities.Edge{
 			Dependent: decl.Key,
 			Provider:  provider,
@@ -49,7 +54,41 @@ func (workspaceRule) Edges(
 		})
 	}
 
-	return edges, nil
+	return append(edges, requireEdges(decls, headers, replaced)...), nil
+}
+
+// requireEdges makes a "require X" wait for the directory its own file's
+// "replace X" points at. The two lines are one fact: a locally replaced
+// require carries the pseudo-version v0.0.0-00010101000000-000000000000, and
+// without the target the go command reaches the network for it and fails.
+func requireEdges(
+	decls []entities.Decl,
+	headers map[string]entities.DeclKey,
+	replaced map[string]string,
+) []entities.Edge {
+	var edges []entities.Edge
+
+	for _, decl := range decls {
+		module, isRequire := strings.CutPrefix(decl.Key.Name, requirePrefix)
+		if !isRequire || path.Base(decl.Key.File) != goModFile {
+			continue
+		}
+
+		target, locally := replaced[decl.Key.File+"\x00"+module]
+		if !locally {
+			continue
+		}
+
+		if provider, found := headers[target]; found {
+			edges = append(edges, entities.Edge{
+				Dependent: decl.Key,
+				Provider:  provider,
+				Reason:    entities.ReasonWorkspace,
+			})
+		}
+	}
+
+	return edges
 }
 
 func (workspaceRule) Anchors(

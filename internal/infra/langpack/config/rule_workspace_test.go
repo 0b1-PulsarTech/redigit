@@ -174,3 +174,65 @@ func TestWorkspaceRuleSurvivesAnUnreadableFile(t *testing.T) {
 		t.Fatalf("got %d edge(s) from a file that could not be read", len(edges))
 	}
 }
+
+// A require whose module is replaced locally carries the pseudo-version
+// v0.0.0-00010101000000-000000000000, which means "the replace resolves this".
+// With the target directory not there yet, the go command tries the network
+// for that version and fails - 247 trees on a real repository.
+func TestWorkspaceRuleMakesARequireWaitForItsLocalReplace(t *testing.T) {
+	t.Parallel()
+
+	const appMod = "apps/lead/go.mod"
+
+	body := "module github.com/org/app\n\ngo 1.26\n\n" +
+		"require github.com/org/lib v0.0.0-00010101000000-000000000000\n\n" +
+		"replace github.com/org/lib => ../../libs/lib\n"
+
+	snap := treeWith(t, map[string]string{appMod: body})
+
+	header := piece(appMod, "github.com/org/app", entities.Span{Start: 0, End: 36})
+	require := piece(appMod, "require github.com/org/lib", entities.Span{Start: 36, End: 98})
+	replace := piece(appMod, "replace github.com/org/lib", entities.Span{Start: 98, End: len(body)})
+	libHeader := piece("libs/lib/go.mod", "github.com/org/lib", entities.Span{Start: 0, End: 30})
+
+	edges, err := (workspaceRule{}).Edges(
+		t.Context(), snap, []entities.Decl{header, require, replace, libHeader},
+	)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if !edgeBetween(edges, require.Key, libHeader.Key) {
+		t.Fatalf(
+			"the require does not wait for %s: the replace resolves it, and without the "+
+				"target the go command reaches the network for a version that does not exist",
+			libHeader.Key.File,
+		)
+	}
+}
+
+// A require with no local replace resolves from the module proxy and needs
+// nothing in this tree.
+func TestWorkspaceRuleLeavesAnOrdinaryRequireAlone(t *testing.T) {
+	t.Parallel()
+
+	const modFile = "go.mod"
+
+	body := "module github.com/org/app\n\nrequire github.com/x/y v1.2.3\n"
+	snap := treeWith(t, map[string]string{modFile: body})
+
+	header := piece(modFile, "github.com/org/app", entities.Span{Start: 0, End: 27})
+	require := piece(modFile, "require github.com/x/y", entities.Span{Start: 27, End: len(body)})
+	other := piece("libs/lib/go.mod", "github.com/x/y", entities.Span{Start: 0, End: 20})
+
+	edges, err := (workspaceRule{}).Edges(
+		t.Context(), snap, []entities.Decl{header, require, other},
+	)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if len(edges) != 0 {
+		t.Fatalf("got %d edge(s) for a require nothing replaces: %v", len(edges), edges)
+	}
+}
