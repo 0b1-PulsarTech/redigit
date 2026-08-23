@@ -13,6 +13,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
 	"github.com/wrapped-owls/redigit/internal/infra/lsp"
 )
@@ -110,12 +111,8 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	}
 
 	indexCfg := cfg.Indexing
-	indexCfg.Languages = []indexing.Language{{
-		Name:       "go",
-		Extensions: []string{".go"},
-		Syntax:     golang.NewSyntax(),
-		Rules:      golang.NewRulePack(),
-	}}
+	configSyntax := config.NewSyntax(configChunkers())
+	indexCfg.Languages = languages(configSyntax)
 
 	// The snapshot describes a REVISION, so its root is where that revision
 	// was materialised - not the repository, whose working tree holds whatever
@@ -152,7 +149,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		auditor:  auditing.New(cfg.Auditing),
 		snapshot: snapshot,
 		source:   source,
-		renderer: golang.NewSyntax(),
+		renderer: newRenderer(golang.NewSyntax(), configRenderers(configSyntax)),
 	}, nil
 }
 
@@ -240,4 +237,24 @@ func (p *Pipeline) Close(ctx context.Context) error {
 	}
 
 	return closeErr
+}
+
+// languages is what the indexer reads with. The config entry covers the files
+// a build needs and no language server reads: without them a plan holds no
+// go.mod, so every tree it describes has source and nothing to compile it.
+func languages(configSyntax config.Syntax) []indexing.Language {
+	return []indexing.Language{
+		{
+			Name:       "go",
+			Extensions: []string{".go"},
+			Syntax:     golang.NewSyntax(),
+			Rules:      golang.NewRulePack(),
+		},
+		{
+			Name:       "config",
+			Extensions: configExtensions(),
+			Syntax:     configSyntax,
+			Rules:      config.NewRulePack(),
+		},
+	}
 }

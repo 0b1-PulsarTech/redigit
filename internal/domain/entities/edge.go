@@ -44,6 +44,16 @@ const (
 	// a document belongs to one unit - a package README - rather than to the
 	// finished tree.
 	ReasonDescribes EdgeReason = "describes"
+	// ReasonModule ties code to the go.mod that makes its directory a module.
+	// Without it nothing in the tree compiles, and no reference query sees it:
+	// a package's declarations name their own module never, and the module
+	// file names them never either.
+	ReasonModule EdgeReason = "module"
+	// ReasonWorkspace ties a go.work "use" line, and a go.mod "replace"
+	// pointing at a local path, to the module directory it names. Go reads a
+	// replaced directory even when nothing imports the module, so a replace
+	// line landing before its target exists breaks every build until it does.
+	ReasonWorkspace EdgeReason = "workspace"
 	// ReasonProse holds back what is only true of the finished tree: general
 	// documentation, a pipeline definition, an agent instruction. Written about
 	// a whole that does not exist until the end, it belongs at the end.

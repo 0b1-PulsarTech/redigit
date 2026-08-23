@@ -7,14 +7,13 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/chunking"
 	"github.com/wrapped-owls/redigit/internal/infra/chunk"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 )
 
 // Cut reads the tree at cfg.Rev and returns every piece of every file a
-// chunker claims, dated against that revision's own history.
-//
-// It starts no language server: chunking is the half of the tool that needs
-// no semantic resolution, and a caller who only wants the pieces should not
-// pay for gopls to index the repository first.
+// chunker claims, dated against that revision's own history. It starts no
+// language server: chunking needs no semantic resolution, and a caller who
+// wants only the pieces should not pay for gopls to index the repository.
 func Cut(ctx context.Context, cfg Config) ([]chunking.Piece, error) {
 	reader := gitstore.NewReader(cfg.Repo, cfg.Rev)
 
@@ -45,6 +44,17 @@ func chunkers() []chunking.Chunker {
 			continue
 		}
 
+		out = append(out, chunker)
+	}
+
+	return out
+}
+
+// configChunkers is what the config language reads with, WholeFile included:
+// an owned file no chunker claims still has to reach the tree.
+func configChunkers() []config.Chunker {
+	out := make([]config.Chunker, 0, len(chunk.Registry))
+	for _, chunker := range chunk.Registry {
 		out = append(out, chunker)
 	}
 

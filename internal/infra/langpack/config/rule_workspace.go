@@ -1,0 +1,129 @@
+package config
+
+import (
+	"context"
+	"path"
+	"strings"
+
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+)
+
+// workspaceRule ties a line naming a module DIRECTORY - a go.work "use ./x",
+// a go.mod "replace y => ../y" - to the go.mod that makes it exist. Go reads a
+// replaced directory even when nothing imports the module, so a replace
+// landing before its target breaks EVERY build until it arrives: that broke
+// 53 trees on a real repository.
+type workspaceRule struct{}
+
+func (workspaceRule) Name() string { return "workspace" }
+
+func (workspaceRule) Edges(
+	_ context.Context,
+	snap entities.Snapshot,
+	decls []entities.Decl,
+) ([]entities.Edge, error) {
+	headers := moduleHeaders(decls)
+	if len(headers) == 0 {
+		return nil, nil
+	}
+
+	sources := map[string][]byte{}
+
+	var edges []entities.Edge
+
+	for _, decl := range decls {
+		target, names := localTarget(decl, snap, sources)
+		if !names {
+			continue
+		}
+
+		provider, found := headers[target]
+		if !found {
+			continue
+		}
+
+		edges = append(edges, entities.Edge{
+			Dependent: decl.Key,
+			Provider:  provider,
+			Reason:    entities.ReasonWorkspace,
+		})
+	}
+
+	return edges, nil
+}
+
+func (workspaceRule) Anchors(
+	_ context.Context,
+	_ entities.Snapshot,
+	_ []entities.Decl,
+) ([]entities.Anchor, error) {
+	return nil, nil
+}
+
+// localTarget reports the repository-relative directory a piece names. A
+// replace whose right-hand side is a version rather than a path names none:
+// "replace X v1.0.0 => X v1.1.0" needs nothing to exist in the tree.
+func localTarget(
+	decl entities.Decl,
+	snap entities.Snapshot,
+	sources map[string][]byte,
+) (string, bool) {
+	base := path.Dir(decl.Key.File)
+
+	switch {
+	case strings.HasPrefix(decl.Key.Name, usePrefix) &&
+		path.Base(decl.Key.File) == goWorkFile:
+		return resolve(base, strings.TrimSpace(strings.TrimPrefix(decl.Key.Name, usePrefix)))
+
+	case strings.HasPrefix(decl.Key.Name, replacePrefix) &&
+		path.Base(decl.Key.File) == goModFile:
+		return replaceTarget(base, decl, snap, sources)
+	}
+
+	return "", false
+}
+
+// replaceTarget reads the right-hand side out of the replace line's own bytes:
+// the NAME carries only the module replaced, the target lives in the span's
+// text. An unreadable file yields no edge rather than an error, because one
+// missing edge orders one line by history while failing loses every edge.
+func replaceTarget(
+	base string,
+	decl entities.Decl,
+	snap entities.Snapshot,
+	sources map[string][]byte,
+) (string, bool) {
+	source, cached := sources[decl.Key.File]
+	if !cached {
+		read, err := readSource(snap, decl.Key.File)
+		if err != nil {
+			read = nil
+		}
+
+		source = read
+		sources[decl.Key.File] = source
+	}
+
+	_, arrow, found := strings.Cut(sliceSpan(source, decl.Span), "=>")
+	if !found {
+		return "", false
+	}
+
+	fields := strings.Fields(arrow)
+	if len(fields) == 0 {
+		return "", false
+	}
+
+	return resolve(base, fields[0])
+}
+
+// resolve turns a path written relative to the file that holds it into a
+// repository-relative one. A target that is not a local path - a module path
+// with no dot-slash - names no directory in this tree.
+func resolve(base, target string) (string, bool) {
+	if !strings.HasPrefix(target, "./") && !strings.HasPrefix(target, "../") {
+		return "", false
+	}
+
+	return path.Clean(path.Join(base, target)), true
+}
