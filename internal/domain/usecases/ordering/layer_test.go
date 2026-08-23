@@ -6,6 +6,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
+// span builds the inclusive run of positions from first to last.
+func span(first, last entities.Position) []entities.Position {
+	at := make([]entities.Position, 0, last-first+1)
+	for position := first; position <= last; position++ {
+		at = append(at, position)
+	}
+
+	return at
+}
+
 func layerDecl(file, name string) entities.Decl {
 	return entities.Decl{
 		Key:  entities.DeclKey{File: file, Kind: entities.KindFunc, Name: name},
@@ -226,8 +236,8 @@ func TestALayerDoesNotReachAcrossFeatures(t *testing.T) {
 	})
 
 	features := entities.NewFeatures([]entities.Feature{
-		{Name: "wabapi", From: 0, To: 100},
-		{Name: "agendamento", From: 243, To: 245},
+		{Name: "wabapi", At: span(0, 100)},
+		{Name: "agendamento", At: span(243, 245)},
 	})
 
 	applyLayers(decls, base, layers, features)
@@ -265,7 +275,7 @@ func TestALayerStillOrdersInsideItsOwnFeature(t *testing.T) {
 		{Prefix: "modules", Layer: 5},
 	})
 
-	features := entities.NewFeatures([]entities.Feature{{Name: "agendamento", From: 243, To: 245}})
+	features := entities.NewFeatures([]entities.Feature{{Name: "agendamento", At: span(243, 245)}})
 
 	applyLayers(decls, base, layers, features)
 
@@ -285,7 +295,7 @@ func TestALayerSkipsADeclarationNoFeatureCovers(t *testing.T) {
 	decls := []entities.Decl{orphan, inside}
 	base := map[entities.DeclKey]entities.Position{orphan.Key: 700, inside.Key: 10}
 
-	features := entities.NewFeatures([]entities.Feature{{Name: "early", From: 0, To: 100}})
+	features := entities.NewFeatures([]entities.Feature{{Name: "early", At: span(0, 100)}})
 
 	applyLayers(decls, base, kernelLayers(), features)
 

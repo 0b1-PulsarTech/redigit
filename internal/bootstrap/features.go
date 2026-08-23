@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,11 +19,11 @@ import (
 // ambiguous slice silently changes which declarations a layer may reorder.
 var ErrMalformedFeature = errors.New("malformed feature")
 
-// LoadFeatures reads a feature file: one slice per line, the first and last
-// position of the published history, then the name, "#" starting a comment.
+// LoadFeatures reads a feature file: one slice per line, the set of positions
+// it covers, then the name, "#" starting a comment.
 //
-//	0    12   bootstrap
-//	243  245  agendamento   # engine and module born together
+//	12-16,89-94  fundacao de erros
+//	17,258,575   tags de lead   # schema, domain and use case, far apart
 func LoadFeatures(path string) (entities.Features, error) {
 	content, err := os.ReadFile(path) // #nosec G304 -- caller-supplied config path.
 	if err != nil {
@@ -58,10 +60,8 @@ func ParseFeatures(content []byte) (entities.Features, error) {
 		first := overlaps[0]
 
 		return entities.Features{}, fmt.Errorf(
-			"%w: %q covers %d-%d and %q covers %d-%d, so a shared position belongs to both",
-			ErrMalformedFeature,
-			first[0].Name, first[0].From, first[0].To,
-			first[1].Name, first[1].From, first[1].To,
+			"%w: %q and %q both claim a position, so it belongs to both",
+			ErrMalformedFeature, first[0].Name, first[1].Name,
 		)
 	}
 
@@ -78,35 +78,76 @@ func parseFeatureLine(line string) (entities.Feature, bool, error) {
 		return entities.Feature{}, false, nil
 	}
 
-	const minFields = 3
+	const minFields = 2
 	if len(fields) < minFields {
 		return entities.Feature{}, false, fmt.Errorf(
-			"%w: want a first position, a last position and a name, got %d field(s)",
+			"%w: want a set of positions and a name, got %d field(s)",
 			ErrMalformedFeature, len(fields),
 		)
 	}
 
-	from, err := parsePosition(fields[0])
+	at, err := parsePositionSet(fields[0])
 	if err != nil {
 		return entities.Feature{}, false, err
 	}
 
-	to, err := parsePosition(fields[1])
-	if err != nil {
-		return entities.Feature{}, false, err
+	return entities.Feature{Name: strings.Join(fields[1:], " "), At: at}, true, nil
+}
+
+// parsePositionSet reads "17,258,575" and "12-16,89-94" and mixtures of the
+// two into the positions they name, sorted and deduplicated.
+//
+// A capability is a set because the published history built it in pieces that
+// sit far apart: a range spanning them would swallow everything in between.
+func parsePositionSet(spec string) ([]entities.Position, error) {
+	seen := map[entities.Position]bool{}
+
+	for _, part := range strings.Split(spec, ",") {
+		if part = strings.TrimSpace(part); part == "" {
+			return nil, fmt.Errorf("%w: %q holds an empty position", ErrMalformedFeature, spec)
+		}
+
+		from, to, err := parseRange(part)
+		if err != nil {
+			return nil, err
+		}
+
+		for at := from; at <= to; at++ {
+			seen[at] = true
+		}
+	}
+
+	at := slices.Collect(maps.Keys(seen))
+	slices.Sort(at)
+
+	return at, nil
+}
+
+// parseRange reads one element of a set: "42" or "12-16". Both ends are
+// inclusive.
+func parseRange(part string) (from, to entities.Position, err error) {
+	first, last, isRange := strings.Cut(part, "-")
+	if !isRange {
+		at, atErr := parsePosition(part)
+
+		return at, at, atErr
+	}
+
+	if from, err = parsePosition(first); err != nil {
+		return 0, 0, err
+	}
+
+	if to, err = parsePosition(last); err != nil {
+		return 0, 0, err
 	}
 
 	if to < from {
-		return entities.Feature{}, false, fmt.Errorf(
-			"%w: last position %d is before first position %d", ErrMalformedFeature, to, from,
+		return 0, 0, fmt.Errorf(
+			"%w: range %q ends before it starts", ErrMalformedFeature, part,
 		)
 	}
 
-	return entities.Feature{
-		Name: strings.Join(fields[2:], " "),
-		From: from,
-		To:   to,
-	}, true, nil
+	return from, to, nil
 }
 
 func parsePosition(field string) (entities.Position, error) {

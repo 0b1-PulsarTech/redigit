@@ -53,13 +53,17 @@ Flags:
                   6  libs/infra      # persists module entities: after them
 
   --features FILE the vertical slices a layer may reorder inside. One slice
-                per line: first position, last position, name. WITHOUT this,
+                per line: the set of positions it covers, then the name. A
+                comma separates, a hyphen marks an inclusive range, so a
+                capability the history built in distant pieces is one slice
+                without swallowing what lies between. WITHOUT this,
                 a layer reaches across the whole history and orders every
                 kernel declaration before every engine, which builds the
                 repository horizontally and leaves it with no working product
                 until the end. A feature says what gets built; a layer says
                 in which order that feature's own pieces are born.
 
-                  0    12   bootstrap
-                  243  245  agendamento  # engine and module born together
+                  0-12         bootstrap
+                  17,258,575   tags de lead   # schema, domain, use case
+                  243-245      agendamento    # engine and module together
 `
