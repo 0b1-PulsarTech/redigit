@@ -21,6 +21,12 @@ type Language struct {
 	Extensions []string
 	Syntax     Syntax
 	Rules      RulePack
+
+	// Resolved says a language server answers reference queries for these
+	// files. It is false for the files a build needs and no server reads: a
+	// query about a go.mod is a round trip that can only come back empty, and
+	// counting those empties as blind spots buries the ones that are real.
+	Resolved bool
 }
 
 func (l Language) owns(file string) bool {
@@ -46,6 +52,14 @@ type Indexer struct {
 	tree     Tree
 	langs    []Language
 	limit    int
+}
+
+// resolvedFile reports whether a language server answers for a path. A path no
+// language owns is not asked about either.
+func (i Indexer) resolvedFile(file string) bool {
+	lang, owned := i.languageFor(file)
+
+	return owned && lang.Resolved
 }
 
 func New(resolver Resolver, tree Tree, cfg Config) Indexer {
@@ -83,7 +97,7 @@ func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, err
 		)
 	}
 
-	edges, blind, err := i.resolve(ctx, decls, where)
+	edges, blind, err := i.resolve(ctx, resolvable(i, decls), where)
 	if err != nil {
 		return Result{}, err
 	}
@@ -207,4 +221,17 @@ func (i Indexer) applyRules(
 	}
 
 	return edges, anchors, nil
+}
+
+// resolvable keeps the declarations a language server can answer about.
+func resolvable(indexer Indexer, decls []entities.Decl) []entities.Decl {
+	out := make([]entities.Decl, 0, len(decls))
+
+	for _, decl := range decls {
+		if indexer.resolvedFile(decl.Key.File) {
+			out = append(out, decl)
+		}
+	}
+
+	return out
 }

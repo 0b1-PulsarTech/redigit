@@ -57,7 +57,9 @@ func indexWith(
 
 	return New(resolver, tree, Config{
 		Concurrency: 1,
-		Languages:   []Language{{Name: "go", Extensions: []string{".go"}, Syntax: syntax}},
+		Languages: []Language{{
+			Name: "go", Extensions: []string{".go"}, Syntax: syntax, Resolved: true,
+		}},
 	}).Index(context.Background(), entities.Snapshot{Files: []string{"a.go"}})
 }
 
@@ -332,5 +334,48 @@ func TestDirectCallsOnlyKeepsWhatItCannotResolve(t *testing.T) {
 	// edge here would move a declaration ahead of something that does read it.
 	if len(got) != 1 {
 		t.Fatalf("directCallsOnly() = %v, want the doubtful reference kept", got)
+	}
+}
+
+// A language server does not read a go.mod, so asking about one is a round
+// trip that can only come back empty. Counting those empties as blind spots
+// buries the ones that are real: on a real repository 514 of them drowned the
+// 4 Go declarations the server genuinely could not answer.
+func TestIndexAsksNothingAboutAnUnresolvedLanguage(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	tree := NewMockTree(ctrl)
+	tree.EXPECT().Read(gomock.Any(), gomock.Any()).Return([]byte("module m\n"), nil).AnyTimes()
+
+	syntax := NewMockSyntax(ctrl)
+	syntax.EXPECT().
+		Declarations(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return([]entities.Decl{{
+			Key:  entities.DeclKey{File: "go.mod", Kind: entities.KindOther, Name: "m"},
+			Unit: ".",
+		}}, nil).
+		AnyTimes()
+
+	// Not AnyTimes: any call at all is the defect.
+	resolver := NewMockResolver(ctrl)
+
+	result, err := New(resolver, tree, Config{
+		Concurrency: 1,
+		Languages: []Language{{
+			Name: "config", Extensions: []string{".mod"}, Syntax: syntax,
+		}},
+	}).Index(context.Background(), entities.Snapshot{Files: []string{"go.mod"}})
+	if err != nil {
+		t.Fatalf("Index() = %v", err)
+	}
+
+	if len(result.Blind) != 0 {
+		t.Fatalf("the run reports %d blind spot(s) for files no server reads", len(result.Blind))
+	}
+
+	if result.Graph.Len() != 1 {
+		t.Fatalf("the declaration did not reach the graph: %d", result.Graph.Len())
 	}
 }

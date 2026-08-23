@@ -46,7 +46,7 @@ func TestIndexerRefusesAnEmptyRun(t *testing.T) {
 		Return(nil, nil).
 		AnyTimes()
 
-	goLang := Language{Name: "go", Extensions: []string{".go"}, Syntax: syntax}
+	goLang := Language{Name: "go", Extensions: []string{".go"}, Syntax: syntax, Resolved: true}
 
 	testCases := []struct {
 		name  string

@@ -249,6 +249,7 @@ func languages(configSyntax config.Syntax) []indexing.Language {
 			Extensions: []string{".go"},
 			Syntax:     golang.NewSyntax(),
 			Rules:      golang.NewRulePack(),
+			Resolved:   true,
 		},
 		{
 			Name:       "config",
