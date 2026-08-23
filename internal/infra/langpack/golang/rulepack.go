@@ -36,6 +36,7 @@ var rules = []rule{
 	testAnchorRule{},
 	enclosesRule{},
 	assertionRule{},
+	conversionRule{},
 	buildTagsRule{},
 }
 
