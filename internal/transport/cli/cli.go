@@ -19,6 +19,7 @@ var ErrUsage = errors.New("usage")
 // its tests never drift from each other on a typo.
 const (
 	cmdAudit  = "audit"
+	cmdChunks = "chunks"
 	cmdEmit   = "emit"
 	cmdGraph  = "graph"
 	cmdPlan   = "plan"
@@ -37,6 +38,13 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
       references it can see. Writes no commit and no ref - that is the calling
       agent's to do. Blobs go into the repository's object database unless
       --blob-dir names a directory to write them to instead.
+
+  redigit chunks --repo PATH [--rev REF]
+      One JSON object per line, per piece of every file a chunker claims: a
+      sqlc "-- name:" block, a go.mod require or replace line, a go.work use
+      line. born_at is the position of the published history that first held
+      the piece, read by re-cutting the file at each commit that touched it,
+      and -1 for a piece that history never held. Starts no language server.
 
   redigit report --repo PATH [--rev REF] [--tags TAGS]
       One JSON object per line, per declaration: where it was born in this
@@ -100,6 +108,8 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, star
 		return runReport(ctx, cfg, stdout, start)
 	case cmdEmit:
 		return runEmit(ctx, cfg, start, stdout)
+	case cmdChunks:
+		return runChunks(ctx, cfg, bootstrap.Cut, stdout)
 	}
 
 	_, _ = fmt.Fprint(stderr, usage)
