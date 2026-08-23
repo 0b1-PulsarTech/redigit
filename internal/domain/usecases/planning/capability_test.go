@@ -238,3 +238,60 @@ func TestPlannerOrdersATieByDependencyNotByName(t *testing.T) {
 		)
 	}
 }
+
+// A topological order is not unique, and the one picked decides how many
+// commits the cut produces. Among declarations nothing separates, the pass
+// must keep emitting the slice it is already emitting: interleaving them costs
+// a commit per switch and spreads a slice across the history.
+func TestPlannerKeepsASliceTogetherAmongTies(t *testing.T) {
+	t.Parallel()
+
+	// Six declarations at one position, nothing between them, alternating
+	// slices in name order. Name order gives six commits; slice-preferring
+	// order gives two.
+	var (
+		decls []entities.Decl
+		caps  = Capabilities{}
+	)
+
+	// The names alternate in ALPHABETICAL order, which is the shape that
+	// makes name order interleave the slices.
+	for index, spec := range []struct {
+		file, slice string
+	}{
+		{"a.go", "alpha"}, {"b.go", "beta"},
+		{"c.go", "alpha"}, {"d.go", "beta"},
+		{"e.go", "alpha"}, {"f.go", "beta"},
+	} {
+		one := decl(spec.file, "F", entities.UnitID(spec.file))
+		decls = append(decls, one)
+		caps[one.Key] = FeatureID(spec.slice)
+
+		_ = index
+	}
+
+	at := map[entities.DeclKey]entities.Position{}
+	for _, one := range decls {
+		at[one.Key] = 3
+	}
+
+	plan, err := New(Config{Capabilities: caps}).Plan(
+		entities.NewGraph(decls, nil, nil), entities.Ordering{At: at},
+	)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	if len(plan.Commits) > 2 {
+		subjects := make([]string, 0, len(plan.Commits))
+		for _, commit := range plan.Commits {
+			subjects = append(subjects, commit.Feature)
+		}
+
+		t.Fatalf(
+			"six tied declarations of two slices became %d commits (%v): the order "+
+				"interleaved the slices instead of finishing one",
+			len(plan.Commits), subjects,
+		)
+	}
+}

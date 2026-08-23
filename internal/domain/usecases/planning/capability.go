@@ -62,7 +62,9 @@ func (p Planner) emitByCapability(
 		keys = append(keys, decl.Key)
 	}
 
-	keys = sortForBirth(graph, order, keys)
+	keys = sortForBirth(graph, order, keys, func(key entities.DeclKey) FeatureID {
+		return own.owner[key]
+	})
 
 	var plan entities.Plan
 

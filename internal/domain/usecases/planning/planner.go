@@ -104,14 +104,12 @@ func (p Planner) emit(
 		if shared := unbornProviders(graph, own, members, born); len(shared) > 0 {
 			plan.Commits = append(
 				plan.Commits,
-				p.cut(
-					graph,
-					order,
-					shared,
-					entities.ShapeLayer,
-					SharedFeature,
-					"shared by several features",
-				)...,
+				p.cut(graph, order, bucket{
+					keys:    shared,
+					shape:   entities.ShapeLayer,
+					feature: SharedFeature,
+					reason:  "shared by several features",
+				})...,
 			)
 
 			markBorn(born, shared)
@@ -119,14 +117,12 @@ func (p Planner) emit(
 
 		plan.Commits = append(
 			plan.Commits,
-			p.cut(
-				graph,
-				order,
-				members,
-				entities.ShapeFeature,
-				feature,
-				"one feature, closed over its own dependencies",
-			)...,
+			p.cut(graph, order, bucket{
+				keys:    members,
+				shape:   entities.ShapeFeature,
+				feature: feature,
+				reason:  "one feature, closed over its own dependencies",
+			})...,
 		)
 
 		markBorn(born, members)
@@ -138,9 +134,12 @@ func (p Planner) emit(
 	if rest := remaining(graph, born); len(rest) > 0 {
 		plan.Commits = append(
 			plan.Commits,
-			p.cut(
-				graph, order, rest, entities.ShapeLayer, SharedFeature, "reached by no entry point",
-			)...,
+			p.cut(graph, order, bucket{
+				keys:    rest,
+				shape:   entities.ShapeLayer,
+				feature: SharedFeature,
+				reason:  "reached by no entry point",
+			})...,
 		)
 
 		markBorn(born, rest)
@@ -161,56 +160,6 @@ func (p Planner) emit(
 	}
 
 	return plan
-}
-
-// cut splits one bucket into commits no wider than MaxFiles, keeping the
-// declarations in the order the fixed point put them so a commit never carries
-// a reader ahead of what it reads.
-func (p Planner) cut(
-	graph entities.Graph,
-	order entities.Ordering,
-	keys []entities.DeclKey,
-	shape entities.CommitShape,
-	feature FeatureID,
-	reason string,
-) []entities.PlannedCommit {
-	keys = sortForBirth(graph, order, keys)
-
-	var (
-		out     []entities.PlannedCommit
-		current []entities.DeclKey
-		files   = map[string]bool{}
-	)
-
-	flush := func() {
-		if len(current) == 0 {
-			return
-		}
-
-		out = append(out, entities.PlannedCommit{
-			Subject: draftSubject(shape, feature, current),
-			Shape:   shape,
-			Feature: string(feature),
-			Decls:   slices.Clone(current),
-			Reason:  reason,
-		})
-		current = current[:0]
-		files = map[string]bool{}
-	}
-
-	for _, key := range keys {
-		if !files[key.File] && len(files) >= p.cfg.MaxFiles {
-			flush()
-		}
-
-		files[key.File] = true
-
-		current = append(current, key)
-	}
-
-	flush()
-
-	return out
 }
 
 func groupByFeature(graph entities.Graph, own ownership) map[FeatureID][]entities.DeclKey {
