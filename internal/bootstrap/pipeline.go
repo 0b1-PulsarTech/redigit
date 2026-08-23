@@ -117,6 +117,14 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		Rules:      golang.NewRulePack(),
 	}}
 
+	// The snapshot describes a REVISION, so its root is where that revision
+	// was materialised - not the repository, whose working tree holds whatever
+	// happens to be checked out. A language pack that reads a sibling file
+	// from disk (a generator directive, a mock header) would otherwise read
+	// the wrong bytes, or fail on a file the revision has and the checkout
+	// does not.
+	snapshot.Root = checkout.Dir()
+
 	source, err := newTreeSource(ctx, reader)
 	if err != nil {
 		_ = session.Close(ctx)

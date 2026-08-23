@@ -121,3 +121,41 @@ func fixtureWorktreeCount(t testing.TB, dir string) int {
 
 	return count
 }
+
+// TestSnapshotRootIsTheMaterialisedRevision pins a defect found only by running
+// against a real repository: a language pack that reads a sibling file from
+// disk was reading the repository's WORKING TREE while everything else read the
+// revision. It failed on a file the revision holds and the checkout does not,
+// and would have silently read stale bytes for a file both hold.
+func TestSnapshotRootIsTheMaterialisedRevision(t *testing.T) {
+	if _, err := exec.LookPath("gopls"); err != nil {
+		t.Skip("gopls not on PATH")
+	}
+
+	dir := t.TempDir()
+	writeFixtureModule(t, dir)
+	initFixtureRepo(t, dir)
+
+	ctx := t.Context()
+
+	pl, err := Start(ctx, Config{
+		Repo:          dir,
+		Rev:           "HEAD",
+		ServerCommand: "gopls",
+		ServerArgs:    []string{"-mode=stdio"},
+	})
+	if err != nil {
+		t.Fatalf("Start() = %v", err)
+	}
+
+	defer func() { _ = pl.Close(context.WithoutCancel(ctx)) }()
+
+	root := pl.Snapshot().Root
+	if root == dir {
+		t.Fatalf("Snapshot().Root is the repository %q, not the checkout", root)
+	}
+
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("Snapshot().Root %q does not exist: %v", root, err)
+	}
+}
