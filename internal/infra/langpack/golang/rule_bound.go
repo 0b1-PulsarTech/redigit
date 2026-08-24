@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"go/ast"
+	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
@@ -38,7 +39,13 @@ func (boundRule) Edges(
 	for _, decl := range decls {
 		for _, name := range mentionedTypes(decl, snap, sources) {
 			key := receiverKey{unit: decl.Unit, name: name}
-			if !bound[key] {
+
+			// A method of T mentions T in its own receiver, so waiting here
+			// would make every method of T wait for every other one: a clique,
+			// which is a cycle, and one that crosses files whenever the
+			// methods do. The methods are what the wait is FOR; they cannot
+			// wait for themselves.
+			if !bound[key] || isMethodOf(decl.Key, name) {
 				continue
 			}
 
@@ -142,4 +149,15 @@ func mentionedTypes(
 	})
 
 	return out
+}
+
+// isMethodOf reports whether key is a method hanging off the named receiver.
+func isMethodOf(key entities.DeclKey, receiver string) bool {
+	if key.Kind != entities.KindMethod {
+		return false
+	}
+
+	name, _, found := strings.Cut(key.Name, ".")
+
+	return found && name == receiver
 }

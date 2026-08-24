@@ -147,3 +147,48 @@ func TestMentionedTypesReadsCodeNotProse(t *testing.T) {
 		}
 	}
 }
+
+// A method of T mentions T in its own receiver. Making it wait for T's other
+// methods builds a clique, which is a cycle - and one that crosses files
+// whenever the methods do. On a real repository this turned 0 cross-file
+// cycles into 33.
+func TestBoundRuleDoesNotMakeAMethodWaitForItsSiblings(t *testing.T) {
+	t.Parallel()
+
+	const file = "reply.go"
+
+	snap, spans := boundTree(t, file,
+		"type replyExecutor struct{}",
+		"func (replyExecutor) Reply() error { return nil }",
+		"func (replyExecutor) Close() error { return nil }",
+		"var _ Replier = replyExecutor{}",
+	)
+
+	replier := entities.Decl{
+		Key:         entities.DeclKey{File: "i.go", Kind: entities.KindType, Name: "Replier"},
+		Unit:        "aiturn",
+		IsInterface: true,
+	}
+	reply := boundDecl(file, entities.KindMethod, "replyExecutor.Reply", spans[1])
+	closeM := boundDecl(file, entities.KindMethod, "replyExecutor.Close", spans[2])
+
+	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+		replier,
+		boundDecl(file, entities.KindType, "replyExecutor", spans[0]),
+		reply,
+		closeM,
+		boundDecl(file, entities.KindValue, "_ Replier = replyExecutor{}", spans[3]),
+	})
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	for _, edge := range edges {
+		if edge.Dependent == reply.Key || edge.Dependent == closeM.Key {
+			t.Fatalf(
+				"%s waits for %s: the methods ARE what the wait is for",
+				edge.Dependent.Name, edge.Provider.Name,
+			)
+		}
+	}
+}
