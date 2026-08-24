@@ -42,14 +42,14 @@ func returnedConcreteTypes(text string, interfaces map[string]bool) []string {
 }
 
 // parseFunc reads one function declaration out of its own source text.
+//
+// No check that the text starts with "func": a declaration's span carries its
+// doc comment, and real code comments almost everything. Requiring the keyword
+// first silently skipped every documented constructor, which is all of them.
 func parseFunc(text string) *ast.FuncDecl {
-	body := strings.TrimSpace(text)
-	if !strings.HasPrefix(body, "func") {
-		return nil
-	}
-
 	file, err := parser.ParseFile(
-		token.NewFileSet(), "fn.go", "package p\n"+body+"\n", parser.SkipObjectResolution,
+		token.NewFileSet(), "fn.go", "package p\n"+strings.TrimSpace(text)+"\n",
+		parser.SkipObjectResolution,
 	)
 	if err != nil {
 		return nil

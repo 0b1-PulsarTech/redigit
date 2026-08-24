@@ -22,6 +22,18 @@ func TestReceiverOfAssertion(t *testing.T) {
 			want: "Registry",
 		},
 		{
+			name: "the span's own var keyword",
+			text: "var _ Codec = (*Registry)(nil)",
+			want: "Registry",
+		},
+		{
+			// A span carries the doc comment too, and prepending "var"
+			// unconditionally would put it before the comment.
+			name: "a documented assertion",
+			text: "// Registry satisfies Codec.\nvar _ Codec = (*Registry)(nil)",
+			want: "Registry",
+		},
+		{
 			// The form a pattern misses, and the one that failed 224 trees.
 			name: "a generic interface",
 			text: "_ ruletypes.Rule[string] = (*factEqualsRule)(nil)",

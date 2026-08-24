@@ -26,6 +26,15 @@ func TestReturnedConcreteTypes(t *testing.T) {
 			want: []string{"factEqualsRule"},
 		},
 		{
+			// A declaration's span carries its doc comment, and real code
+			// comments almost every exported constructor. Requiring the text
+			// to start with "func" skipped all of them.
+			name: "a documented constructor",
+			text: "// NewEquals builds a Rule.\n" +
+				"func NewEquals() ruletypes.Rule[string] {\n\treturn &factEqualsRule{}\n}",
+			want: []string{"factEqualsRule"},
+		},
+		{
 			name: "a value, not a pointer",
 			text: "func New() Handler {\n\treturn handler{}\n}",
 			want: []string{"handler"},
