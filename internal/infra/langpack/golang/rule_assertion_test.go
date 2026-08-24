@@ -50,14 +50,44 @@ func TestReceiverOfAssertion(t *testing.T) {
 			want: "unionActionCatalog",
 		},
 		{
+			// The form that cost 300 of 327 failing trees: a VALUE composite
+			// literal is not a conversion, so a check written for conversions
+			// never saw it.
+			name: "a value composite literal",
+			text: "_ Replier = replyExecutor{}",
+			want: "replyExecutor",
+		},
+		{
+			name: "a pointer to a composite literal",
+			text: "_ ReplyEnricher = &BotReplyEnricher{}",
+			want: "BotReplyEnricher",
+		},
+		{
+			name: "a qualified interface with a value literal",
+			text: "_ aiturn.ReplyEnricher = BotReplyEnricher{}",
+			want: "BotReplyEnricher",
+		},
+		{
+			name: "a generic type with a value literal",
+			text: "_ ruletypes.Rule[string] = factEqualsRule{}",
+			want: "factEqualsRule",
+		},
+		{
 			name: "a qualified interface and a local type",
 			text: "_ http.Handler = (*Server)(nil)",
 			want: "Server",
 		},
 		{
-			// A type from another package has no methods in this unit.
+			// A type from another package has no methods in this unit, and
+			// its qualifier hides two levels down: testing only the outermost
+			// expression let it through as "Thing".
 			name: "a type from another package",
 			text: "_ Iface = (*other.Thing)(nil)",
+			want: "",
+		},
+		{
+			name: "a value literal from another package",
+			text: "_ Iface = other.Thing{}",
 			want: "",
 		},
 		{

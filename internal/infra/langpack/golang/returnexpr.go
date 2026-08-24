@@ -28,7 +28,7 @@ func returnedConcreteTypes(text string, interfaces map[string]bool) []string {
 		}
 
 		for _, value := range ret.Results {
-			if name, built := constructedName(value); built && !seen[name] {
+			if name, built := concreteTypeIn(value); built && !seen[name] {
 				seen[name] = true
 
 				out = append(out, name)
@@ -101,14 +101,15 @@ func typeName(expr ast.Expr) (string, bool) {
 	}
 }
 
-// constructedName reports the type a returned expression builds: "&T{}",
-// "T{}", and "newT()" are three different things, and only the first two name
-// a type this file constructs directly.
-func constructedName(expr ast.Expr) (string, bool) {
+// concreteTypeIn reports the local type an expression names where an interface
+// is expected, in every form: "(*T)(nil)", "T(nil)", "&T{}", "T{}".
+// Enumerating them one at a time let "var _ I = T{}" through and cost 300 of
+// 327 failing trees - a value literal is a composite, not a conversion.
+func concreteTypeIn(expr ast.Expr) (string, bool) {
 	switch node := expr.(type) {
 	case *ast.UnaryExpr:
 		if node.Op == token.AND {
-			return constructedName(node.X)
+			return concreteTypeIn(node.X)
 		}
 
 		return "", false
@@ -118,18 +119,30 @@ func constructedName(expr ast.Expr) (string, bool) {
 		}
 
 		return localTypeName(node.Type)
+	case *ast.CallExpr:
+		return localTypeName(node.Fun)
 	default:
 		return "", false
 	}
 }
 
-// localTypeName is typeName restricted to a type this package declares: a
-// qualified one belongs to another package, whose methods are not in this
-// unit.
+// localTypeName is typeName restricted to a type THIS package declares: a
+// qualified one has no methods in this unit. It unwraps before deciding,
+// because "(*other.Thing)(nil)" hides its qualifier two levels down and
+// testing the outermost expression let it through as "Thing".
 func localTypeName(expr ast.Expr) (string, bool) {
-	if _, qualified := expr.(*ast.SelectorExpr); qualified {
+	switch node := expr.(type) {
+	case *ast.Ident:
+		return node.Name, true
+	case *ast.ParenExpr:
+		return localTypeName(node.X)
+	case *ast.StarExpr:
+		return localTypeName(node.X)
+	case *ast.IndexExpr:
+		return localTypeName(node.X)
+	case *ast.IndexListExpr:
+		return localTypeName(node.X)
+	default:
 		return "", false
 	}
-
-	return typeName(expr)
 }
