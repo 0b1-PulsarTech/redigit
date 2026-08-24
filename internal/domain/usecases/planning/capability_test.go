@@ -295,3 +295,44 @@ func TestPlannerKeepsASliceTogetherAmongTies(t *testing.T) {
 		)
 	}
 }
+
+// A commit never splits an atom. Its members were written by a tool in one
+// pass, and they can carry different slices only because each was DATED
+// separately - an artefact of reading births per declaration, not a reason to
+// write half a generated file.
+func TestPlannerNeverSplitsAnAtom(t *testing.T) {
+	t.Parallel()
+
+	const file = "store/repo_mock_test.go"
+
+	first := entities.Decl{
+		Key:  entities.DeclKey{File: file, Kind: entities.KindType, Name: "MockRepo"},
+		Unit: "store",
+		Atom: file,
+	}
+	second := entities.Decl{
+		Key:  entities.DeclKey{File: file, Kind: entities.KindType, Name: "MockRepoRecorder"},
+		Unit: "store",
+		Atom: file,
+	}
+
+	graph := entities.NewGraph([]entities.Decl{first, second}, nil, nil)
+	order := entities.Ordering{At: map[entities.DeclKey]entities.Position{
+		first.Key: 7, second.Key: 7,
+	}}
+
+	// The two halves were dated into different capabilities.
+	capabilities := Capabilities{first.Key: "alpha", second.Key: "beta"}
+
+	plan, err := New(Config{Capabilities: capabilities}).Plan(graph, order)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	if len(plan.Commits) != 1 {
+		t.Fatalf(
+			"a generated file was written across %d commits: half of it exists on its own",
+			len(plan.Commits),
+		)
+	}
+}

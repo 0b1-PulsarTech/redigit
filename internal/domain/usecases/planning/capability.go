@@ -62,7 +62,20 @@ func (p Planner) emitByCapability(
 		keys = append(keys, decl.Key)
 	}
 
+	atoms := make(map[entities.DeclKey]string, graph.Len())
+	for _, decl := range graph.Decls() {
+		if decl.Atom != "" {
+			atoms[decl.Key] = decl.Atom
+		}
+	}
+
+	// The affinity a tie is resolved by: the atom first, because its members
+	// must end up in ONE commit, then the slice.
 	keys = sortForBirth(graph, order, keys, func(key entities.DeclKey) FeatureID {
+		if atom, grouped := atoms[key]; grouped {
+			return FeatureID(atom)
+		}
+
 		return own.owner[key]
 	})
 
@@ -71,6 +84,7 @@ func (p Planner) emitByCapability(
 	current := []entities.DeclKey{}
 	files := map[string]bool{}
 	slice := SharedFeature
+	atom := ""
 	started := false
 
 	flush := func() {
@@ -88,17 +102,27 @@ func (p Planner) emitByCapability(
 		})
 		current = current[:0]
 		files = map[string]bool{}
+		atom = ""
 	}
 
 	for _, key := range keys {
 		owner := own.owner[key]
+		keyAtom := atoms[key]
+
+		// A commit never splits an atom, whatever else changes. The members
+		// of one were written by a tool in a single pass, and they can carry
+		// different slices only because each was DATED separately - which is
+		// an artefact of reading births per declaration, not a reason to
+		// write half a generated file.
+		inAtom := started && keyAtom != "" && keyAtom == atom
 
 		tooWide := !files[key.File] && len(files) >= p.cfg.MaxFiles
-		if started && (owner != slice || tooWide) {
+		if started && !inAtom && (owner != slice || tooWide) {
 			flush()
 		}
 
 		slice = owner
+		atom = keyAtom
 		started = true
 		files[key.File] = true
 
