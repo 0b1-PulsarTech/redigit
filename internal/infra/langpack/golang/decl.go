@@ -50,16 +50,6 @@ func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]ent
 
 	unit := unitOf(path, file.Name.Name)
 
-	// A generated file is written by its generator in ONE pass. Cutting it by
-	// declaration describes a generator that ran six times and got it right in
-	// pieces, which never happened - and it produces trees where a mock file
-	// holds NewMockX without the MockX it returns. On a real repository 100 of
-	// 235 generated files were born in pieces, and 98 of those compiled while
-	// broken, waiting for any reordering to turn them into an error.
-	if isGenerated(source) {
-		return []entities.Decl{wholeFile(fset, path, unit, source, file)}, nil
-	}
-
 	isTestFile := strings.HasSuffix(path, "_test.go")
 
 	var decls []entities.Decl
@@ -70,6 +60,16 @@ func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]ent
 
 	if len(decls) == 0 {
 		return []entities.Decl{wholeFile(fset, path, unit, source, file)}, nil
+	}
+
+	// A generated file is written by its generator in ONE pass, so its
+	// declarations are born together. They STAY declarations: taking them out
+	// of the graph took every reference edge to them along, and a test landed
+	// 491 positions before the mock it uses.
+	if isGenerated(source) {
+		for index := range decls {
+			decls[index].Atom = path
+		}
 	}
 
 	return decls, nil

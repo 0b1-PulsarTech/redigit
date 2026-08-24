@@ -45,6 +45,13 @@ func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) 
 		return source, nil
 	}
 
+	// A generated file is reproduced verbatim: its declarations are one atom
+	// and arrive together, and filtering through the printer would drop the
+	// marker comment that says a tool wrote it.
+	if len(keep) > 0 && isGenerated(source) {
+		return source, nil
+	}
+
 	fset := token.NewFileSet()
 
 	file, err := parser.ParseFile(

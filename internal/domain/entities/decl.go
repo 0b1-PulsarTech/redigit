@@ -96,6 +96,11 @@ type Decl struct {
 	// A pack that leaves this false loses implementation edges rather than
 	// inventing backwards ones, which is the safe direction to fail in.
 	IsInterface bool
+	// Atom groups declarations one tool wrote in a single pass, so they are
+	// born together. It is a constraint and NOT a merge: they stay in the
+	// graph, so what reads them still produces edges. Merging them instead
+	// took their names out and a test landed 491 positions early.
+	Atom string
 	// GroupSize is how many declarations share this one's declaration block.
 	// A constant is not judged alone when it belongs to a group: an enum of
 	// two members is as indivisible as one of twenty-seven, and counting

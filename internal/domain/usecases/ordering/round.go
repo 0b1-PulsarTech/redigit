@@ -26,7 +26,8 @@ func (e *engine) converge(roundLimit int) (int, error) {
 
 // step runs one full round: the per-declaration pass, a global edge sweep
 // that lets a dependent catch up to a provider the floor passes just moved,
-// and a refresh of the unit floor for the next round. Every piece only ever
+// a refresh of the unit floor, and the atom floor that keeps a
+// generator-written file from arriving in pieces. Every piece only ever
 // raises an assignment, so a round either advances the fixed point or leaves
 // it untouched.
 func (e *engine) step() bool {
@@ -43,6 +44,10 @@ func (e *engine) step() bool {
 	}
 
 	if e.recomputeUnitFloor() {
+		changed = true
+	}
+
+	if e.recomputeAtoms() {
 		changed = true
 	}
 
