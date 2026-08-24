@@ -31,6 +31,7 @@ type rule interface {
 var rules = []rule{
 	goverterRule{},
 	mockgenRule{},
+	generateRule{},
 	sqlcRule{},
 	migrationRule{},
 	testAnchorRule{},
