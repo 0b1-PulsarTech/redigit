@@ -32,16 +32,47 @@ type PlannedCommit struct {
 	IsWIP    bool
 }
 
-// DraftMarker prefixes every subject a planner invents. A generated subject is
-// evidence for a reviewer, not a commit message: the previous rebuild ended up
-// with 561 placeholder subjects that had to be authored afterwards, and the
-// ones that slipped through described work that had moved elsewhere. The marker
-// lives here, on the plan both stages meet through, rather than being spelled
-// out again in each of them.
+// DraftMarker prefixes every subject a planner invents: a generated subject is
+// evidence for a reviewer, not a commit message. The previous rebuild ended up
+// with 561 placeholders, and the ones that slipped through described work that
+// had moved elsewhere.
 const DraftMarker = "DRAFT: "
 
 // IsDraft reports whether a subject still needs a human or an agent to write it.
 func IsDraft(subject string) bool { return strings.HasPrefix(subject, DraftMarker) }
+
+// WIPMarker declares a commit leaving a piece incomplete: a type without all
+// its methods, a declaration reaching for something unborn. Only the final tree
+// must compile, and unmarked, an honest vertical slice is indistinguishable
+// from a defect - which reported 311 incompletenesses as 311 failures.
+const WIPMarker = "[wip] "
+
+// IsWIPSubject reports whether a subject already carries the marker.
+func IsWIPSubject(subject string) bool { return strings.Contains(subject, WIPMarker) }
+
+// MarkWIP puts the marker where the conventional-commit format wants it:
+// after "type(scope): " and before the description, keeping any draft prefix
+// ahead of both. Marking twice changes nothing.
+func MarkWIP(subject string) string {
+	if IsWIPSubject(subject) {
+		return subject
+	}
+
+	prefix := ""
+
+	body := subject
+	if IsDraft(subject) {
+		prefix = DraftMarker
+		body = strings.TrimPrefix(subject, DraftMarker)
+	}
+
+	cut := strings.Index(body, ": ")
+	if cut < 0 {
+		return prefix + WIPMarker + body
+	}
+
+	return prefix + body[:cut+2] + WIPMarker + body[cut+2:]
+}
 
 // Plan is the reviewable artifact. No history is ever written straight from
 // automatic clustering: the plan is emitted, a human or the operating agent

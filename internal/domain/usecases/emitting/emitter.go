@@ -62,16 +62,26 @@ func (e Emitter) Emit(
 			return nil, err
 		}
 
+		risks := risksFor(planned, graph, positions)
+
+		// A commit that leaves a piece incomplete says so. Only the final tree
+		// has to be green; a vertical slice routinely lands one that is not,
+		// and an unmarked one is indistinguishable from a defect.
+		subject, isWIP := planned.Subject, planned.IsWIP
+		if len(risks) > 0 {
+			subject, isWIP = entities.MarkWIP(subject), true
+		}
+
 		commit := Commit{
 			Position: planned.Position,
-			Subject:  planned.Subject,
+			Subject:  subject,
 			Shape:    planned.Shape,
 			Feature:  planned.Feature,
 			Reason:   planned.Reason,
-			IsWIP:    planned.IsWIP,
+			IsWIP:    isWIP,
 			Chunks:   chunks,
 			Blobs:    blobs,
-			Risks:    risksFor(planned, graph, positions),
+			Risks:    risks,
 		}
 
 		if commit.IsEmpty() {
@@ -129,13 +139,10 @@ func check(plan entities.Plan) error {
 	return nil
 }
 
-// checkCoverage refuses to proceed on a declaration the graph knows about
-// that landed in no commit. check already refuses any plan carrying a
-// non-empty Unplaced, so by the time this runs every declaration the planner
-// gave up on has already stopped the run; a graph declaration still missing
-// from positions is not a deferral the planner recorded, it is a hole the
-// plan never accounted for at all - the same hazard Plan.Unplaced exists to
-// name, just missed by whoever built or edited this plan.
+// checkCoverage refuses to proceed on a declaration the graph knows about that
+// landed in no commit. check already refuses a plan with a non-empty Unplaced,
+// so one still missing here is not a deferral the planner recorded: it is a
+// hole the plan never accounted for.
 func checkCoverage(graph entities.Graph, positions map[entities.DeclKey]entities.Position) error {
 	for _, decl := range graph.Decls() {
 		if _, ok := positions[decl.Key]; !ok {

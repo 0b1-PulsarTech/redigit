@@ -347,3 +347,52 @@ func TestEmitterPropagatesFailures(t *testing.T) {
 		})
 	}
 }
+
+// A commit that leaves a piece incomplete says so in its subject. Only the
+// final tree has to be green; an unmarked incomplete commit is
+// indistinguishable from a defect, and a real repository reported 311 declared
+// incompletenesses as 311 failures.
+func TestEmitMarksACommitThatLeavesAPieceIncomplete(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	early := key("a.go", "One")
+	late := key("b.go", "Two")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{decl(early, entities.Span{Start: 0, End: 4}), decl(late, entities.Span{Start: 0, End: 4})},
+		[]entities.Edge{{Dependent: early, Provider: late, Reason: entities.ReasonReference}},
+		nil,
+	)
+
+	source := NewMockSource(ctrl)
+	source.EXPECT().
+		Read(gomock.Any(), gomock.Any()).
+		Return([]byte("body"), FileMode("100644"), nil).
+		AnyTimes()
+
+	plan := entities.Plan{Commits: []entities.PlannedCommit{
+		{Position: 0, Subject: "feat(a): One", Decls: []entities.DeclKey{early}},
+		{Position: 1, Subject: "feat(b): Two", Decls: []entities.DeclKey{late}},
+	}}
+
+	commits, err := New(source, growingRenderer(ctrl), countingSink(ctrl)).
+		Emit(t.Context(), plan, graph)
+	if err != nil {
+		t.Fatalf("Emit() = %v", err)
+	}
+
+	if !commits[0].IsWIP {
+		t.Fatal("the commit reaching for something unborn is not marked incomplete")
+	}
+
+	if !entities.IsWIPSubject(commits[0].Subject) {
+		t.Fatalf("subject = %q, want the marker", commits[0].Subject)
+	}
+
+	// The commit that needs nothing later stays unmarked.
+	if commits[1].IsWIP || entities.IsWIPSubject(commits[1].Subject) {
+		t.Fatalf("a complete commit was marked: %q", commits[1].Subject)
+	}
+}
