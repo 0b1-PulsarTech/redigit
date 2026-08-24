@@ -38,6 +38,7 @@ var rules = []rule{
 	enclosesRule{},
 	assertionRule{},
 	conversionRule{},
+	boundRule{},
 	buildTagsRule{},
 }
 

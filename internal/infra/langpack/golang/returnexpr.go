@@ -146,3 +146,17 @@ func localTypeName(expr ast.Expr) (string, bool) {
 		return "", false
 	}
 }
+
+// parseDeclaration reads any top-level declaration out of its own source text,
+// doc comment and all.
+func parseDeclaration(text string) ast.Decl {
+	file, err := parser.ParseFile(
+		token.NewFileSet(), "decl.go", "package p\n"+strings.TrimSpace(text)+"\n",
+		parser.SkipObjectResolution,
+	)
+	if err != nil || len(file.Decls) == 0 {
+		return nil
+	}
+
+	return file.Decls[0]
+}
