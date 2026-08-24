@@ -55,18 +55,15 @@ func (r mockgenRule) Edges(
 
 		candidates := mockCandidates(byFile, target)
 
-		for _, d := range mockDecls {
-			name, ok := mockSubjectName(d.Key)
-			if !ok {
-				continue
-			}
-
-			if provider, found := findTypeNamed(candidates, name); found {
-				edges = append(edges, entities.Edge{
-					Dependent: d.Key,
-					Provider:  provider,
-					Reason:    entities.ReasonMirrors,
-				})
+		for _, dependent := range mockDependents(mockDecls, source) {
+			for _, name := range dependent.subjects {
+				if provider, found := findTypeNamed(candidates, name); found {
+					edges = append(edges, entities.Edge{
+						Dependent: dependent.key,
+						Provider:  provider,
+						Reason:    entities.ReasonMirrors,
+					})
+				}
 			}
 		}
 	}
@@ -226,4 +223,38 @@ func (mockgenRule) Anchors(
 	[]entities.Decl,
 ) ([]entities.Anchor, error) {
 	return nil, nil
+}
+
+// mockDependent is what waits for a mirrored interface, and which interfaces
+// it mirrors.
+type mockDependent struct {
+	key      entities.DeclKey
+	subjects []string
+}
+
+// mockDependents reports what to hang the mirror edges off.
+//
+// A GENERATED mock is one declaration standing for the whole file, so every
+// interface it mirrors is a wait on that single declaration, and the names
+// come from the source rather than from declaration names that no longer
+// exist. A hand-written one is still cut per declaration, and each Mock type
+// waits for its own subject.
+func mockDependents(decls []entities.Decl, source []byte) []mockDependent {
+	for _, decl := range decls {
+		if decl.Key.Kind != entities.KindOther || decl.Key.Name != fileDeclName {
+			continue
+		}
+
+		return []mockDependent{{key: decl.Key, subjects: mockedNamesIn(source)}}
+	}
+
+	out := make([]mockDependent, 0, len(decls))
+
+	for _, decl := range decls {
+		if name, named := mockSubjectName(decl.Key); named {
+			out = append(out, mockDependent{key: decl.Key, subjects: []string{name}})
+		}
+	}
+
+	return out
 }
