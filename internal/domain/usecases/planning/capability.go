@@ -3,6 +3,7 @@ package planning
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
@@ -57,13 +58,12 @@ func (p Planner) emitByCapability(
 	order entities.Ordering,
 	own ownership,
 ) entities.Plan {
+	atoms := make(map[entities.DeclKey]string, graph.Len())
 	keys := make([]entities.DeclKey, 0, graph.Len())
+
 	for _, decl := range graph.Decls() {
 		keys = append(keys, decl.Key)
-	}
 
-	atoms := make(map[entities.DeclKey]string, graph.Len())
-	for _, decl := range graph.Decls() {
 		if decl.Atom != "" {
 			atoms[decl.Key] = decl.Atom
 		}
@@ -79,57 +79,83 @@ func (p Planner) emitByCapability(
 		return own.owner[key]
 	})
 
-	var plan entities.Plan
-
-	current := []entities.DeclKey{}
-	files := map[string]bool{}
-	slice := SharedFeature
-	atom := ""
-	started := false
-
-	flush := func() {
-		if len(current) == 0 {
-			return
-		}
-
-		plan.Commits = append(plan.Commits, entities.PlannedCommit{
-			Position: entities.Position(len(plan.Commits)),
-			Subject:  draftSubject(entities.ShapeFeature, slice, current),
-			Shape:    entities.ShapeFeature,
-			Feature:  string(slice),
-			Decls:    slices.Clone(current),
-			Reason:   "one capability, in the order the fixed point settled",
-		})
-		current = current[:0]
-		files = map[string]bool{}
-		atom = ""
-	}
+	run := &commitRun{maxFiles: p.cfg.MaxFiles, files: map[string]bool{}}
 
 	for _, key := range keys {
-		owner := own.owner[key]
-		keyAtom := atoms[key]
-
-		// A commit never splits an atom, whatever else changes. The members
-		// of one were written by a tool in a single pass, and they can carry
-		// different slices only because each was DATED separately - which is
-		// an artefact of reading births per declaration, not a reason to
-		// write half a generated file.
-		inAtom := started && keyAtom != "" && keyAtom == atom
-
-		tooWide := !files[key.File] && len(files) >= p.cfg.MaxFiles
-		if started && !inAtom && (owner != slice || tooWide) {
-			flush()
-		}
-
-		slice = owner
-		atom = keyAtom
-		started = true
-		files[key.File] = true
-
-		current = append(current, key)
+		run.take(key, own.owner[key], atoms[key])
 	}
 
-	flush()
+	run.flush()
 
-	return plan
+	return entities.Plan{Commits: run.commits}
+}
+
+// commitRun accumulates declarations into commits as they arrive in birth
+// order, closing one whenever the next declaration cannot join it.
+type commitRun struct {
+	maxFiles int
+
+	commits []entities.PlannedCommit
+	current []entities.DeclKey
+	files   map[string]bool
+	slice   FeatureID
+	atom    string
+	pkg     string
+	started bool
+}
+
+// take adds one declaration, closing the open commit when it belongs to
+// another package or the open one already spans MaxFiles.
+//
+// The cut follows the PACKAGE, the slice deciding order rather than
+// boundaries: cutting on the slice put 31% of commits at one file each,
+// because the slice changes at almost every commit.
+func (r *commitRun) take(key entities.DeclKey, owner FeatureID, atom string) {
+	// A commit never splits an atom, whatever else changes. Its members were
+	// written by a tool in one pass, and they carry different slices only
+	// because each was DATED separately.
+	inAtom := r.started && atom != "" && atom == r.atom
+
+	tooWide := !r.files[key.File] && len(r.files) >= r.maxFiles
+	if r.started && !inAtom && (dirOf(key.File) != r.pkg || tooWide) {
+		r.flush()
+	}
+
+	r.slice = owner
+	r.atom = atom
+	r.pkg = dirOf(key.File)
+	r.started = true
+	r.files[key.File] = true
+
+	r.current = append(r.current, key)
+}
+
+func (r *commitRun) flush() {
+	if len(r.current) == 0 {
+		return
+	}
+
+	r.commits = append(r.commits, entities.PlannedCommit{
+		Position: entities.Position(len(r.commits)),
+		Subject:  draftSubject(entities.ShapeFeature, r.slice, r.current),
+		Shape:    entities.ShapeFeature,
+		Feature:  string(r.slice),
+		Decls:    slices.Clone(r.current),
+		Reason:   "one package, in the order the fixed point settled",
+	})
+
+	r.current = r.current[:0]
+	r.files = map[string]bool{}
+	r.atom = ""
+	r.pkg = ""
+}
+
+// dirOf is the package a file belongs to: its directory, which is what Go
+// compiles as a unit.
+func dirOf(file string) string {
+	if cut := strings.LastIndexByte(file, '/'); cut >= 0 {
+		return file[:cut]
+	}
+
+	return "."
 }

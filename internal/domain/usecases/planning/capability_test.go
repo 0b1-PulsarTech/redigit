@@ -21,10 +21,11 @@ func capabilitiesOf(decls map[string]entities.Decl) Capabilities {
 	}
 }
 
-// The whole reason this exists: a caller's slicing must survive into the
-// commits. Reachability put 42% of a real repository's declarations in layer
-// commits with no slice; a supplied slicing must leave none.
-func TestPlannerKeepsACapabilityInItsOwnCommits(t *testing.T) {
+// A commit holds one PACKAGE. Cutting on the capability instead put 31% of a
+// real repository's commits at one file each: the capability changes at almost
+// every commit, so consecutive declarations of one package landed apart for no
+// reason a reader could see.
+func TestPlannerKeepsACommitToOnePackage(t *testing.T) {
 	t.Parallel()
 
 	graph, order, decls := twoFeatures()
@@ -35,18 +36,45 @@ func TestPlannerKeepsACapabilityInItsOwnCommits(t *testing.T) {
 	}
 
 	for _, commit := range plan.Commits {
-		slices := map[FeatureID]bool{}
-
+		dirs := map[string]bool{}
 		for _, key := range commit.Decls {
-			slices[capabilitiesOf(decls)[key]] = true
+			dirs[dirOf(key.File)] = true
 		}
 
-		if len(slices) > 1 {
+		if len(dirs) > 1 {
 			t.Fatalf(
-				"commit %d (%q) mixes %d capabilities: a commit must belong to one",
-				commit.Position, commit.Subject, len(slices),
+				"commit %d (%q) spans %d packages", commit.Position, commit.Subject, len(dirs),
 			)
 		}
+	}
+}
+
+// Two declarations of one package, in different capabilities, adjacent in
+// birth order: one commit, not two. This is the shape that dominated the
+// single-file commits - 113 of 302 on a real repository.
+func TestPlannerJoinsOnePackageAcrossCapabilities(t *testing.T) {
+	t.Parallel()
+
+	first := decl("wire/a.go", "One", "wire")
+	second := decl("wire/b.go", "Two", "wire")
+
+	graph := entities.NewGraph([]entities.Decl{first, second}, nil, nil)
+	order := entities.Ordering{At: map[entities.DeclKey]entities.Position{
+		first.Key: 4, second.Key: 5,
+	}}
+
+	plan, err := New(Config{Capabilities: Capabilities{
+		first.Key: "chatbot", second.Key: "agenda",
+	}}).Plan(graph, order)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	if len(plan.Commits) != 1 {
+		t.Fatalf(
+			"one package became %d commits: the capability changed and the package did not",
+			len(plan.Commits),
+		)
 	}
 }
 
