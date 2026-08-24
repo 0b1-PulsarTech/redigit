@@ -67,10 +67,10 @@ func (boundRule) Anchors(
 	return nil, nil
 }
 
-// boundTypes are the concrete types something in their own package hands to an
-// interface, which the assertion and return forms detect reliably. Every
-// declaration naming one then waits for its whole method set: coarse, but
-// delaying is the safe direction. A type with no method is never bound.
+// boundTypes are the concrete types something in their package may hand to an
+// interface. Every declaration naming one waits for its whole method set:
+// coarse, but delaying is safe, and a method-less type is never bound. Handing
+// counts too - "Handover: noopFlowRunHandover{}" is named by no assertion.
 func boundTypes(
 	decls []entities.Decl,
 	snap entities.Snapshot,
@@ -94,6 +94,12 @@ func boundTypes(
 
 		for _, name := range convertedTypes(decl, snap, sources, interfaces) {
 			mark(decl.Unit, name)
+		}
+
+		for _, name := range builtTypes(decl, snap, sources) {
+			if !declares(decl.Key, name) {
+				mark(decl.Unit, name)
+			}
 		}
 	}
 
@@ -146,16 +152,11 @@ func mentionedTypes(
 	return out
 }
 
-// declares reports whether key IS the named type or one of its methods -
-// which is what the wait is FOR, and so cannot be what waits.
+// declares reports whether key IS the named type or one of its methods, which
+// is what the wait is FOR and cannot be what waits.
 //
-// A method names its receiver, and the type names itself, so without this
-// every method of T waits for every other and the type waits for all of them:
-// a clique, which is a cycle, and one that crosses files whenever the methods
-// do. It turned 0 cross-file cycles into 33 on a real repository.
-//
-// Excluding the type itself is not just cycle avoidance: "type T struct{}"
-// compiles with no method at all. Only what HANDS T somewhere needs them.
+// Without this they form a clique - a cycle crossing files, 0 of them into 33
+// on a real repository - and "type T struct{}" needs no method anyway.
 func declares(key entities.DeclKey, typeName string) bool {
 	switch key.Kind {
 	case entities.KindType:

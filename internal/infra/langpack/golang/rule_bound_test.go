@@ -232,3 +232,73 @@ func TestBoundRuleDoesNotMakeATypeWaitForItsOwnMethods(t *testing.T) {
 		}
 	}
 }
+
+// The second largest failure on a real repository had no assertion at all:
+// "Handover: noopFlowRunHandover{}" hands the type to a struct FIELD whose
+// interface type lives in another package this layer cannot resolve.
+func TestBoundRuleBindsATypeHandedToAStructField(t *testing.T) {
+	t.Parallel()
+
+	const file = "routing_test.go"
+
+	snap, spans := boundTree(t, file,
+		"type noopHandover struct{}",
+		"func (noopHandover) HandToHuman() error { return nil }",
+		"func newDeps() Deps {\n\treturn Deps{Handover: noopHandover{}}\n}",
+	)
+
+	iface := entities.Decl{
+		Key:         entities.DeclKey{File: "i.go", Kind: entities.KindType, Name: "Replier"},
+		Unit:        "aiturn",
+		IsInterface: true,
+	}
+	hand := boundDecl(file, entities.KindMethod, "noopHandover.HandToHuman", spans[1])
+	builder := boundDecl(file, entities.KindFunc, "newDeps", spans[2])
+
+	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+		iface, boundDecl(file, entities.KindType, "noopHandover", spans[0]), hand, builder,
+	})
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	for _, edge := range edges {
+		if edge.Dependent == builder.Key && edge.Provider == hand.Key {
+			return
+		}
+	}
+
+	t.Fatalf("the builder does not wait for the method of the type it hands over; got %v", edges)
+}
+
+// Building a value and keeping it is not handing it to an interface. Counting
+// every construction would mark most types with methods as bound.
+func TestBoundRuleDoesNotBindAPlainConstruction(t *testing.T) {
+	t.Parallel()
+
+	const file = "plain.go"
+
+	snap, spans := boundTree(t, file,
+		"type plain struct{}",
+		"func (plain) Do() error { return nil }",
+		"func use() error {\n\tp := plain{}\n\n\treturn p.Do()\n}",
+	)
+
+	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+		{
+			Key:         entities.DeclKey{File: "i.go", Kind: entities.KindType, Name: "Replier"},
+			Unit:        "aiturn",
+			IsInterface: true,
+		},
+		boundDecl(file, entities.KindType, "plain", spans[0]),
+		boundDecl(file, entities.KindMethod, "plain.Do", spans[1]),
+		boundDecl(file, entities.KindFunc, "use", spans[2]),
+	})
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if len(edges) != 0 {
+		t.Fatalf("got %d edge(s) for a value built and kept: %v", len(edges), edges)
+	}
+}
