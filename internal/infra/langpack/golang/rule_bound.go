@@ -40,12 +40,7 @@ func (boundRule) Edges(
 		for _, name := range mentionedTypes(decl, snap, sources) {
 			key := receiverKey{unit: decl.Unit, name: name}
 
-			// A method of T mentions T in its own receiver, so waiting here
-			// would make every method of T wait for every other one: a clique,
-			// which is a cycle, and one that crosses files whenever the
-			// methods do. The methods are what the wait is FOR; they cannot
-			// wait for themselves.
-			if !bound[key] || isMethodOf(decl.Key, name) {
+			if !bound[key] || declares(decl.Key, name) {
 				continue
 			}
 
@@ -151,13 +146,25 @@ func mentionedTypes(
 	return out
 }
 
-// isMethodOf reports whether key is a method hanging off the named receiver.
-func isMethodOf(key entities.DeclKey, receiver string) bool {
-	if key.Kind != entities.KindMethod {
+// declares reports whether key IS the named type or one of its methods -
+// which is what the wait is FOR, and so cannot be what waits.
+//
+// A method names its receiver, and the type names itself, so without this
+// every method of T waits for every other and the type waits for all of them:
+// a clique, which is a cycle, and one that crosses files whenever the methods
+// do. It turned 0 cross-file cycles into 33 on a real repository.
+//
+// Excluding the type itself is not just cycle avoidance: "type T struct{}"
+// compiles with no method at all. Only what HANDS T somewhere needs them.
+func declares(key entities.DeclKey, typeName string) bool {
+	switch key.Kind {
+	case entities.KindType:
+		return key.Name == typeName
+	case entities.KindMethod:
+		receiver, _, found := strings.Cut(key.Name, ".")
+
+		return found && receiver == typeName
+	default:
 		return false
 	}
-
-	name, _, found := strings.Cut(key.Name, ".")
-
-	return found && name == receiver
 }

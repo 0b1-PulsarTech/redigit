@@ -78,15 +78,18 @@ func TestBoundRuleTiesAConstructorThatNamesABoundType(t *testing.T) {
 		}
 	}
 
-	for _, want := range []entities.Decl{constructor, executor, assertion} {
+	for _, want := range []entities.Decl{constructor, assertion} {
 		if !waits[want.Key] {
 			t.Fatalf("%s names a bound type and does not wait for its method", want.Key.Name)
 		}
 	}
 
-	// A method of the type never waits for itself.
-	if waits[reply.Key] {
-		t.Fatal("the method waits for itself")
+	// Neither the method nor the type itself waits: they ARE the wait, and
+	// "type T struct{}" compiles with no method at all.
+	for _, never := range []entities.Decl{reply, executor} {
+		if waits[never.Key] {
+			t.Fatalf("%s waits for a method of the type it declares", never.Key.Name)
+		}
 	}
 }
 
@@ -189,6 +192,43 @@ func TestBoundRuleDoesNotMakeAMethodWaitForItsSiblings(t *testing.T) {
 				"%s waits for %s: the methods ARE what the wait is for",
 				edge.Dependent.Name, edge.Provider.Name,
 			)
+		}
+	}
+}
+
+// The type declaration itself never waits for its methods: "type T struct{}"
+// compiles with none, and making it wait puts the type in a cycle with the
+// methods that name it as their receiver.
+func TestBoundRuleDoesNotMakeATypeWaitForItsOwnMethods(t *testing.T) {
+	t.Parallel()
+
+	const file = "reply.go"
+
+	snap, spans := boundTree(t, file,
+		"type replyExecutor struct{}",
+		"func (replyExecutor) Reply() error { return nil }",
+		"var _ Replier = replyExecutor{}",
+	)
+
+	executor := boundDecl(file, entities.KindType, "replyExecutor", spans[0])
+
+	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+		{
+			Key:         entities.DeclKey{File: "i.go", Kind: entities.KindType, Name: "Replier"},
+			Unit:        "aiturn",
+			IsInterface: true,
+		},
+		executor,
+		boundDecl(file, entities.KindMethod, "replyExecutor.Reply", spans[1]),
+		boundDecl(file, entities.KindValue, "_ Replier = replyExecutor{}", spans[2]),
+	})
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	for _, edge := range edges {
+		if edge.Dependent == executor.Key {
+			t.Fatalf("the type waits for %s, one of its own methods", edge.Provider.Name)
 		}
 	}
 }
