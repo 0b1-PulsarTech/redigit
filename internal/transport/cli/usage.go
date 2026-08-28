@@ -4,7 +4,8 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
 
   redigit audit  --repo PATH [--rev REF] [--tags TAGS] [--far N]
       Index, order, and report. Says which declarations are born far from
-      whatever reads them, and what each number does not look at.
+      whatever reads them, what each number does not look at, and which files
+      a build constraint hid from the reference queries.
 
   redigit emit   --repo PATH [--rev REF] [--tags TAGS] [--blob-dir DIR]
       Materialise the plan: one JSON object per commit with the declarations
@@ -37,9 +38,12 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
 Flags:
   --repo PATH   repository to read (required)
   --rev  REF    revision holding the tree to read (default HEAD)
-  --tags TAGS   comma-separated build tags. Passing none is a real choice:
-                a file behind a build constraint is invisible to reference
-                queries, and nothing reports that it was skipped.
+  --tags TAGS   comma-separated build tags. Passing none is a real choice: a
+                file behind a build constraint answers a syntactic query but is
+                invisible to reference queries, so its declarations reach the
+                graph with no edges and look exactly like code nothing reads.
+                Every command now names those files on stderr, and audit lists
+                them under "unseen", so the choice is at least reported.
   --far  N      positions a declaration may sit ahead of its first outside
                 reader before audit reports it (default 25)
   --layers FILE which path prefixes come first when the graph is indifferent.

@@ -33,6 +33,15 @@ type cycleDTO struct {
 // auditDTO is what `redigit audit` prints. Integrity and shape stay apart:
 // a rebuild can replay almost perfectly while grouping badly, and one merged
 // number would hide exactly that.
+// unseenDTO is one file this run could not read, and the constraint that hid
+// it. It is not omitempty: an empty list is the claim that nothing was hidden,
+// and a reader must be able to tell that from a tool too old to report it.
+type unseenDTO struct {
+	File       string   `json:"file"`
+	Constraint string   `json:"constraint"`
+	Tags       []string `json:"tags"`
+}
+
 type auditDTO struct {
 	Repo         string       `json:"repo"`
 	Rev          string       `json:"rev"`
@@ -40,6 +49,7 @@ type auditDTO struct {
 	Declarations int          `json:"declarations"`
 	Edges        int          `json:"edges"`
 	Rounds       int          `json:"rounds"`
+	Unseen       []unseenDTO  `json:"unseen"`
 	Integrity    []measureDTO `json:"integrity"`
 	Shape        []measureDTO `json:"shape"`
 	Cycles       []cycleDTO   `json:"cycles"`
@@ -80,6 +90,21 @@ type graphDTO struct {
 	Rev   string    `json:"rev"`
 	Decls []declDTO `json:"decls"`
 	Edges []edgeDTO `json:"edges"`
+}
+
+func toUnseen(in []auditing.Unseen) []unseenDTO {
+	out := make([]unseenDTO, 0, len(in))
+
+	for _, unseen := range in {
+		tags := unseen.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+
+		out = append(out, unseenDTO{File: unseen.File, Constraint: unseen.Constraint, Tags: tags})
+	}
+
+	return out
 }
 
 func toMeasures(in []entities.Measure) []measureDTO {

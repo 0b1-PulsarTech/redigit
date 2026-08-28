@@ -17,9 +17,10 @@ type Config struct {
 	Repo string
 	Rev  string
 	// BuildTags is passed to the language server. It is explicit rather than
-	// inferred because leaving it empty is a real choice with a silent cost:
-	// a file behind a build constraint is invisible to reference queries and
-	// nothing reports that it was skipped.
+	// inferred because leaving it empty is a real choice with a cost: a file
+	// behind a build constraint is invisible to reference queries, so its
+	// declarations arrive with no edges. Auditing.Unseen names the files that
+	// happened to, which is what keeps the cost from being silent.
 	BuildTags []string
 	// ServerCommand and ServerArgs launch the language server. Configurable
 	// so nothing in this tool hardcodes what Go is.

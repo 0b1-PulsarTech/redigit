@@ -3,6 +3,8 @@ package golang
 import (
 	"context"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"sort"
 	"testing"
 
@@ -122,5 +124,85 @@ func TestBuildConstraintsFileInSubdir(t *testing.T) {
 
 	if len(got) != 1 || got[0].File != filepath.Join("pkg", "windows.go") {
 		t.Fatalf("got %+v, want one entry for the subdirectory file", got)
+	}
+}
+
+func TestHidden(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		tags      []BuildTag
+		satisfied []string
+		wantFiles []string
+	}{
+		{
+			name:      "constraint the run satisfies is not hidden",
+			tags:      []BuildTag{{File: "a_test.go", Constraint: "//go:build integration"}},
+			satisfied: []string{"integration"},
+			wantFiles: nil,
+		},
+		{
+			name:      "constraint the run does not satisfy is hidden",
+			tags:      []BuildTag{{File: "a_test.go", Constraint: "//go:build integration"}},
+			satisfied: nil,
+			wantFiles: []string{"a_test.go"},
+		},
+		{
+			name:      "current platform satisfies its own goos",
+			tags:      []BuildTag{{File: "p.go", Constraint: "//go:build " + runtime.GOOS}},
+			satisfied: nil,
+			wantFiles: nil,
+		},
+		{
+			name:      "negated tag is hidden once the tag is passed",
+			tags:      []BuildTag{{File: "n.go", Constraint: "//go:build !integration"}},
+			satisfied: []string{"integration"},
+			wantFiles: []string{"n.go"},
+		},
+		{
+			name: "only the unsatisfied half of a mixed set is reported",
+			tags: []BuildTag{
+				{File: "seen.go", Constraint: "//go:build integration"},
+				{File: "unseen.go", Constraint: "//go:build e2e"},
+			},
+			satisfied: []string{"integration"},
+			wantFiles: []string{"unseen.go"},
+		},
+		{
+			name:      "an and expression needs every tag",
+			tags:      []BuildTag{{File: "both.go", Constraint: "//go:build integration && e2e"}},
+			satisfied: []string{"integration"},
+			wantFiles: []string{"both.go"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Hidden(testCase.tags, testCase.satisfied)
+			if err != nil {
+				t.Fatalf("Hidden: %v", err)
+			}
+
+			files := make([]string, 0, len(got))
+			for _, tag := range got {
+				files = append(files, tag.File)
+			}
+
+			if !slices.Equal(files, testCase.wantFiles) {
+				t.Fatalf("hidden files = %v, want %v", files, testCase.wantFiles)
+			}
+		})
+	}
+}
+
+func TestHiddenRejectsAMalformedConstraint(t *testing.T) {
+	t.Parallel()
+
+	_, err := Hidden([]BuildTag{{File: "bad.go", Constraint: "//go:build ("}}, nil)
+	if err == nil {
+		t.Fatal("Hidden accepted a constraint that does not parse")
 	}
 }

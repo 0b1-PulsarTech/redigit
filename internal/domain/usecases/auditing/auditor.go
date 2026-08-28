@@ -15,6 +15,11 @@ const defaultFarApart = 25
 // Config tunes what counts as far.
 type Config struct {
 	FarApart int
+	// Unseen names the files a build constraint hid from the reference
+	// queries. It is supplied by the composition root because deciding which
+	// constraints a run satisfies is a per-language question, and this package
+	// knows no language.
+	Unseen []Unseen
 }
 
 func (c Config) withDefaults() Config {
@@ -30,6 +35,7 @@ func (c Config) withDefaults() Config {
 type Result struct {
 	Report entities.Report
 	Drifts []Drift
+	Unseen []Unseen
 }
 
 // Auditor measures a rebuilt ordering. Every measure it produces names what it
@@ -57,6 +63,7 @@ func (a Auditor) Audit(graph entities.Graph, order entities.Ordering) (Result, e
 			Integrity: []entities.Measure{
 				a.placed(graph, order),
 				a.cyclesNamed(graph, order),
+				a.resolverCouldSee(graph),
 			},
 			Shape: []entities.Measure{
 				a.nearTheirReader(graph, order, found),
@@ -64,6 +71,7 @@ func (a Auditor) Audit(graph entities.Graph, order entities.Ordering) (Result, e
 			},
 		},
 		Drifts: found,
+		Unseen: a.cfg.Unseen,
 	}
 
 	// A measure that does not name its blind spot never leaves this package.

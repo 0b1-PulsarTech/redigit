@@ -11,6 +11,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
 )
@@ -66,6 +67,8 @@ func withPipeline(
 
 	defer func() { _ = pl.Close(context.WithoutCancel(ctx)) }()
 
+	warnUnseen(pl.Unseen())
+
 	return run(pl)
 }
 
@@ -99,6 +102,7 @@ func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer, start st
 			Declarations: graph.Len(),
 			Edges:        len(graph.Edges()),
 			Rounds:       order.Rounds,
+			Unseen:       toUnseen(result.Unseen),
 			Integrity:    toMeasures(result.Report.Integrity),
 			Shape:        toMeasures(result.Report.Shape),
 			Cycles:       toCycles(order.Cycles),
@@ -168,6 +172,25 @@ func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer, start sta
 			Unplaced: toKeys(plan.Unplaced),
 		})
 	})
+}
+
+// warnUnseen names the files a build constraint hid from the reference
+// queries. It is a DIFFERENT failure from warnBlind and needs its own line:
+// a blind query errored and is counted, while a hidden file answers the
+// syntactic query normally and contributes declarations with no edges at all.
+// That is indistinguishable from code nothing references, so without this the
+// run reports a clean graph and means nothing by it.
+func warnUnseen(unseen []auditing.Unseen) {
+	if len(unseen) == 0 {
+		return
+	}
+
+	slog.Warn(
+		"a build constraint hid some files from the reference queries",
+		slog.Int("files", len(unseen)),
+		slog.String("first", unseen[0].File),
+		slog.String("constraint", unseen[0].Constraint),
+	)
 }
 
 // warnBlind names what the resolver could not answer. It goes to the log

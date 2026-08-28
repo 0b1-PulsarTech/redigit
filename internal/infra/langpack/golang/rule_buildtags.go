@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"go/build/constraint"
+	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -125,3 +127,51 @@ func constraintTags(expr constraint.Expr) []string {
 
 	return tags
 }
+
+// Hidden reports which of tags name a constraint that satisfied does NOT
+// satisfy: the set an index built with those tags never sees. Being behind a
+// constraint and being invisible differ, and a "//go:build linux" file read
+// normally on Linux would bury the integration-tagged files really missing.
+func Hidden(tags []BuildTag, satisfied []string) ([]BuildTag, error) {
+	// simplification: satisfied plus GOOS, GOARCH and "unix" is the whole
+	// truth here, so a "go1.27" or "cgo" guard evaluates false and is named
+	// hidden. Naming a file that was in fact read beats restoring the silence.
+	// Upgrade path: evaluate against the build context gopls was started with.
+	const implicitTags = 3 // GOOS, GOARCH, unix
+
+	known := make(map[string]bool, len(satisfied)+implicitTags)
+	for _, tag := range satisfied {
+		known[tag] = true
+	}
+
+	known[runtime.GOOS] = true
+	known[runtime.GOARCH] = true
+
+	if isUnix(runtime.GOOS) {
+		known["unix"] = true
+	}
+
+	var out []BuildTag
+
+	for _, tag := range tags {
+		expr, err := constraint.Parse(tag.Constraint)
+		if err != nil {
+			return nil, fmt.Errorf("parse constraint %q in %s: %w", tag.Constraint, tag.File, err)
+		}
+
+		if !expr.Eval(func(name string) bool { return known[name] }) {
+			out = append(out, tag)
+		}
+	}
+
+	return out, nil
+}
+
+// unixGOOS lists the platforms for which the "unix" constraint is true, as
+// go/build defines it.
+var unixGOOS = []string{
+	"aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos",
+	"ios", "linux", "netbsd", "openbsd", "solaris",
+}
+
+func isUnix(goos string) bool { return slices.Contains(unixGOOS, goos) }

@@ -36,7 +36,13 @@ type Pipeline struct {
 	snapshot entities.Snapshot
 	source   emitting.Source
 	renderer emitting.Renderer
+	unseen   []auditing.Unseen
 }
+
+// Unseen names the files a build constraint hid from this run's reference
+// queries. A caller reports it so a graph built without the tags is not read
+// as a graph built with them.
+func (p *Pipeline) Unseen() []auditing.Unseen { return p.unseen }
 
 // closer is what Pipeline.Close needs from the language server session and
 // the checkout it made.
@@ -139,6 +145,14 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, err
 	}
 
+	cfg.Auditing.Unseen, err = unseen(snapshot, cfg.BuildTags)
+	if err != nil {
+		_ = session.Close(ctx)
+		_ = checkout.Close(ctx)
+
+		return nil, err
+	}
+
 	return &Pipeline{
 		checkout: checkout,
 		session:  session,
@@ -147,10 +161,38 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		orderer:  ordering.New(cfg.Ordering),
 		planner:  planning.New(cfg.Planning),
 		auditor:  auditing.New(cfg.Auditing),
+		unseen:   cfg.Auditing.Unseen,
 		snapshot: snapshot,
 		source:   source,
 		renderer: newRenderer(golang.NewSyntax(), configRenderers(configSyntax)),
 	}, nil
+}
+
+// unseen names the files this run's build tags leave invisible to the
+// reference queries. It is computed here, at the composition root, because
+// which constraints a tag satisfies is a per-language question and the
+// auditing use case knows no language.
+func unseen(snap entities.Snapshot, tags []string) ([]auditing.Unseen, error) {
+	constrained, err := golang.BuildConstraints(snap)
+	if err != nil {
+		return nil, fmt.Errorf("read build constraints: %w", err)
+	}
+
+	hidden, err := golang.Hidden(constrained, tags)
+	if err != nil {
+		return nil, fmt.Errorf("evaluate build constraints: %w", err)
+	}
+
+	out := make([]auditing.Unseen, 0, len(hidden))
+	for _, tag := range hidden {
+		out = append(out, auditing.Unseen{
+			File:       tag.File,
+			Constraint: tag.Constraint,
+			Tags:       tag.Tags,
+		})
+	}
+
+	return out, nil
 }
 
 func buildFlags(tags []string) []string {

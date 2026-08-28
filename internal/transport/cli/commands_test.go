@@ -127,6 +127,7 @@ func runSettledTestCase(t *testing.T, graph entities.Graph, testCase settledTest
 
 	ctrl := gomock.NewController(t)
 	pl := NewMockpipeline(ctrl)
+	pl.EXPECT().Unseen().Return(nil).AnyTimes()
 
 	if testCase.graphErr != nil {
 		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, testCase.graphErr)
@@ -195,6 +196,7 @@ func TestWithPipeline(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		pl := NewMockpipeline(ctrl)
+		pl.EXPECT().Unseen().Return(nil).AnyTimes()
 		pl.EXPECT().Close(gomock.Any()).Return(nil)
 
 		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
@@ -213,6 +215,7 @@ func TestWithPipeline(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		pl := NewMockpipeline(ctrl)
+		pl.EXPECT().Unseen().Return(nil).AnyTimes()
 		pl.EXPECT().Close(gomock.Any()).Return(nil)
 
 		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
@@ -228,6 +231,7 @@ func TestWithPipeline(t *testing.T) {
 
 func settledStart(ctrl *gomock.Controller, graphErr error) (starter, *Mockpipeline) {
 	pl := NewMockpipeline(ctrl)
+	pl.EXPECT().Unseen().Return(nil).AnyTimes()
 
 	if graphErr != nil {
 		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, graphErr)

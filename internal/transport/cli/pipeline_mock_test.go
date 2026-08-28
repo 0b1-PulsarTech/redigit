@@ -161,3 +161,17 @@ func (mr *MockpipelineMockRecorder) Snapshot() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Snapshot", reflect.TypeOf((*Mockpipeline)(nil).Snapshot))
 }
+
+// Unseen mocks base method.
+func (m *Mockpipeline) Unseen() []auditing.Unseen {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unseen")
+	ret0, _ := ret[0].([]auditing.Unseen)
+	return ret0
+}
+
+// Unseen indicates an expected call of Unseen.
+func (mr *MockpipelineMockRecorder) Unseen() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unseen", reflect.TypeOf((*Mockpipeline)(nil).Unseen))
+}
