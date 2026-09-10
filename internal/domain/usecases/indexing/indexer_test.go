@@ -102,6 +102,49 @@ func TestIndexerReadsOnlyOwnedFiles(t *testing.T) {
 	}
 }
 
+func TestLanguageOwns(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		lang Language
+		file string
+		want bool
+	}{
+		{"an owned extension", Language{Extensions: []string{".go"}}, "a.go", true},
+		{"an unowned extension", Language{Extensions: []string{".go"}}, "a.ts", false},
+		{"no extensions owns nothing", Language{}, "a.go", false},
+		{
+			"AnyExtension claims a known extension",
+			Language{Extensions: []string{AnyExtension}},
+			"a.go",
+			true,
+		},
+		{
+			"AnyExtension claims an unknown extension",
+			Language{Extensions: []string{AnyExtension}},
+			"a.ts",
+			true,
+		},
+		{
+			"AnyExtension claims a file with none",
+			Language{Extensions: []string{AnyExtension}},
+			"Dockerfile",
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := testCase.lang.Owns(testCase.file); got != testCase.want {
+				t.Fatalf("Owns(%q) = %v, want %v", testCase.file, got, testCase.want)
+			}
+		})
+	}
+}
+
 type failingParts struct {
 	tree     Tree
 	syntax   Syntax

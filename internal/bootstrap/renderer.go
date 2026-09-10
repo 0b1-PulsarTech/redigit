@@ -71,3 +71,15 @@ func configRenderers(syntax renderer) map[string]renderer {
 
 	return out
 }
+
+// renderersByExtension is byExtension's dispatch table: ".go" reads with
+// goSyntax, every extension the config pack owns reads with configSyntax, and
+// configSyntax is also passed as byExtension's fallback - the opaque pack
+// shares configSyntax too, so a path neither list names still renders through
+// the Syntax it was indexed with, never through the Go syntax.
+func renderersByExtension(goSyntax, configSyntax renderer) map[string]renderer {
+	out := configRenderers(configSyntax)
+	out[".go"] = goSyntax
+
+	return out
+}

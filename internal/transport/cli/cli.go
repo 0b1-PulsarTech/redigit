@@ -77,10 +77,11 @@ func parse(args []string) (bootstrap.Config, int, error) {
 	cfg := bootstrap.Defaults()
 
 	var (
-		tags        string
-		layerFile   string
-		featureFile string
-		far         int
+		tags         string
+		layerFile    string
+		featureFile  string
+		chunkMapFile string
+		far          int
 	)
 
 	set := flag.NewFlagSet("redigit", flag.ContinueOnError)
@@ -97,7 +98,18 @@ func parse(args []string) (bootstrap.Config, int, error) {
 	)
 	set.StringVar(&cfg.ServerCommand, "server", cfg.ServerCommand, "language server command")
 	set.StringVar(&layerFile, "layers", "", "layer file: which path prefixes come first")
-	set.StringVar(&featureFile, "features", "", "feature file: the vertical slices layers act inside")
+	set.StringVar(
+		&featureFile,
+		"features",
+		"",
+		"feature file: the vertical slices layers act inside",
+	)
+	set.StringVar(
+		&chunkMapFile,
+		"chunk-map",
+		"",
+		"chunk map file: JSON spans for a format redigit cannot parse on its own",
+	)
 
 	if err := set.Parse(args); err != nil {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: %s", ErrUsage, err)
@@ -110,6 +122,10 @@ func parse(args []string) (bootstrap.Config, int, error) {
 	cfg.BuildTags = splitTags(tags)
 
 	if err := loadSlicing(&cfg, layerFile, featureFile); err != nil {
+		return bootstrap.Config{}, 0, err
+	}
+
+	if err := loadChunkMap(&cfg, chunkMapFile); err != nil {
 		return bootstrap.Config{}, 0, err
 	}
 

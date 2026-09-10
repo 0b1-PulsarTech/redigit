@@ -29,12 +29,19 @@ type Language struct {
 	Resolved bool
 }
 
+// AnyExtension is the sentinel Extensions entry a catch-all language pack
+// uses to claim every path no earlier-registered language already owns - the
+// same last-refusal role chunk.WholeFile plays one level down, inside a
+// single language's own chunker list.
+const AnyExtension = "*"
+
 // Owns reports whether file's extension is one this language reads. The
 // composition root reuses it to name a final-tree path no configured
 // language claims at all (see bootstrap.unclaimed), the same check the
 // indexer's own read loop uses to decide what to parse.
 func (l Language) Owns(file string) bool {
-	return slices.Contains(l.Extensions, path.Ext(file))
+	return slices.Contains(l.Extensions, AnyExtension) ||
+		slices.Contains(l.Extensions, path.Ext(file))
 }
 
 // Config tunes the index run.

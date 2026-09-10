@@ -125,8 +125,17 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	}
 
 	indexCfg := cfg.Indexing
-	configSyntax := config.NewSyntax(configChunkers())
-	indexCfg.Languages = languages(configSyntax)
+	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
+	specific := specificLanguages(configSyntax)
+
+	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
+		_ = session.Close(ctx)
+		_ = checkout.Close(ctx)
+
+		return nil, fmt.Errorf("validate chunk map: %w", err)
+	}
+
+	indexCfg.Languages = append(specific, opaqueLanguage(configSyntax))
 
 	// The snapshot describes a REVISION, so its root is where that revision
 	// was materialised - not the repository, whose working tree holds whatever
@@ -175,7 +184,10 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		unclaimed: cfg.Auditing.Unclaimed,
 		snapshot:  snapshot,
 		source:    source,
-		renderer:  newRenderer(golang.NewSyntax(), configRenderers(configSyntax)),
+		renderer: newRenderer(
+			configSyntax,
+			renderersByExtension(golang.NewSyntax(), configSyntax),
+		),
 	}, nil
 }
 
@@ -317,10 +329,15 @@ func (p *Pipeline) Close(ctx context.Context) error {
 	return closeErr
 }
 
-// languages is what the indexer reads with. The config entry covers the files
-// a build needs and no language server reads: without them a plan holds no
-// go.mod, so every tree it describes has source and nothing to compile it.
-func languages(configSyntax config.Syntax) []indexing.Language {
+// specificLanguages is what the indexer reads a known format with. The config
+// entry covers the files a build needs and no language server reads: without
+// them a plan holds no go.mod, so every tree it describes has source and
+// nothing to compile it.
+//
+// Kept apart from opaqueLanguage so validateChunkMap can check a supplied
+// chunk map against real ownership before the catch-all pack - which would
+// otherwise also claim every path - is added.
+func specificLanguages(configSyntax config.Syntax) []indexing.Language {
 	return []indexing.Language{
 		{
 			Name:       "go",
@@ -335,5 +352,19 @@ func languages(configSyntax config.Syntax) []indexing.Language {
 			Syntax:     configSyntax,
 			Rules:      config.NewRulePack(),
 		},
+	}
+}
+
+// opaqueLanguage claims every final-tree path neither "go" nor "config" owns.
+// It shares configSyntax's own chunker list, so it reads such a path
+// whole-file by default (chunk.WholeFile) unless a chunk map entry refines
+// the cut - see docs/PLANO-EMISSAO.md:113-133. Without it, a format this tool
+// has no reader for - .ts, .tmpl, a golden fixture - vanishes from the graph
+// in silence and a plan built from this run can never reproduce it.
+func opaqueLanguage(configSyntax config.Syntax) indexing.Language {
+	return indexing.Language{
+		Name:       "opaque",
+		Extensions: []string{indexing.AnyExtension},
+		Syntax:     configSyntax,
 	}
 }

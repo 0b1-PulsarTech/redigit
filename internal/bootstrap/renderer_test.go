@@ -88,6 +88,51 @@ func TestConfigRenderersCoverEveryConfigExtension(t *testing.T) {
 	}
 
 	if len(table) != len(configExtensions()) {
-		t.Fatalf("the table holds %d entries for %d extensions", len(table), len(configExtensions()))
+		t.Fatalf(
+			"the table holds %d entries for %d extensions",
+			len(table),
+			len(configExtensions()),
+		)
+	}
+}
+
+func TestRenderersByExtensionFallsBackToConfig(t *testing.T) {
+	t.Parallel()
+
+	goSyntax := stubRenderer{tag: "go"}
+	configSyntax := stubRenderer{tag: "config"}
+
+	byExt := renderersByExtension(goSyntax, configSyntax)
+	dispatch := newRenderer(configSyntax, byExt)
+
+	testCases := []struct {
+		name string
+		file string
+		want string
+	}{
+		{"a Go file reads with the Go syntax", "apps/lead/main.go", "go"},
+		{"a known config extension reads with the config syntax", "apps/lead/go.mod", "config"},
+		{
+			"an extension neither pack lists falls back to config, not go",
+			"engines/wwebjs/src/main.ts",
+			"config",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			keep := []entities.DeclKey{{File: testCase.file, Name: "<file>"}}
+
+			got, err := dispatch.Render(t.Context(), nil, keep)
+			if err != nil {
+				t.Fatalf("Render() = %v", err)
+			}
+
+			if string(got) != testCase.want {
+				t.Fatalf("reached the %q renderer, want %q", got, testCase.want)
+			}
+		})
 	}
 }

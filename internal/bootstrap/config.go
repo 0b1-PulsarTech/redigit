@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"time"
 
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
@@ -39,6 +40,12 @@ type Config struct {
 	BlobDir string
 
 	Author AuthorConfig
+
+	// ChunkMap is the operator-supplied escape hatch for a format this tool
+	// cannot parse (docs/PLANO-EMISSAO.md:113-133). It only refines the
+	// opaque pack's whole-file default; a path a specific pack already
+	// understands structurally is refused rather than overridden.
+	ChunkMap entities.ChunkMap
 }
 
 // AuthorConfig is who a rebuilt history is attributed to, and from when. The
