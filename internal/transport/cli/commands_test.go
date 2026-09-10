@@ -128,6 +128,7 @@ func runSettledTestCase(t *testing.T, graph entities.Graph, testCase settledTest
 	ctrl := gomock.NewController(t)
 	pl := NewMockpipeline(ctrl)
 	pl.EXPECT().Unseen().Return(nil).AnyTimes()
+	pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 
 	if testCase.graphErr != nil {
 		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, testCase.graphErr)
@@ -197,6 +198,7 @@ func TestWithPipeline(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		pl := NewMockpipeline(ctrl)
 		pl.EXPECT().Unseen().Return(nil).AnyTimes()
+		pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 		pl.EXPECT().Close(gomock.Any()).Return(nil)
 
 		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
@@ -216,6 +218,7 @@ func TestWithPipeline(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		pl := NewMockpipeline(ctrl)
 		pl.EXPECT().Unseen().Return(nil).AnyTimes()
+		pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 		pl.EXPECT().Close(gomock.Any()).Return(nil)
 
 		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
@@ -232,6 +235,7 @@ func TestWithPipeline(t *testing.T) {
 func settledStart(ctrl *gomock.Controller, graphErr error) (starter, *Mockpipeline) {
 	pl := NewMockpipeline(ctrl)
 	pl.EXPECT().Unseen().Return(nil).AnyTimes()
+	pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 
 	if graphErr != nil {
 		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, graphErr)
@@ -499,6 +503,53 @@ func TestWarnBlind(t *testing.T) {
 		)
 
 		warnBlind(indexing.Result{Graph: declGraph(), Blind: testCase.blind})
+
+		slog.SetDefault(restore)
+
+		got := 0
+		if buf.Len() > 0 {
+			got = 1
+		}
+
+		if got != testCase.wantLines {
+			t.Errorf(
+				"%s: logged = %d lines, want %d (output: %q)",
+				testCase.name,
+				got,
+				testCase.wantLines,
+				buf.String(),
+			)
+		}
+	}
+}
+
+// TestWarnUnclaimed pins that a path no language pack claims is logged (not
+// dropped), and that nothing is logged when every path was claimed. It runs
+// outside t.Parallel() for the same reason TestWarnBlind does: it swaps the
+// package-global slog default, and that state is process-wide.
+func TestWarnUnclaimed(t *testing.T) {
+	testCases := []struct {
+		name      string
+		unclaimed []auditing.Unclaimed
+		wantLines int
+	}{
+		{"nothing unclaimed logs nothing", nil, 0},
+		{
+			"an unclaimed path is logged",
+			[]auditing.Unclaimed{{File: "database/atlas.hcl"}},
+			1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		var buf bytes.Buffer
+
+		restore := slog.Default()
+		slog.SetDefault(
+			slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})),
+		)
+
+		warnUnclaimed(testCase.unclaimed)
 
 		slog.SetDefault(restore)
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
@@ -26,23 +27,30 @@ import (
 // Order, Plan, Audit, Births, Close - with a fake stage instead of a real
 // language server, git worktree, or parsed source tree.
 type Pipeline struct {
-	checkout closer
-	session  closer
-	indexer  indexer
-	scanner  scanner
-	orderer  orderer
-	planner  planner
-	auditor  auditor
-	snapshot entities.Snapshot
-	source   emitting.Source
-	renderer emitting.Renderer
-	unseen   []auditing.Unseen
+	checkout  closer
+	session   closer
+	indexer   indexer
+	scanner   scanner
+	orderer   orderer
+	planner   planner
+	auditor   auditor
+	snapshot  entities.Snapshot
+	source    emitting.Source
+	renderer  emitting.Renderer
+	unseen    []auditing.Unseen
+	unclaimed []auditing.Unclaimed
 }
 
 // Unseen names the files a build constraint hid from this run's reference
 // queries. A caller reports it so a graph built without the tags is not read
 // as a graph built with them.
 func (p *Pipeline) Unseen() []auditing.Unseen { return p.unseen }
+
+// Unclaimed names the final-tree paths no configured language pack claims. A
+// caller reports it because a plan built from this run can never reproduce
+// one of these paths at all, which is a different failure than Unseen: that
+// one still answers the syntactic query, this one is never read.
+func (p *Pipeline) Unclaimed() []auditing.Unclaimed { return p.unclaimed }
 
 // closer is what Pipeline.Close needs from the language server session and
 // the checkout it made.
@@ -153,18 +161,21 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, err
 	}
 
+	cfg.Auditing.Unclaimed = unclaimed(snapshot, indexCfg.Languages)
+
 	return &Pipeline{
-		checkout: checkout,
-		session:  session,
-		indexer:  indexing.New(session, reader, indexCfg),
-		scanner:  scanner,
-		orderer:  ordering.New(cfg.Ordering),
-		planner:  planning.New(cfg.Planning),
-		auditor:  auditing.New(cfg.Auditing),
-		unseen:   cfg.Auditing.Unseen,
-		snapshot: snapshot,
-		source:   source,
-		renderer: newRenderer(golang.NewSyntax(), configRenderers(configSyntax)),
+		checkout:  checkout,
+		session:   session,
+		indexer:   indexing.New(session, reader, indexCfg),
+		scanner:   scanner,
+		orderer:   ordering.New(cfg.Ordering),
+		planner:   planning.New(cfg.Planning),
+		auditor:   auditing.New(cfg.Auditing),
+		unseen:    cfg.Auditing.Unseen,
+		unclaimed: cfg.Auditing.Unclaimed,
+		snapshot:  snapshot,
+		source:    source,
+		renderer:  newRenderer(golang.NewSyntax(), configRenderers(configSyntax)),
 	}, nil
 }
 
@@ -193,6 +204,31 @@ func unseen(snap entities.Snapshot, tags []string) ([]auditing.Unseen, error) {
 	}
 
 	return out, nil
+}
+
+// unclaimed names every final-tree path no configured language's extension
+// list matches. It is computed here, at the composition root, for the same
+// reason unseen is: which extensions a language owns is a per-language
+// question, and the auditing use case knows no language.
+//
+// This is the loud version of the indexer's own read loop
+// (internal/domain/usecases/indexing/indexer.go), which skips exactly these
+// paths with a bare continue and reports nothing - a plan built from this
+// run can never reproduce one of them, and without this, nothing says so
+// until the final-tree invariant fails at the very end.
+func unclaimed(snap entities.Snapshot, langs []indexing.Language) []auditing.Unclaimed {
+	out := make([]auditing.Unclaimed, 0, len(snap.Files))
+
+	for _, file := range snap.Files {
+		if !slices.ContainsFunc(
+			langs,
+			func(lang indexing.Language) bool { return lang.Owns(file) },
+		) {
+			out = append(out, auditing.Unclaimed{File: file})
+		}
+	}
+
+	return out
 }
 
 func buildFlags(tags []string) []string {

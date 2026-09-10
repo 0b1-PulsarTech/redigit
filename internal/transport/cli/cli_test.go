@@ -220,6 +220,7 @@ func TestDispatchRoutesKnownCommands(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			pl := NewMockpipeline(ctrl)
 			pl.EXPECT().Unseen().Return(nil).AnyTimes()
+			pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 			pl.EXPECT().Close(gomock.Any()).Return(nil)
 
 			// Every handler starts by asking for the graph; failing fast

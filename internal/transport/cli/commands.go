@@ -68,6 +68,7 @@ func withPipeline(
 	defer func() { _ = pl.Close(context.WithoutCancel(ctx)) }()
 
 	warnUnseen(pl.Unseen())
+	warnUnclaimed(pl.Unclaimed())
 
 	return run(pl)
 }
@@ -103,6 +104,7 @@ func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer, start st
 			Edges:        len(graph.Edges()),
 			Rounds:       order.Rounds,
 			Unseen:       toUnseen(result.Unseen),
+			Unclaimed:    toUnclaimed(result.Unclaimed),
 			Integrity:    toMeasures(result.Report.Integrity),
 			Shape:        toMeasures(result.Report.Shape),
 			Cycles:       toCycles(order.Cycles),
@@ -190,6 +192,24 @@ func warnUnseen(unseen []auditing.Unseen) {
 		slog.Int("files", len(unseen)),
 		slog.String("first", unseen[0].File),
 		slog.String("constraint", unseen[0].Constraint),
+	)
+}
+
+// warnUnclaimed names the final-tree paths no configured language pack
+// claims. It is a DIFFERENT failure from warnUnseen and needs its own line:
+// an unseen file still answers the syntactic query and contributes
+// declarations with no edges, while an unclaimed path is never read at all -
+// no plan built from this run can reproduce it, and without this warning
+// nothing says so until the final-tree invariant fails at the very end.
+func warnUnclaimed(unclaimed []auditing.Unclaimed) {
+	if len(unclaimed) == 0 {
+		return
+	}
+
+	slog.Warn(
+		"no language pack claims some final-tree paths",
+		slog.Int("files", len(unclaimed)),
+		slog.String("first", unclaimed[0].File),
 	)
 }
 

@@ -29,7 +29,11 @@ type Language struct {
 	Resolved bool
 }
 
-func (l Language) owns(file string) bool {
+// Owns reports whether file's extension is one this language reads. The
+// composition root reuses it to name a final-tree path no configured
+// language claims at all (see bootstrap.unclaimed), the same check the
+// indexer's own read loop uses to decide what to parse.
+func (l Language) Owns(file string) bool {
 	return slices.Contains(l.Extensions, path.Ext(file))
 }
 
@@ -183,7 +187,7 @@ func (i Indexer) read(
 
 func (i Indexer) languageFor(file string) (Language, bool) {
 	for _, lang := range i.langs {
-		if lang.owns(file) {
+		if lang.Owns(file) {
 			return lang, true
 		}
 	}

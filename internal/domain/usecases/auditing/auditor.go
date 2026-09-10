@@ -20,6 +20,11 @@ type Config struct {
 	// constraints a run satisfies is a per-language question, and this package
 	// knows no language.
 	Unseen []Unseen
+	// Unclaimed names the final-tree paths no configured language pack's
+	// extension list matches. Supplied by the composition root for the same
+	// reason as Unseen: which extensions a language owns is a per-language
+	// question, and this package knows no language.
+	Unclaimed []Unclaimed
 }
 
 func (c Config) withDefaults() Config {
@@ -33,9 +38,10 @@ func (c Config) withDefaults() Config {
 // Result is what an audit produces: numbers that each declare their own blind
 // spot, and the list of declarations worth looking at.
 type Result struct {
-	Report entities.Report
-	Drifts []Drift
-	Unseen []Unseen
+	Report    entities.Report
+	Drifts    []Drift
+	Unseen    []Unseen
+	Unclaimed []Unclaimed
 }
 
 // Auditor measures a rebuilt ordering. Every measure it produces names what it
@@ -70,8 +76,9 @@ func (a Auditor) Audit(graph entities.Graph, order entities.Ordering) (Result, e
 				a.testsWithSubject(graph, order),
 			},
 		},
-		Drifts: found,
-		Unseen: a.cfg.Unseen,
+		Drifts:    found,
+		Unseen:    a.cfg.Unseen,
+		Unclaimed: a.cfg.Unclaimed,
 	}
 
 	// A measure that does not name its blind spot never leaves this package.

@@ -356,6 +356,68 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 	}
 }
 
+func TestPipelineUnclaimed(t *testing.T) {
+	t.Parallel()
+
+	want := []auditing.Unclaimed{{File: "database/atlas.hcl"}}
+	pipeline := &Pipeline{unclaimed: want}
+
+	got := pipeline.Unclaimed()
+	if len(got) != len(want) || got[0].File != want[0].File {
+		t.Fatalf("Unclaimed() = %+v, want %+v", got, want)
+	}
+}
+
+func TestUnclaimed(t *testing.T) {
+	t.Parallel()
+
+	langs := []indexing.Language{
+		{Name: "go", Extensions: []string{".go"}},
+		{Name: "config", Extensions: []string{".mod", ".yml"}},
+	}
+
+	testCases := []struct {
+		name  string
+		files []string
+		want  []string
+	}{
+		{
+			name:  "every final-tree path is owned by some language",
+			files: []string{"main.go", "go.mod"},
+			want:  nil,
+		},
+		{
+			name:  "a path no language's extension list matches is reported",
+			files: []string{"main.go", "engines/wwebjs/src/index.ts", "database/atlas.hcl"},
+			want:  []string{"engines/wwebjs/src/index.ts", "database/atlas.hcl"},
+		},
+		{
+			name:  "an empty final tree reports nothing",
+			files: nil,
+			want:  nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap := entities.Snapshot{Files: testCase.files}
+
+			got := unclaimed(snap, langs)
+			if len(got) != len(testCase.want) {
+				t.Fatalf("unclaimed() = %+v, want %d entries", got, len(testCase.want))
+			}
+
+			for i, file := range testCase.want {
+				if got[i].File != file {
+					t.Fatalf("unclaimed()[%d].File = %q, want %q", i, got[i].File, file)
+				}
+			}
+		})
+	}
+}
+
 func TestBuildFlags(t *testing.T) {
 	t.Parallel()
 

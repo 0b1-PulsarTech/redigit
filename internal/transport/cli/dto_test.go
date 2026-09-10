@@ -34,7 +34,11 @@ func TestToUnseen(t *testing.T) {
 		{
 			name: "the constraint and its tags both travel",
 			in: []auditing.Unseen{
-				{File: "b_test.go", Constraint: "//go:build integration", Tags: []string{"integration"}},
+				{
+					File:       "b_test.go",
+					Constraint: "//go:build integration",
+					Tags:       []string{"integration"},
+				},
 			},
 			wantLen:  1,
 			wantJSON: `[{"file":"b_test.go","constraint":"//go:build integration","tags":["integration"]}]`,
@@ -76,5 +80,60 @@ func TestAuditDTOAlwaysCarriesUnseen(t *testing.T) {
 
 	if !strings.Contains(string(encoded), `"unseen":[]`) {
 		t.Fatalf("audit output dropped the unseen key: %s", encoded)
+	}
+}
+
+func TestToUnclaimed(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		in       []auditing.Unclaimed
+		wantJSON string
+	}{
+		{
+			name:     "every path claimed serialises as an empty array, never null",
+			in:       nil,
+			wantJSON: "[]",
+		},
+		{
+			name:     "an unclaimed path travels as a bare string",
+			in:       []auditing.Unclaimed{{File: "database/atlas.hcl"}},
+			wantJSON: `["database/atlas.hcl"]`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := toUnclaimed(testCase.in)
+
+			encoded, err := json.Marshal(got)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+
+			if string(encoded) != testCase.wantJSON {
+				t.Fatalf("json = %s, want %s", encoded, testCase.wantJSON)
+			}
+		})
+	}
+}
+
+// An audit that could not read some paths and says so is the whole point of
+// the field, mirroring TestAuditDTOAlwaysCarriesUnseen: a consumer must be
+// able to tell "every path was claimed" from "this tool never looked", so
+// the key is present either way.
+func TestAuditDTOAlwaysCarriesUnclaimed(t *testing.T) {
+	t.Parallel()
+
+	encoded, err := json.Marshal(auditDTO{Unclaimed: toUnclaimed(nil)})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	if !strings.Contains(string(encoded), `"unclaimed":[]`) {
+		t.Fatalf("audit output dropped the unclaimed key: %s", encoded)
 	}
 }

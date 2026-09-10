@@ -247,6 +247,7 @@ func reportStart(
 ) starter {
 	pl := NewMockpipeline(ctrl)
 	pl.EXPECT().Unseen().Return(nil).AnyTimes()
+	pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 	pl.EXPECT().Close(gomock.Any()).Return(nil)
 
 	if graphErr != nil {

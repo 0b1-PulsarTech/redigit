@@ -43,17 +43,22 @@ type unseenDTO struct {
 }
 
 type auditDTO struct {
-	Repo         string       `json:"repo"`
-	Rev          string       `json:"rev"`
-	BuildTags    []string     `json:"build_tags"`
-	Declarations int          `json:"declarations"`
-	Edges        int          `json:"edges"`
-	Rounds       int          `json:"rounds"`
-	Unseen       []unseenDTO  `json:"unseen"`
-	Integrity    []measureDTO `json:"integrity"`
-	Shape        []measureDTO `json:"shape"`
-	Cycles       []cycleDTO   `json:"cycles"`
-	Drift        []driftDTO   `json:"drift"`
+	Repo         string      `json:"repo"`
+	Rev          string      `json:"rev"`
+	BuildTags    []string    `json:"build_tags"`
+	Declarations int         `json:"declarations"`
+	Edges        int         `json:"edges"`
+	Rounds       int         `json:"rounds"`
+	Unseen       []unseenDTO `json:"unseen"`
+	// Unclaimed is not omitempty either, and for the same reason Unseen
+	// isn't: a path no language pack claims is never even read, so an empty
+	// list here is the claim that every final-tree path was claimed, not
+	// that this run is too old to say so.
+	Unclaimed []string     `json:"unclaimed"`
+	Integrity []measureDTO `json:"integrity"`
+	Shape     []measureDTO `json:"shape"`
+	Cycles    []cycleDTO   `json:"cycles"`
+	Drift     []driftDTO   `json:"drift"`
 }
 
 type commitDTO struct {
@@ -102,6 +107,16 @@ func toUnseen(in []auditing.Unseen) []unseenDTO {
 		}
 
 		out = append(out, unseenDTO{File: unseen.File, Constraint: unseen.Constraint, Tags: tags})
+	}
+
+	return out
+}
+
+func toUnclaimed(in []auditing.Unclaimed) []string {
+	out := make([]string, 0, len(in))
+
+	for _, unclaimed := range in {
+		out = append(out, unclaimed.File)
 	}
 
 	return out

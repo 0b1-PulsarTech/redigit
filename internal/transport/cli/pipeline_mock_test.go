@@ -162,6 +162,20 @@ func (mr *MockpipelineMockRecorder) Snapshot() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Snapshot", reflect.TypeOf((*Mockpipeline)(nil).Snapshot))
 }
 
+// Unclaimed mocks base method.
+func (m *Mockpipeline) Unclaimed() []auditing.Unclaimed {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unclaimed")
+	ret0, _ := ret[0].([]auditing.Unclaimed)
+	return ret0
+}
+
+// Unclaimed indicates an expected call of Unclaimed.
+func (mr *MockpipelineMockRecorder) Unclaimed() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unclaimed", reflect.TypeOf((*Mockpipeline)(nil).Unclaimed))
+}
+
 // Unseen mocks base method.
 func (m *Mockpipeline) Unseen() []auditing.Unseen {
 	m.ctrl.T.Helper()

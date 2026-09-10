@@ -26,6 +26,7 @@ type pipeline interface {
 	Plan(graph entities.Graph, order entities.Ordering) (entities.Plan, error)
 	Audit(graph entities.Graph, order entities.Ordering) (auditing.Result, error)
 	Unseen() []auditing.Unseen
+	Unclaimed() []auditing.Unclaimed
 	Emit(
 		ctx context.Context,
 		plan entities.Plan,
