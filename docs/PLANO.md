@@ -206,6 +206,33 @@ precisamente porque agrupamento 100% automatico se mostrou inusavel na pratica.
 O `jj absorb` recusa-se a agir quando a atribuicao e ambigua, e essa recusa e
 uma feature.
 
+### 3.2 O corte do nucleo compartilhado fecha sobre si mesmo
+
+Medido num repositorio real de 505 arquivos: `Event` nascia no commit 25 de
+247, mas os tipos dos seus proprios campos (`AckFunc`, `Kind`, `QRPayload`,
+`InboundMessage`, `ReceiptBatch`, `reason.Reason`) so nasciam depois, o ultimo
+na posicao 203. Uma duzia de outras declaracoes repetia o padrao, com lacunas
+de 180 a 200 posicoes - `emit` reportava 850 riscos de referencia para frente.
+
+A causa nao estava no ponto fixo: `order.Of()` ja calculava a posicao certa
+para `Event`, tarde o bastante para vir depois de tudo que ele precisa. A
+causa era o corte puxar o nucleo compartilhado em UM SO SALTO. Quando a
+primeira feature que le `Event` pede o que ainda nao nasceu, o corte incluia
+`Event` porque `Event` mesmo era um pedido direto - mas nao olhava o que
+`Event` por sua vez precisa, entao `reason.Reason` ficava para tras, a espera
+de outra feature que o pedisse por conta propria.
+
+O corte agora fecha sobre o proprio nucleo: puxar uma declaracao compartilhada
+tambem puxa, transitivamente, toda declaracao compartilhada QUE ELA MESMA
+precisa e ainda nao nasceu. Isto nunca alcanca a declaracao de uma feature
+ainda nao processada - a mesma prova de ownership que impede duas features de
+precisarem uma da outra (secao 2, `assign`) garante que tudo que uma
+declaracao compartilhada precisa e alcancado pelas MESMAS features que a
+alcancam, logo tambem e compartilhado. O fecho so cresce o commit que ja
+estava sendo cortado; nunca espera por uma feature adiante na fila. Dentro do
+commit, a ordem de nascimento de cada membro continua vindo de `order.Of()`,
+que e quem sabia a resposta certa o tempo todo.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

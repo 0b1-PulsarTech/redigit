@@ -183,6 +183,63 @@ func TestPlannerVerticalCommitCrossesDirectories(t *testing.T) {
 	}
 }
 
+// sharedKernelWithLateProvider: two features read shared event directly,
+// event needs shared reason, and one reader also owns an early declaration
+// that wins the chronology tie-break ahead of what event itself needed.
+func sharedKernelWithLateProvider() (entities.Graph, entities.Ordering) {
+	early := decl("consumera/early.go", "Early", "consumera")
+	consumerA := decl("consumera/handler.go", "HandleA", "consumera")
+	consumerB := decl("consumerb/handler.go", "HandleB", "consumerb")
+	event := decl("kernel/event.go", "Event", "kernel")
+	reason := decl("kernel/reason.go", "Reason", "kernel")
+
+	decls := []entities.Decl{early, consumerA, consumerB, event, reason}
+	edges := []entities.Edge{
+		needs(consumerA, event),
+		needs(consumerB, event),
+		needs(event, reason),
+	}
+
+	at := map[entities.DeclKey]entities.Position{
+		early.Key:     0,
+		consumerB.Key: 2,
+		reason.Key:    50,
+		consumerA.Key: 60,
+		event.Key:     61,
+	}
+
+	return entities.NewGraph(decls, edges, nil), entities.Ordering{At: at}
+}
+
+func TestPlannerSharedDeclarationWaitsForItsOwnProvider(t *testing.T) {
+	t.Parallel()
+
+	graph, order := sharedKernelWithLateProvider()
+
+	plan, err := New(Config{}).Plan(graph, order)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+
+	for index, commit := range plan.Commits {
+		for _, key := range commit.Decls {
+			bornAt[key] = index
+		}
+	}
+
+	for _, edge := range graph.Edges() {
+		dependent, provider := bornAt[edge.Dependent], bornAt[edge.Provider]
+		if provider > dependent {
+			t.Fatalf(
+				"%s (commit %d) is born before %s (commit %d), which it needs",
+				edge.Dependent, dependent, edge.Provider, provider,
+			)
+		}
+	}
+}
+
 func TestPlannerErrors(t *testing.T) {
 	t.Parallel()
 
