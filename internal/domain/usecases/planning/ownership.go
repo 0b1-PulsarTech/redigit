@@ -50,6 +50,8 @@ func assign(graph entities.Graph) ownership {
 		}
 	}
 
+	unionAtoms(graph, reachedBy)
+
 	for key, features := range reachedBy {
 		own.reach[key] = len(features)
 		own.owner[key] = soleOwner(features)
@@ -66,9 +68,32 @@ func assign(graph entities.Graph) ownership {
 		}
 	}
 
+	inheritTestOwnership(graph, own)
+	inheritTestFileOwnership(graph, own)
+
 	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
 
 	return own
+}
+
+func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[FeatureID]bool) {
+	for _, members := range atomGroups(graph) {
+		union := map[FeatureID]bool{}
+
+		for _, key := range members {
+			for feature := range reachedBy[key] {
+				union[feature] = true
+			}
+		}
+
+		if len(union) == 0 {
+			continue
+		}
+
+		for _, key := range members {
+			reachedBy[key] = union
+		}
+	}
 }
 
 // soleOwner is deliberately not a threshold. A declaration reached by two

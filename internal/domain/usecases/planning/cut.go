@@ -6,9 +6,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// cut splits one bucket into commits no wider than MaxFiles, keeping the
-// declarations in the order the fixed point put them so a commit never carries
-// a reader ahead of what it reads.
 // bucket is one group of declarations headed for commits of their own.
 type bucket struct {
 	keys    []entities.DeclKey
@@ -22,43 +19,61 @@ func (p Planner) cut(
 	order entities.Ordering,
 	in bucket,
 ) []entities.PlannedCommit {
-	keys, shape, feature, reason := in.keys, in.shape, in.feature, in.reason
-
-	keys = sortForBirth(graph, order, keys, nil)
+	keys := sortForBirth(graph, order, in.keys, nil)
 
 	var (
-		out     []entities.PlannedCommit
-		current []entities.DeclKey
-		files   = map[string]bool{}
+		out      []entities.PlannedCommit
+		current  []entities.DeclKey
+		files    = map[string]bool{}
+		pkg      string
+		boundary int
 	)
 
-	flush := func() {
-		if len(current) == 0 {
+	flush := func(upTo int) {
+		if upTo == 0 {
 			return
 		}
 
 		out = append(out, entities.PlannedCommit{
-			Subject: draftSubject(shape, feature, current),
-			Shape:   shape,
-			Feature: string(feature),
-			Decls:   slices.Clone(current),
-			Reason:  reason,
+			Subject: draftSubject(in.shape, in.feature, current[:upTo]),
+			Shape:   in.shape,
+			Feature: string(in.feature),
+			Decls:   slices.Clone(current[:upTo]),
+			Reason:  in.reason,
 		})
-		current = current[:0]
+
+		current = slices.Clone(current[upTo:])
 		files = map[string]bool{}
+
+		for _, key := range current {
+			files[key.File] = true
+		}
+
+		boundary = 0
 	}
 
 	for _, key := range keys {
-		if !files[key.File] && len(files) >= p.cfg.MaxFiles {
-			flush()
+		if len(current) > 0 && dirOf(key.File) != pkg {
+			boundary = len(current)
 		}
 
-		files[key.File] = true
+		// Roll back to the last package boundary instead of the raw cap, or a
+		// package with no boundary yet before it: the cap stays an upper bound.
+		if !files[key.File] && len(files) >= p.cfg.MaxFiles {
+			cutAt := boundary
+			if cutAt == 0 {
+				cutAt = len(current)
+			}
+
+			flush(cutAt)
+		}
 
 		current = append(current, key)
+		files[key.File] = true
+		pkg = dirOf(key.File)
 	}
 
-	flush()
+	flush(len(current))
 
 	return out
 }

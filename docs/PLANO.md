@@ -233,9 +233,76 @@ estava sendo cortado; nunca espera por uma feature adiante na fila. Dentro do
 commit, a ordem de nascimento de cada membro continua vindo de `order.Of()`,
 que e quem sabia a resposta certa o tempo todo.
 
-## 4. As duas entradas
+### 3.3 Quatro defeitos no corte, medidos numa reconstrucao real de 195 commits
 
-`base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.
+Uma auditoria independente da historia reconstruida (mesmo repositorio de 505
+arquivos) achou quatro defeitos na politica de agrupamento e corte, nenhum no
+ponto fixo.
+
+**Teste separado do codigo.** `entryPoints` (secao 2) exclui um teste de ser
+ele mesmo um ponto de entrada, e com razao - mas nada o atribuia a feature do
+que ele exercita. Sem dono, um teste caia sempre no balde compartilhado e so
+nascia no corte final (`remaining`), longe do sujeito que testa: 205 pares
+`foo.go`/`foo_test.go` com mediana de 90 commits de distancia, so 3 no mesmo
+commit. A correcao e em duas camadas: `inheritTestOwnership` copia o dono do
+alvo que a `Anchor` de `test-of` ja aponta (a mesma ancora que a secao 1.3 do
+CONTRATO-EMISSAO usa para aproximar o `order.Of()`); `inheritTestFileOwnership`
+cobre o teste que a ancora por nome nao resolveu, herdando o dono do arquivo
+irmao (`foo_test.go` de `foo.go`) quando esse arquivo tem um dono unico. A
+segunda camada so se aplica quando as PROPRIAS necessidades do teste nao
+cruzam para outra feature - herdar cegamente criou um ciclo entre dez
+features na primeira tentativa, porque um teste que le um helper de outra
+feature vira, sem essa guarda, uma aresta real entre as duas.
+
+**Prosa como ponto de entrada.** Um arquivo `KindOther` de fallback (`docs/*.md`,
+`LICENSE`) que nada le e nada consome vira, pela regra da secao 2, um ponto de
+entrada de uma feature so - o proprio arquivo. `docs/**` nascia na posicao
+12-15 de 195, e o PLANO-EMISSAO diz que documentacao geral pertence ao fim.
+A causa e que TODO arquivo carrega uma aresta `module` (secao 8) so por estar
+dentro do modulo, entao "sem aresta nenhuma" nunca e verdade. `isOrphanProse`
+ignora essa aresta estrutural (`module`, `hosts`, `workspace`) ao decidir se
+um `KindOther` e um ponto de entrada de verdade; sem needs alem dela e sem
+consumidor, cai no balde compartilhado e nasce no corte final, como um
+`deps.go` de import em branco (que tem um need real) continua sem cair.
+
+**Atomo dividido entre dois pedidos.** Um arquivo gerado (`Atom`, secao 5)
+nasce inteiro quando o primeiro pedaco e pedido - mas o corte so olhava as
+arestas de QUEM pede, nunca os outros membros do mesmo atomo. `WwebjsAuthSession`
+foi pedido no commit 91 por uma feature tardia; as outras seis declaracoes do
+mesmo `models.go` ja tinham sido renderizadas no commit 38 por outra feature,
+e o renderizador (que sempre emite o arquivo por inteiro) ja incluia
+`WwebjsAuthSession` ali. O commit 91 virava um commit vazio - a arvore nao
+mudava, mas a feature achava que tinha nascido algo. A correcao fecha o
+`unbornProviders` (secao 3.2) tambem sobre o atomo: puxar uma declaracao
+compartilhada agora puxa toda irma de atomo ainda nao nascida junto, e
+`assign` uniformiza o dono do atomo pela UNIAO de quem alcanca qualquer um dos
+seus membros, para as duas metades nunca terminarem em features diferentes.
+
+**Corte mecanico no limite de arquivos.** `cut` fechava um commit assim que
+`MaxFiles` estourava, sem olhar se aquele arquivo era o meio de um pacote
+coerente: 73 dos 199 commits medidos tinham exatamente 12 arquivos, o teto
+configurado, e a auditoria achou commits tocando de 9 a 11 pacotes sem
+historia em comum. `cut` agora lembra a ultima fronteira de pacote dentro do
+commit corrente; ao estourar o teto, recua ate ali em vez de cortar no
+arquivo exato que excedeu, e so cai no corte mecanico quando um pacote
+sozinho e maior que `MaxFiles` (nao ha fronteira anterior para recuar). O
+teto continua sendo um limite, nunca a regra que decide onde cortar.
+
+### 3.4 O ponto de composicao nasce por ultimo, e nao ha correcao para isso
+
+`cmd/wasabizap/main.go` e `bootstrap.Run` nascem na posicao 167 de 195 (85% da
+historia), enquanto a historia humana original os introduziu no commit 2.
+Medido diretamente no grafo: `main()` tem `order.Of() = 227`, o MESMO valor
+maximo de toda a arvore de 3699 declaracoes - nenhuma outra declaracao chega
+mais tarde. Isso nao e um defeito de corte: `main()` referencia a raiz de cada
+subsistema, e o ponto fixo (secao 5 do documento, "toda medida declara o que
+nao olha") so pode dar a ele a posicao de quem ele precisa por ultimo. A
+historia humana original edita `main.go` incrementalmente, acrescentando uma
+linha a cada modulo que fica pronto; este `Writer` renderiza o conteudo FINAL
+de cada declaracao a cada commit (CONTRATO-EMISSAO secao 4), nunca um diff, e
+"todo commit compila" exige que tudo que `main()` referencia ja exista. As
+duas restricoes juntas fecham a porta: nao ha como nascer mais cedo sem
+quebrar uma das duas.
 
 **Com historia de origem** (o caso do terectek): cada declaracao herda como
 `base` a primeira posicao que a continha. O ponto fixo so empurra para frente.

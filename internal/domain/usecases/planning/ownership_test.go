@@ -87,6 +87,63 @@ func TestAssignHasNoSharingThreshold(t *testing.T) {
 	}
 }
 
+func TestAssignMergesAnAtomIntoOneOwner(t *testing.T) {
+	t.Parallel()
+
+	newAtom := func() (typeA, typeB entities.Decl) {
+		typeA = decl("dbgen/models.go", "TypeA", "dbgen")
+		typeA.Atom = "dbgen/models.go"
+		typeB = decl("dbgen/models.go", "TypeB", "dbgen")
+		typeB.Atom = "dbgen/models.go"
+
+		return typeA, typeB
+	}
+
+	t.Run("read by two features through either half, so neither owns it alone", func(t *testing.T) {
+		t.Parallel()
+
+		typeA, typeB := newAtom()
+		readerA := decl("a/h.go", "A", "a")
+		readerB := decl("b/h.go", "B", "b")
+
+		own := assign(entities.NewGraph(
+			[]entities.Decl{typeA, typeB, readerA, readerB},
+			[]entities.Edge{needs(readerA, typeA), needs(readerB, typeB)},
+			nil,
+		))
+
+		if got := own.owner[typeA.Key]; got != SharedFeature {
+			t.Fatalf("TypeA owner = %q, want the shared bucket", got)
+		}
+
+		if got := own.owner[typeB.Key]; got != SharedFeature {
+			t.Fatalf("TypeB owner = %q, want the shared bucket", got)
+		}
+	})
+
+	t.Run("read by one feature through either half, so that feature owns both", func(t *testing.T) {
+		t.Parallel()
+
+		typeA, typeB := newAtom()
+		readerA := decl("a/one.go", "One", "a")
+		readerA2 := decl("a/two.go", "Two", "a")
+
+		own := assign(entities.NewGraph(
+			[]entities.Decl{typeA, typeB, readerA, readerA2},
+			[]entities.Edge{needs(readerA, typeA), needs(readerA2, typeB)},
+			nil,
+		))
+
+		if got := own.owner[typeA.Key]; got != "a" {
+			t.Fatalf("TypeA owner = %q, want %q", got, "a")
+		}
+
+		if got := own.owner[typeB.Key]; got != "a" {
+			t.Fatalf("TypeB owner = %q, want %q", got, "a")
+		}
+	})
+}
+
 func TestAssignOrdersFeaturesDeterministically(t *testing.T) {
 	t.Parallel()
 

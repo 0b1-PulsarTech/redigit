@@ -7,6 +7,19 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
+func entryPointNames(graph entities.Graph) []string {
+	entries := entryPoints(graph)
+	got := make([]string, 0, len(entries))
+
+	for _, entry := range entries {
+		got = append(got, entry.Key.Name)
+	}
+
+	slices.Sort(got)
+
+	return got
+}
+
 func TestEntryPoints(t *testing.T) {
 	t.Parallel()
 
@@ -58,14 +71,60 @@ func TestEntryPoints(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			var got []string
-			for _, entry := range entryPoints(testCase.graph) {
-				got = append(got, entry.Key.Name)
+			if got := entryPointNames(testCase.graph); !slices.Equal(got, testCase.want) {
+				t.Fatalf("entryPoints() = %v, want %v", got, testCase.want)
 			}
+		})
+	}
+}
 
-			slices.Sort(got)
+func TestEntryPointsExcludesOrphanProse(t *testing.T) {
+	t.Parallel()
 
-			if !slices.Equal(got, testCase.want) {
+	handler := decl("api/handler.go", "Handle", "api")
+	service := decl("svc/service.go", "Serve", "svc")
+	docPage := entities.Decl{
+		Key:  entities.DeclKey{File: "docs/PLANO.md", Kind: entities.KindOther, Name: "<file>"},
+		Unit: "docs",
+	}
+
+	testCases := []struct {
+		name  string
+		graph entities.Graph
+		want  []string
+	}{
+		{
+			"a whole-file declaration with no edge in either direction is prose, not a tip",
+			entities.NewGraph([]entities.Decl{handler, docPage}, nil, nil),
+			[]string{"Handle"},
+		},
+		{
+			"a structural-only edge - every file in a module carries one - still reads as prose",
+			entities.NewGraph(
+				[]entities.Decl{handler, docPage, service},
+				[]entities.Edge{
+					{Dependent: docPage.Key, Provider: service.Key, Reason: entities.ReasonModule},
+				},
+				nil,
+			),
+			[]string{"Handle"},
+		},
+		{
+			"a real need - a blank import, say - keeps a whole-file declaration a tip",
+			entities.NewGraph(
+				[]entities.Decl{handler, docPage, service},
+				[]entities.Edge{needs(docPage, service)},
+				nil,
+			),
+			[]string{"<file>", "Handle"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := entryPointNames(testCase.graph); !slices.Equal(got, testCase.want) {
 				t.Fatalf("entryPoints() = %v, want %v", got, testCase.want)
 			}
 		})

@@ -31,6 +31,10 @@ func entryPoints(graph entities.Graph) []entities.Decl {
 			continue
 		}
 
+		if isOrphanProse(graph, decl) {
+			continue
+		}
+
 		if hasProductionConsumer(graph, decl.Key) {
 			continue
 		}
@@ -43,6 +47,29 @@ func entryPoints(graph entities.Graph) []entities.Decl {
 	})
 
 	return out
+}
+
+func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
+	if decl.Key.Kind != entities.KindOther || len(graph.Consumers(decl.Key)) > 0 {
+		return false
+	}
+
+	for _, edge := range graph.Needs(decl.Key) {
+		if !isStructural(edge.Reason) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isStructural(reason entities.EdgeReason) bool {
+	switch reason {
+	case entities.ReasonModule, entities.ReasonHosts, entities.ReasonWorkspace:
+		return true
+	default:
+		return false
+	}
 }
 
 func hasProductionConsumer(graph entities.Graph, key entities.DeclKey) bool {

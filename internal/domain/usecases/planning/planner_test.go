@@ -240,6 +240,43 @@ func TestPlannerSharedDeclarationWaitsForItsOwnProvider(t *testing.T) {
 	}
 }
 
+func TestPlannerKeepsAnAtomInOneCommit(t *testing.T) {
+	t.Parallel()
+
+	typeA := decl("dbgen/models.go", "TypeA", "dbgen")
+	typeA.Atom = "dbgen/models.go"
+	typeB := decl("dbgen/models.go", "TypeB", "dbgen")
+	typeB.Atom = "dbgen/models.go"
+
+	consumerA := decl("consumera/handler.go", "HandleA", "consumera")
+	consumerB := decl("consumerb/handler.go", "HandleB", "consumerb")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{typeA, typeB, consumerA, consumerB},
+		[]entities.Edge{needs(consumerA, typeA), needs(consumerB, typeB)},
+		nil,
+	)
+
+	plan, err := New(Config{}).Plan(graph, entities.Ordering{})
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+	for index, commit := range plan.Commits {
+		for _, key := range commit.Decls {
+			bornAt[key] = index
+		}
+	}
+
+	if bornAt[typeA.Key] != bornAt[typeB.Key] {
+		t.Fatalf(
+			"atom split across commits %d and %d, want the same one",
+			bornAt[typeA.Key], bornAt[typeB.Key],
+		)
+	}
+}
+
 func TestPlannerErrors(t *testing.T) {
 	t.Parallel()
 
