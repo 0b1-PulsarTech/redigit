@@ -215,6 +215,148 @@ func TestCamelOrSnakeTokens(t *testing.T) {
 	}
 }
 
+func TestTestAnchorRuleMatchesABareFunction(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	writeFile(t, root, filepath.Join("idnorm", "provider_message_id.go"), `package idnorm
+
+func NormalizeProviderMessageID(raw string) (string, error) { return raw, nil }
+`)
+	writeFile(t, root, filepath.Join("idnorm", "provider_message_id_test.go"), `package idnorm
+
+import "testing"
+
+func TestNormalizeProviderMessageID(t *testing.T) {}
+`)
+
+	snap := entities.Snapshot{Root: root}
+	syntax := NewSyntax()
+
+	decls := declareAll(t, syntax, root, []string{
+		filepath.Join("idnorm", "provider_message_id.go"),
+		filepath.Join("idnorm", "provider_message_id_test.go"),
+	})
+
+	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Anchors() error = %v", err)
+	}
+
+	want := entities.DeclKey{
+		File: filepath.Join("idnorm", "provider_message_id.go"),
+		Kind: entities.KindFunc,
+		Name: "NormalizeProviderMessageID",
+	}
+
+	if len(anchors) != 1 || anchors[0].To != want {
+		t.Fatalf("anchors = %+v, want one anchoring to %+v", anchors, want)
+	}
+}
+
+func TestTestAnchorRulePrefersTheCalledDeclarationOverTheName(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	writeFile(t, root, filepath.Join("norm", "norm.go"), `package norm
+
+func Canonicalize(raw string) string { return raw }
+
+func Other(raw string) string { return raw }
+`)
+	writeFile(t, root, filepath.Join("norm", "norm_test.go"), `package norm
+
+import "testing"
+
+func TestOtherCasesTableDriven(t *testing.T) {
+	cases := []struct{ in, want string }{{"a", "a"}}
+	for _, tc := range cases {
+		if got := Canonicalize(tc.in); got != tc.want {
+			t.Fatalf("got %q want %q", got, tc.want)
+		}
+	}
+}
+`)
+
+	snap := entities.Snapshot{Root: root}
+	syntax := NewSyntax()
+
+	decls := declareAll(t, syntax, root, []string{
+		filepath.Join("norm", "norm.go"),
+		filepath.Join("norm", "norm_test.go"),
+	})
+
+	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Anchors() error = %v", err)
+	}
+
+	want := entities.DeclKey{
+		File: filepath.Join("norm", "norm.go"),
+		Kind: entities.KindFunc,
+		Name: "Canonicalize",
+	}
+
+	if len(anchors) != 1 || anchors[0].To != want {
+		t.Fatalf(
+			"anchors = %+v, want the body's call to Canonicalize, not the name's match on Other",
+			anchors,
+		)
+	}
+}
+
+func TestTestAnchorRuleWidensToTheUnitWhenTheTwinMisses(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	writeFile(t, root, filepath.Join("svc", "handle.go"), `package svc
+
+const unrelatedConstant = 1
+`)
+	writeFile(t, root, filepath.Join("svc", "server.go"), `package svc
+
+type Server struct{}
+
+func (Server) Handle() error { return nil }
+`)
+	writeFile(t, root, filepath.Join("svc", "handle_test.go"), `package svc
+
+import "testing"
+
+func TestServerHandle(t *testing.T) {}
+`)
+
+	snap := entities.Snapshot{Root: root}
+	syntax := NewSyntax()
+
+	decls := declareAll(t, syntax, root, []string{
+		filepath.Join("svc", "handle.go"),
+		filepath.Join("svc", "server.go"),
+		filepath.Join("svc", "handle_test.go"),
+	})
+
+	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Anchors() error = %v", err)
+	}
+
+	want := entities.DeclKey{
+		File: filepath.Join("svc", "server.go"),
+		Kind: entities.KindMethod,
+		Name: "Server.Handle",
+	}
+
+	if len(anchors) != 1 || anchors[0].To != want {
+		t.Fatalf(
+			"anchors = %+v, want the twin-scope miss to widen to the unit and find %+v",
+			anchors, want,
+		)
+	}
+}
+
 func TestTestAnchorRuleEdgesIsEmpty(t *testing.T) {
 	t.Parallel()
 

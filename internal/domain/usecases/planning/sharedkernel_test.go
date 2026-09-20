@@ -72,6 +72,68 @@ func TestUnbornProvidersPullsAnAtomSiblingAlong(t *testing.T) {
 	}
 }
 
+func TestUnbornProvidersPullsAnAnchoredTestAlong(t *testing.T) {
+	t.Parallel()
+
+	member := decl("a/handler.go", "Handle", "a")
+	event := decl("kernel/event.go", "Event", "kernel")
+	eventTest := testDecl("kernel/event_test.go", "TestEvent", "kernel")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{member, event, eventTest},
+		[]entities.Edge{needs(member, event)},
+		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
+	)
+
+	own := ownership{owner: map[entities.DeclKey]FeatureID{
+		member.Key:    "a",
+		event.Key:     SharedFeature,
+		eventTest.Key: SharedFeature,
+	}}
+
+	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
+
+	if !slices.Contains(got, eventTest.Key) {
+		t.Fatalf(
+			"unbornProviders() = %v, want it to also carry the anchored test %s",
+			got,
+			eventTest.Key,
+		)
+	}
+}
+
+func TestUnbornProvidersLeavesAnAnchoredTestBehindWhenItsOwnNeedIsNotReady(t *testing.T) {
+	t.Parallel()
+
+	member := decl("a/handler.go", "Handle", "a")
+	event := decl("kernel/event.go", "Event", "kernel")
+	late := decl("b/late.go", "Late", "b")
+	eventTest := testDecl("kernel/event_test.go", "TestEvent", "kernel")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{member, event, late, eventTest},
+		[]entities.Edge{needs(member, event), needs(eventTest, late)},
+		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
+	)
+
+	own := ownership{owner: map[entities.DeclKey]FeatureID{
+		member.Key:    "a",
+		event.Key:     SharedFeature,
+		late.Key:      "b",
+		eventTest.Key: SharedFeature,
+	}}
+
+	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
+
+	if slices.Contains(got, eventTest.Key) {
+		t.Fatalf(
+			"unbornProviders() = %v, must not carry %s ahead of the feature b need it has not satisfied",
+			got,
+			eventTest.Key,
+		)
+	}
+}
+
 func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 	t.Parallel()
 

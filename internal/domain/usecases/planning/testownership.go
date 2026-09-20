@@ -17,6 +17,13 @@ func inheritTestOwnership(graph entities.Graph, own ownership) {
 			continue
 		}
 
+		// A shared target is always safe: SharedFeature never enters
+		// featureNeeds, so inheriting it can never cycle two features. A real
+		// feature is only safe once its own needs agree (see needsOnly).
+		if owner != SharedFeature && !needsOnly(graph, anchor.Decl, own, owner) {
+			continue
+		}
+
 		own.owner[anchor.Decl] = owner
 		own.reach[anchor.Decl] = own.reach[anchor.To]
 	}
@@ -24,6 +31,7 @@ func inheritTestOwnership(graph entities.Graph, own ownership) {
 
 func inheritTestFileOwnership(graph entities.Graph, own ownership) {
 	bySourceFile := map[string][]entities.DeclKey{}
+	anchored := map[entities.DeclKey]bool{}
 
 	for _, decl := range graph.Decls() {
 		if !decl.IsTest {
@@ -31,8 +39,16 @@ func inheritTestFileOwnership(graph entities.Graph, own ownership) {
 		}
 	}
 
+	for _, anchor := range graph.Anchors() {
+		if anchor.Reason == entities.ReasonTestOf {
+			anchored[anchor.Decl] = true
+		}
+	}
+
 	for _, decl := range graph.Decls() {
-		if !decl.IsTest || own.owner[decl.Key] != SharedFeature {
+		// An anchored test is settled, shared or not: re-guessing from the
+		// twin file is what let a shared test get claimed twice.
+		if !decl.IsTest || anchored[decl.Key] || own.owner[decl.Key] != SharedFeature {
 			continue
 		}
 

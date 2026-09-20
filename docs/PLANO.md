@@ -304,6 +304,60 @@ de cada declaracao a cada commit (CONTRATO-EMISSAO secao 4), nunca um diff, e
 duas restricoes juntas fecham a porta: nao ha como nascer mais cedo sem
 quebrar uma das duas.
 
+### 3.5 A ancora `test-of` so cobria 175 dos 742 testes com sujeito
+
+A secao 3.3 deu ao teste o dono do seu sujeito, mas so quando uma `Anchor`
+`test-of` existia. A regra do pack Go so casava o nome inteiro do teste contra
+um tipo (nunca uma funcao ou um valor) e nunca contra menos que o SUFIXO
+inteiro na busca por metodo, entao `TestNormalizeProviderMessageID` - uma
+funcao pura, sem tipo - nao gerava ancora nenhuma: o teste caia no balde
+compartilhado e nascia 174 commits depois de `NormalizeProviderMessageID`.
+
+Tres reforcos, nesta ordem de confianca:
+
+- **corpo antes do nome**: se o corpo do teste chama exatamente UMA declaracao
+  do pacote (identificador nu, nunca qualificado), essa chamada e um FATO e
+  vence qualquer palpite do nome;
+- **casamento por nome, mais longo primeiro**: alem da busca original
+  (tipo cresce a esquerda, metodo encolhe a direita, o ultimo casamento
+  vence), um recuo tenta o prefixo inteiro como tipo, funcao OU valor, depois
+  cada prefixo mais curto - "TestSupervisorRunDrains" perde "Drains" e acha
+  "Supervisor" mesmo sem achar o metodo "Run" exato;
+- **arquivo irmao mais amplo**: quando o escopo do arquivo irmao (`foo.go` de
+  `foo_test.go`) nao acha nada, a busca repete no pacote inteiro antes de
+  desistir.
+
+O resultado real: de 175 testes com sujeito identificado para 742, com 719
+(96%) nascendo na mesma posicao do `order.Of()` do sujeito - medido por
+`redigit audit`.
+
+**Ownership sozinho nao bastava.** Um sujeito compartilhado (`SharedFeature`)
+nunca e "precisado" por ninguem - nada tem aresta ATE um teste - entao
+`unbornProviders` (secao 3.2) nunca o puxava, e o teste caia no `remaining()`
+do fim mesmo com o dono certo. `unbornProviders` agora tambem puxa, junto de
+cada declaracao compartilhada, qualquer teste ancorado a ela cujas PROPRIAS
+necessidades ja estejam satisfeitas (nascidas, ou tambem compartilhadas e
+alcancadas pelo mesmo fecho) - a mesma guarda de seguranca que protege atomos.
+
+**Dois jeitos de duplicar uma declaracao, achados rodando no repositorio
+real, nao no sintetico.** Primeiro: sem uma guarda equivalente a `needsOnly`
+(secao 3.3) em `inheritTestOwnership`, herdar o dono de uma ancora para uma
+feature real podia criar o mesmo ciclo entre features que a secao 3.3 ja
+tinha corrigido para o recuo por arquivo irmao - a correcao e a mesma: heranca
+de uma feature real so vale quando as proprias necessidades do teste
+concordam; heranca de `SharedFeature` vale sempre, porque `SharedFeature`
+nunca entra em `featureNeeds`. Segundo: um teste ja resolvido por uma ancora
+podia ser re-adivinhado pelo recuo de arquivo irmao (secao 3.3), que via
+"ainda compartilhado" e tentava de novo a partir do dono do arquivo irmao -
+achando as vezes uma feature real e colocando o teste em DOIS commits (o da
+feature, e o puxado pelo sujeito compartilhado). O recuo por arquivo irmao
+agora ignora todo teste que uma ancora ja resolveu, sujeito compartilhado ou
+nao.
+
+## 4. As duas entradas
+
+`base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.
+
 **Com historia de origem** (o caso do terectek): cada declaracao herda como
 `base` a primeira posicao que a continha. O ponto fixo so empurra para frente.
 

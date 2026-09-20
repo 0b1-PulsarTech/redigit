@@ -37,11 +37,12 @@ func (testAnchorRule) Edges(
 
 func (testAnchorRule) Anchors(
 	_ context.Context,
-	_ entities.Snapshot,
+	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
 	byFile := groupByFile(decls)
 	byUnit := groupByUnit(decls)
+	sources := map[string][]byte{}
 
 	var anchors []entities.Anchor
 
@@ -50,12 +51,9 @@ func (testAnchorRule) Anchors(
 			continue
 		}
 
-		prefix, ok := testSubjectPrefix(d.Key.Name)
-		if !ok {
-			continue
-		}
+		unit := byUnit[d.Unit]
+		scope := unit
 
-		scope := byUnit[d.Unit]
 		if twin, found := twinFile(
 			filepath.Dir(d.Key.File),
 			filepath.Base(d.Key.File),
@@ -64,12 +62,19 @@ func (testAnchorRule) Anchors(
 			scope = byFile[twin]
 		}
 
-		if to, found := bestSubject(scope, camelOrSnakeTokens(prefix)); found {
-			anchors = append(
-				anchors,
-				entities.Anchor{Decl: d.Key, To: to, Reason: entities.ReasonTestOf},
-			)
+		to, found := testSubject(d, scope, snap, sources)
+		if !found && len(scope) != len(unit) {
+			to, found = testSubject(d, unit, snap, sources)
 		}
+
+		if !found {
+			continue
+		}
+
+		anchors = append(
+			anchors,
+			entities.Anchor{Decl: d.Key, To: to, Reason: entities.ReasonTestOf},
+		)
 	}
 
 	return anchors, nil
@@ -137,51 +142,4 @@ func camelOrSnakeTokens(name string) []string {
 	}
 
 	return append(tokens, string(runes[start:]))
-}
-
-// bestSubject walks the token boundaries left to right. At each cut, the
-// growing left side is checked against a type name and the shrinking right
-// side against a bare method name; either match overwrites the previous
-// best, so the last (most specific) match along the walk wins.
-func bestSubject(scope []entities.Decl, tokens []string) (entities.DeclKey, bool) {
-	var best entities.DeclKey
-
-	found := false
-
-	for cut := 1; cut < len(tokens); cut++ {
-		left := strings.Join(tokens[:cut], "")
-		right := strings.Join(tokens[cut:], "")
-
-		if key, ok := findTypeNamed(scope, left); ok {
-			best, found = key, true
-		}
-
-		if key, ok := findMethodNamed(scope, right); ok {
-			best, found = key, true
-		}
-	}
-
-	if !found {
-		if key, ok := findTypeNamed(scope, strings.Join(tokens, "")); ok {
-			return key, true
-		}
-	}
-
-	return best, found
-}
-
-// findMethodNamed looks up a method by its bare method part (after the
-// receiver's "."), the shape a test name's suffix names.
-func findMethodNamed(decls []entities.Decl, name string) (entities.DeclKey, bool) {
-	for _, d := range decls {
-		if d.Key.Kind != entities.KindMethod {
-			continue
-		}
-
-		if _, method, ok := strings.Cut(d.Key.Name, "."); ok && method == name {
-			return d.Key, true
-		}
-	}
-
-	return entities.DeclKey{}, false
 }

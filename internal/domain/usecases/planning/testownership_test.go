@@ -39,6 +39,37 @@ func TestAssignLeavesAnUnanchoredTestShared(t *testing.T) {
 	}
 }
 
+func TestAssignDoesNotReguessAnAlreadyAnchoredTest(t *testing.T) {
+	t.Parallel()
+
+	entryA := decl("a/main.go", "MainA", "a")
+	entryB := decl("b/main.go", "MainB", "b")
+	shared := decl("kernel/normalize.go", "Normalize", "kernel")
+	entryC := decl("kernel/main.go", "MainC", "kernel")
+	twinSibling := decl("kernel/normalize.go", "helper", "kernel")
+	suite := testDecl("kernel/normalize_test.go", "TestNormalize", "kernel")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{entryA, entryB, shared, entryC, twinSibling, suite},
+		[]entities.Edge{
+			needs(entryA, shared),
+			needs(entryB, shared),
+			needs(entryC, twinSibling),
+		},
+		[]entities.Anchor{{Decl: suite.Key, To: shared.Key, Reason: entities.ReasonTestOf}},
+	)
+
+	own := assign(graph)
+
+	if got := own.owner[suite.Key]; got != SharedFeature {
+		t.Fatalf(
+			"owner = %q, want the shared bucket: the anchor already settled this, "+
+				"the twin file (owned by %q) must not reopen it",
+			got, own.owner[twinSibling.Key],
+		)
+	}
+}
+
 func TestAssignFallsBackToTheTwinFilesOwner(t *testing.T) {
 	t.Parallel()
 
@@ -56,6 +87,61 @@ func TestAssignFallsBackToTheTwinFilesOwner(t *testing.T) {
 
 	if got, want := own.owner[suite.Key], own.owner[subject.Key]; got != want {
 		t.Fatalf("test owner = %q, twin file's owner = %q", got, want)
+	}
+}
+
+func TestAssignDoesNotAnchorATestWhoseOwnNeedCrossesFeatures(t *testing.T) {
+	t.Parallel()
+
+	entryA := decl("a/main.go", "MainA", "a")
+	subjectA := decl("a/handler.go", "Handle", "a")
+	entryB := decl("b/main.go", "MainB", "b")
+	helperB := decl("b/helper.go", "Helper", "b")
+	suite := testDecl("a/handler_test.go", "TestHandle", "a")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{entryA, subjectA, entryB, helperB, suite},
+		[]entities.Edge{needs(entryA, subjectA), needs(entryB, helperB), needs(suite, helperB)},
+		[]entities.Anchor{{Decl: suite.Key, To: subjectA.Key, Reason: entities.ReasonTestOf}},
+	)
+
+	own := assign(graph)
+
+	if got := own.owner[suite.Key]; got != SharedFeature {
+		t.Fatalf(
+			"owner = %q, want the shared bucket: honoring the anchor would cycle a with b",
+			got,
+		)
+	}
+}
+
+func TestAssignAlwaysInheritsASharedAnchorTarget(t *testing.T) {
+	t.Parallel()
+
+	entryA := decl("a/main.go", "MainA", "a")
+	entryB := decl("b/main.go", "MainB", "b")
+	shared := decl("kernel/normalize.go", "Normalize", "kernel")
+	helperB := decl("b/helper.go", "Helper", "b")
+	suite := testDecl("kernel/normalize_test.go", "TestNormalize", "kernel")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{entryA, entryB, shared, helperB, suite},
+		[]entities.Edge{
+			needs(entryA, shared),
+			needs(entryB, shared),
+			needs(entryB, helperB),
+			needs(suite, helperB),
+		},
+		[]entities.Anchor{{Decl: suite.Key, To: shared.Key, Reason: entities.ReasonTestOf}},
+	)
+
+	own := assign(graph)
+
+	if got := own.owner[suite.Key]; got != SharedFeature {
+		t.Fatalf(
+			"owner = %q, want the shared bucket: a shared target is always safe to inherit",
+			got,
+		)
 	}
 }
 
