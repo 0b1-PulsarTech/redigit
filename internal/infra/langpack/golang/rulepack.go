@@ -40,6 +40,7 @@ var rules = []rule{
 	conversionRule{},
 	boundRule{},
 	buildTagsRule{},
+	embedRule{},
 }
 
 // RulePack implements indexing.RulePack for Go by fanning out to every

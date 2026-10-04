@@ -62,6 +62,10 @@ const (
 	// go command verifies it against; without them the build stops on "missing
 	// go.sum entry" even though the require is present.
 	ReasonChecksum EdgeReason = "checksum"
+	// ReasonEmbed ties a //go:embed declaration to a file its pattern matches.
+	// The pattern is a string, not a reference, and go refuses a pattern that
+	// matches nothing.
+	ReasonEmbed EdgeReason = "embed"
 	// ReasonProse holds back what is only true of the finished tree: general
 	// documentation, a pipeline definition, an agent instruction. Written about
 	// a whole that does not exist until the end, it belongs at the end.
