@@ -361,7 +361,10 @@ func TestEmitMarksACommitThatLeavesAPieceIncomplete(t *testing.T) {
 	late := key("b.go", "Two")
 
 	graph := entities.NewGraph(
-		[]entities.Decl{decl(early, entities.Span{Start: 0, End: 4}), decl(late, entities.Span{Start: 0, End: 4})},
+		[]entities.Decl{
+			decl(early, entities.Span{Start: 0, End: 4}),
+			decl(late, entities.Span{Start: 0, End: 4}),
+		},
 		[]entities.Edge{{Dependent: early, Provider: late, Reason: entities.ReasonReference}},
 		nil,
 	)

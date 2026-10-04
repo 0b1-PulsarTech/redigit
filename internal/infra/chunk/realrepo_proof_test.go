@@ -27,20 +27,22 @@ func TestChunkersAgainstARealRepository(t *testing.T) {
 		rev = "HEAD"
 	}
 
-	out, err := exec.Command("git", "-C", repo, "ls-tree", "-r", "--name-only", rev).Output()
+	out, err := exec.CommandContext(t.Context(), "git", "-C", repo, "ls-tree", "-r", "--name-only", rev).
+		Output()
 	if err != nil {
 		t.Fatalf("list %s: %v", rev, err)
 	}
 
 	var checked int
 
-	for _, path := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for path := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
 		chunker := pick(path)
 		if chunker == nil {
 			continue
 		}
 
-		source, showErr := exec.Command("git", "-C", repo, "show", rev+":"+path).Output()
+		source, showErr := exec.CommandContext(t.Context(), "git", "-C", repo, "show", rev+":"+path).
+			Output()
 		if showErr != nil {
 			t.Fatalf("read %s: %v", path, showErr)
 		}

@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"slices"
 
@@ -37,15 +38,22 @@ func (r byExtension) Render(
 	source []byte,
 	keep []entities.DeclKey,
 ) ([]byte, error) {
-	if len(keep) == 0 {
-		return r.fallback.Render(ctx, source, keep)
+	chosen, ext := r.fallback, ""
+
+	if len(keep) > 0 {
+		ext = path.Ext(keep[0].File)
+
+		if byExt, found := r.byExt[ext]; found {
+			chosen = byExt
+		}
 	}
 
-	if chosen, found := r.byExt[path.Ext(keep[0].File)]; found {
-		return chosen.Render(ctx, source, keep)
+	out, err := chosen.Render(ctx, source, keep)
+	if err != nil {
+		return nil, fmt.Errorf("render a %q file: %w", ext, err)
 	}
 
-	return r.fallback.Render(ctx, source, keep)
+	return out, nil
 }
 
 // configExtensions are the files the config pack reads. The first four carry

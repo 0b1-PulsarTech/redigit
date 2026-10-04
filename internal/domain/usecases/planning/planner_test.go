@@ -263,6 +263,7 @@ func TestPlannerKeepsAnAtomInOneCommit(t *testing.T) {
 	}
 
 	bornAt := map[entities.DeclKey]int{}
+
 	for index, commit := range plan.Commits {
 		for _, key := range commit.Decls {
 			bornAt[key] = index

@@ -1,6 +1,7 @@
 package planning
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -82,7 +83,7 @@ func TestPlannerJoinsOnePackageAcrossCapabilities(t *testing.T) {
 // cannot: base(0) and top(2) are one capability, mid(1) is another. The first
 // slice starts at 0 and is emitted first, and its top reads a mid no commit
 // has produced yet.
-func straddling() (entities.Graph, entities.Ordering, Capabilities, entities.Decl) {
+func straddling() (entities.Graph, entities.Ordering, Capabilities) {
 	base := decl("base/id.go", "NewID", "base")
 	mid := decl("mid/store.go", "Save", "mid")
 	top := decl("top/handler.go", "Handle", "top")
@@ -101,7 +102,7 @@ func straddling() (entities.Graph, entities.Ordering, Capabilities, entities.Dec
 		base.Key: "primeira",
 		top.Key:  "primeira",
 		mid.Key:  "segunda",
-	}, mid
+	}
 }
 
 // A declaration pulled forward to satisfy an earlier slice must not be
@@ -110,7 +111,7 @@ func straddling() (entities.Graph, entities.Ordering, Capabilities, entities.Dec
 func TestPlannerEmitsEachDeclarationOnce(t *testing.T) {
 	t.Parallel()
 
-	graph, order, capabilities, _ := straddling()
+	graph, order, capabilities := straddling()
 
 	plan, err := New(Config{Capabilities: capabilities}).Plan(graph, order)
 	if err != nil {
@@ -118,6 +119,7 @@ func TestPlannerEmitsEachDeclarationOnce(t *testing.T) {
 	}
 
 	seen := map[entities.DeclKey]int{}
+
 	for _, commit := range plan.Commits {
 		for _, key := range commit.Decls {
 			seen[key]++
@@ -141,7 +143,7 @@ func TestPlannerEmitsEachDeclarationOnce(t *testing.T) {
 func TestPlannerBornBeforeUseWithCapabilities(t *testing.T) {
 	t.Parallel()
 
-	graph, order, capabilities, _ := straddling()
+	graph, order, capabilities := straddling()
 
 	plan, err := New(Config{Capabilities: capabilities}).Plan(graph, order)
 	if err != nil {
@@ -149,6 +151,7 @@ func TestPlannerBornBeforeUseWithCapabilities(t *testing.T) {
 	}
 
 	bornAt := map[entities.DeclKey]int{}
+
 	for _, commit := range plan.Commits {
 		for _, key := range commit.Decls {
 			bornAt[key] = int(commit.Position)
@@ -183,10 +186,8 @@ func TestPlannerPlacesADeclarationNoCapabilityNames(t *testing.T) {
 	}
 
 	for _, commit := range plan.Commits {
-		for _, key := range commit.Decls {
-			if key == decls["kernel"].Key {
-				return
-			}
+		if slices.Contains(commit.Decls, decls["kernel"].Key) {
+			return
 		}
 	}
 
@@ -252,6 +253,7 @@ func TestPlannerOrdersATieByDependencyNotByName(t *testing.T) {
 	}
 
 	bornAt := map[entities.DeclKey]int{}
+
 	for _, commit := range plan.Commits {
 		for _, key := range commit.Decls {
 			bornAt[key] = int(commit.Position)
@@ -278,7 +280,7 @@ func TestPlannerKeepsASliceTogetherAmongTies(t *testing.T) {
 	// slices in name order. Name order gives six commits; slice-preferring
 	// order gives two.
 	var (
-		decls []entities.Decl
+		decls = make([]entities.Decl, 0, 6)
 		caps  = Capabilities{}
 	)
 
@@ -287,9 +289,12 @@ func TestPlannerKeepsASliceTogetherAmongTies(t *testing.T) {
 	for index, spec := range []struct {
 		file, slice string
 	}{
-		{"a.go", "alpha"}, {"b.go", "beta"},
-		{"c.go", "alpha"}, {"d.go", "beta"},
-		{"e.go", "alpha"}, {"f.go", "beta"},
+		{"a.go", "alpha"},
+		{"b.go", "beta"},
+		{"c.go", "alpha"},
+		{"d.go", "beta"},
+		{"e.go", "alpha"},
+		{"f.go", "beta"},
 	} {
 		one := decl(spec.file, "F", entities.UnitID(spec.file))
 		decls = append(decls, one)

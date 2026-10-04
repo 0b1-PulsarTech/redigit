@@ -65,7 +65,9 @@ func parseLayerLine(line string) (entities.LayerRule, bool, error) {
 		return entities.LayerRule{}, false, nil
 	}
 
-	if len(fields) != 2 {
+	const layerFields = 2
+
+	if len(fields) != layerFields {
 		return entities.LayerRule{}, false, fmt.Errorf(
 			"%w: want a layer number and a path prefix, got %d field(s)",
 			ErrMalformedLayer, len(fields),

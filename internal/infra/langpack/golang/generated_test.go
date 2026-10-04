@@ -85,7 +85,9 @@ func TestDeclarationsMarkAGeneratedFileAsOneAtom(t *testing.T) {
 func TestDeclarationsStillCutAHandWrittenFile(t *testing.T) {
 	t.Parallel()
 
-	source := []byte("package flow\n\ntype storeMock struct{}\n\nfunc (storeMock) Read() error { return nil }\n")
+	source := []byte(
+		"package flow\n\ntype storeMock struct{}\n\nfunc (storeMock) Read() error { return nil }\n",
+	)
 
 	decls, err := NewSyntax().Declarations(t.Context(), "flow/store_mock_test.go", source)
 	if err != nil {

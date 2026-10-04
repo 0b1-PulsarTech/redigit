@@ -94,7 +94,9 @@ func TestRunChunksKeepsNoPositionDistinctFromZero(t *testing.T) {
 		t.Context(),
 		bootstrap.Config{},
 		func(context.Context, bootstrap.Config) ([]chunking.Piece, error) {
-			return []chunking.Piece{pieceOf("go.mod", "require github.com/x", entities.NoPosition, "")}, nil
+			return []chunking.Piece{
+				pieceOf("go.mod", "require github.com/x", entities.NoPosition, ""),
+			}, nil
 		},
 		&out,
 	)

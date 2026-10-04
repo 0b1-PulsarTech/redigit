@@ -94,7 +94,11 @@ func TestConversionRuleTiesAConstructorToTheMethods(t *testing.T) {
 	source := "package commonrules\n\n" +
 		"func NewEquals() ruletypes.Rule[string] {\n\treturn &factEqualsRule{}\n}\n"
 
-	if err := os.WriteFile(filepath.Join(root, "fact_equals.go"), []byte(source), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(root, "fact_equals.go"),
+		[]byte(source),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,11 +111,19 @@ func TestConversionRuleTiesAConstructorToTheMethods(t *testing.T) {
 		Span: entities.Span{Start: start, End: len(source)},
 	}
 	evaluate := entities.Decl{
-		Key:  entities.DeclKey{File: "fact_equals.go", Kind: entities.KindMethod, Name: "factEqualsRule.Evaluate"},
+		Key: entities.DeclKey{
+			File: "fact_equals.go",
+			Kind: entities.KindMethod,
+			Name: "factEqualsRule.Evaluate",
+		},
 		Unit: "commonrules",
 	}
 	rule := entities.Decl{
-		Key:         entities.DeclKey{File: "ruletypes/rule.go", Kind: entities.KindType, Name: "Rule"},
+		Key: entities.DeclKey{
+			File: "ruletypes/rule.go",
+			Kind: entities.KindType,
+			Name: "Rule",
+		},
 		Unit:        "ruletypes",
 		IsInterface: true,
 	}

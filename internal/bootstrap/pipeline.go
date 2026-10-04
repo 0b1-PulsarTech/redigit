@@ -112,16 +112,11 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, fmt.Errorf("materialise revision: %w", err)
 	}
 
-	session, err := lsp.StartSession(ctx, lsp.ServerConfig{
-		Command:    cfg.ServerCommand,
-		Args:       cfg.ServerArgs,
-		RootPath:   checkout.Dir(),
-		BuildFlags: buildFlags(cfg.BuildTags),
-	})
+	session, err := startSession(ctx, cfg, checkout)
 	if err != nil {
-		_ = checkout.Close(ctx)
+		release(ctx, checkout)
 
-		return nil, fmt.Errorf("start language server: %w", err)
+		return nil, err
 	}
 
 	indexCfg := cfg.Indexing
@@ -129,8 +124,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	specific := specificLanguages(configSyntax, cfg.BuildTags)
 
 	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
-		_ = session.Close(ctx)
-		_ = checkout.Close(ctx)
+		release(ctx, session, checkout)
 
 		return nil, fmt.Errorf("validate chunk map: %w", err)
 	}
@@ -147,8 +141,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 
 	source, err := newTreeSource(ctx, reader)
 	if err != nil {
-		_ = session.Close(ctx)
-		_ = checkout.Close(ctx)
+		release(ctx, session, checkout)
 
 		return nil, err
 	}
@@ -156,16 +149,14 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	scanner := indexing.NewScanner(reader, indexCfg)
 
 	if err = loadCapabilities(ctx, &cfg, scanner, snapshot); err != nil {
-		_ = session.Close(ctx)
-		_ = checkout.Close(ctx)
+		release(ctx, session, checkout)
 
 		return nil, err
 	}
 
 	cfg.Auditing.Unseen, err = unseen(snapshot, cfg.BuildTags)
 	if err != nil {
-		_ = session.Close(ctx)
-		_ = checkout.Close(ctx)
+		release(ctx, session, checkout)
 
 		return nil, err
 	}
@@ -189,6 +180,32 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 			renderersByExtension(golang.NewSyntax(), configSyntax),
 		),
 	}, nil
+}
+
+func startSession(
+	ctx context.Context,
+	cfg Config,
+	checkout *gitstore.Checkout,
+) (*lsp.Session, error) {
+	session, err := lsp.StartSession(ctx, lsp.ServerConfig{
+		Command:    cfg.ServerCommand,
+		Args:       cfg.ServerArgs,
+		RootPath:   checkout.Dir(),
+		BuildFlags: buildFlags(cfg.BuildTags),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("start language server: %w", err)
+	}
+
+	return session, nil
+}
+
+// release closes what a failed start already opened. The start's own error is
+// the one worth reporting, so a close error is dropped.
+func release(ctx context.Context, opened ...closer) {
+	for _, c := range opened {
+		_ = c.Close(ctx)
+	}
 }
 
 // unseen names the files this run's build tags leave invisible to the

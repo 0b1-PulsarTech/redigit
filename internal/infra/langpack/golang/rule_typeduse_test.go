@@ -62,7 +62,11 @@ func runEnrichCase(t *testing.T, c enrichCase) { t.Log(c.name) }
 	convert := declKey("gen.go", entities.KindFunc, "Convert")
 
 	reference := func(dependent, provider entities.DeclKey) entities.Edge {
-		return entities.Edge{Dependent: dependent, Provider: provider, Reason: entities.ReasonReference}
+		return entities.Edge{
+			Dependent: dependent,
+			Provider:  provider,
+			Reason:    entities.ReasonReference,
+		}
 	}
 
 	wants := []entities.Edge{

@@ -65,14 +65,6 @@ type Indexer struct {
 	limit    int
 }
 
-// resolvedFile reports whether a language server answers for a path. A path no
-// language owns is not asked about either.
-func (i Indexer) resolvedFile(file string) bool {
-	lang, owned := i.languageFor(file)
-
-	return owned && lang.Resolved
-}
-
 func New(resolver Resolver, tree Tree, cfg Config) Indexer {
 	limit := cfg.Concurrency
 	if limit < 1 {
@@ -194,6 +186,14 @@ func (i Indexer) read(
 	})
 
 	return decls, where, nil
+}
+
+// resolvedFile reports whether a language server answers for a path. A path no
+// language owns is not asked about either.
+func (i Indexer) resolvedFile(file string) bool {
+	lang, owned := i.languageFor(file)
+
+	return owned && lang.Resolved
 }
 
 func (i Indexer) languageFor(file string) (Language, bool) {

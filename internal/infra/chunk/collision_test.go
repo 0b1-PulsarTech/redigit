@@ -146,7 +146,9 @@ func assertSpansCoverSource(t *testing.T, decls []entities.Decl, source []byte) 
 		if decl.Span.Start != cursor {
 			t.Fatalf(
 				"span %v does not resume at %d: bytes %q are covered by nothing or by two Decls",
-				decl.Span, cursor, source[min(cursor, decl.Span.Start):max(cursor, decl.Span.Start)],
+				decl.Span,
+				cursor,
+				source[min(cursor, decl.Span.Start):max(cursor, decl.Span.Start)],
 			)
 		}
 

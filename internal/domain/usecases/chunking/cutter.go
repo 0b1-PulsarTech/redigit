@@ -66,6 +66,7 @@ func (c Cutter) Pieces(ctx context.Context, snap entities.Snapshot) ([]Piece, er
 	return pieces, nil
 }
 
+//nolint:ireturn // the interface is what the registry holds.
 func (c Cutter) pick(path string) Chunker {
 	for _, chunker := range c.chunkers {
 		if chunker.Handles(path) {
@@ -144,7 +145,6 @@ func (c Cutter) births(
 
 	for _, touch := range touches {
 		content, err := c.revisions.ReadAt(ctx, touch.Rev, path)
-
 		// A file deleted and later restored is still touched by the commit
 		// that removed it, and that commit holds no version to cut. Absent is
 		// not a failure.

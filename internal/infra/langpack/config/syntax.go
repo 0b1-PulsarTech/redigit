@@ -129,6 +129,8 @@ func (s Syntax) spansOf(source []byte, keep []entities.DeclKey) ([]entities.Span
 }
 
 // rendererFor reports the chunker that claims path and writes its own file.
+//
+//nolint:ireturn // the interface is what the registry holds.
 func (s Syntax) rendererFor(path string) (Renderer, bool) {
 	for _, chunker := range s.chunkers {
 		if !chunker.Handles(path) {

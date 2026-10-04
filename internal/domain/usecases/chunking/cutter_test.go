@@ -47,7 +47,9 @@ func (lineChunker) Chunks(
 	return decls, nil
 }
 
-func snapshotOf(path string, revs ...string) entities.Snapshot {
+func snapshotOf(revs ...string) entities.Snapshot {
+	const path = "queries.txt"
+
 	history := make([]entities.SourceTouch, 0, len(revs))
 	for index, rev := range revs {
 		history = append(history, entities.SourceTouch{
@@ -86,7 +88,7 @@ func TestCutterDatesEachPieceAtItsOwnFirstCommit(t *testing.T) {
 
 	cutter := NewCutter(source, revisions, []Chunker{lineChunker{}})
 
-	pieces, err := cutter.Pieces(t.Context(), snapshotOf(path, "r0", "r1", "r2"))
+	pieces, err := cutter.Pieces(t.Context(), snapshotOf("r0", "r1", "r2"))
 	if err != nil {
 		t.Fatalf("Pieces() = %v", err)
 	}
@@ -144,7 +146,7 @@ func TestCutterReportsNoPositionForAPieceTheHistoryNeverHeld(t *testing.T) {
 
 	cutter := NewCutter(source, revisions, []Chunker{lineChunker{}})
 
-	pieces, err := cutter.Pieces(t.Context(), snapshotOf(path, "r0"))
+	pieces, err := cutter.Pieces(t.Context(), snapshotOf("r0"))
 	if err != nil {
 		t.Fatalf("Pieces() = %v", err)
 	}
@@ -186,7 +188,7 @@ func TestCutterSkipsARevisionThePathIsAbsentFrom(t *testing.T) {
 
 	cutter := NewCutter(source, revisions, []Chunker{lineChunker{}})
 
-	pieces, err := cutter.Pieces(t.Context(), snapshotOf(path, "r0", "r1"))
+	pieces, err := cutter.Pieces(t.Context(), snapshotOf("r0", "r1"))
 	if err != nil {
 		t.Fatalf("Pieces() = %v", err)
 	}
@@ -279,7 +281,7 @@ func TestCutterFailsWhenAFileCannotBeRead(t *testing.T) {
 
 	cutter := NewCutter(source, NewMockRevisions(ctrl), []Chunker{lineChunker{}})
 
-	_, err := cutter.Pieces(t.Context(), snapshotOf("queries.txt", "r0"))
+	_, err := cutter.Pieces(t.Context(), snapshotOf("r0"))
 	if !errors.Is(err, errRead) {
 		t.Fatalf("Pieces() err = %v, want it to wrap %v", err, errRead)
 	}

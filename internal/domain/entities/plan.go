@@ -61,6 +61,7 @@ func MarkWIP(subject string) string {
 	prefix := ""
 
 	body := subject
+
 	if IsDraft(subject) {
 		prefix = DraftMarker
 		body = strings.TrimPrefix(subject, DraftMarker)

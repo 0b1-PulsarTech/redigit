@@ -19,8 +19,20 @@ func TestShowingTags(t *testing.T) {
 		want       []string
 		wantOK     bool
 	}{
-		{"a negated tag is shown by dropping it", "//go:build !dev", []string{"dev", "x"}, []string{"x"}, true},
-		{"a missing tag is shown by adding it", "//go:build integration", nil, []string{"integration"}, true},
+		{
+			"a negated tag is shown by dropping it",
+			"//go:build !dev",
+			[]string{"dev", "x"},
+			[]string{"x"},
+			true,
+		},
+		{
+			"a missing tag is shown by adding it",
+			"//go:build integration",
+			nil,
+			[]string{"integration"},
+			true,
+		},
 		{"a conjunction needs both", "//go:build a && b", []string{"a"}, []string{"a", "b"}, true},
 		{"a contradiction is shown by nothing", "//go:build a && !a", nil, nil, false},
 		{"not a constraint at all", "// just a comment", nil, nil, false},
@@ -32,7 +44,13 @@ func TestShowingTags(t *testing.T) {
 
 			got, ok := showingTags(testCase.constraint, testCase.tags)
 			if ok != testCase.wantOK || (ok && !reflect.DeepEqual(got, testCase.want)) {
-				t.Fatalf("showingTags() = %v, %v; want %v, %v", got, ok, testCase.want, testCase.wantOK)
+				t.Fatalf(
+					"showingTags() = %v, %v; want %v, %v",
+					got,
+					ok,
+					testCase.want,
+					testCase.wantOK,
+				)
 			}
 		})
 	}
@@ -66,5 +84,9 @@ func NewVerifier() int { return NewGateway() }
 		return
 	}
 
-	t.Fatalf("Uses = %+v, missing %+v: the file hidden by the tags was never checked", facts.Uses, want)
+	t.Fatalf(
+		"Uses = %+v, missing %+v: the file hidden by the tags was never checked",
+		facts.Uses,
+		want,
+	)
 }

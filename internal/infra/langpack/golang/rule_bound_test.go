@@ -72,6 +72,7 @@ func TestBoundRuleTiesAConstructorThatNamesABoundType(t *testing.T) {
 	}
 
 	waits := map[entities.DeclKey]bool{}
+
 	for _, edge := range edges {
 		if edge.Provider == reply.Key {
 			waits[edge.Dependent] = true
@@ -134,7 +135,9 @@ func TestMentionedTypesReadsCodeNotProse(t *testing.T) {
 
 	const file = "doc.go"
 
-	snap, spans := boundTree(t, file,
+	snap, spans := boundTree(
+		t,
+		file,
 		"// replyExecutor is described here but not named.\nfunc unrelated() string {\n\treturn \"replyExecutor\"\n}",
 	)
 

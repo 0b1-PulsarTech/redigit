@@ -51,6 +51,7 @@ func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]lo
 	}
 
 	passes := make([]loadPass, 0, len(byTags))
+
 	for _, key := range slices.Sorted(maps.Keys(byTags)) {
 		slices.Sort(byTags[key].patterns)
 

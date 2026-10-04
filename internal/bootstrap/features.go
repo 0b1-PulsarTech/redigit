@@ -102,7 +102,7 @@ func parseFeatureLine(line string) (entities.Feature, bool, error) {
 func parsePositionSet(spec string) ([]entities.Position, error) {
 	seen := map[entities.Position]bool{}
 
-	for _, part := range strings.Split(spec, ",") {
+	for part := range strings.SplitSeq(spec, ",") {
 		if part = strings.TrimSpace(part); part == "" {
 			return nil, fmt.Errorf("%w: %q holds an empty position", ErrMalformedFeature, spec)
 		}

@@ -2,6 +2,7 @@ package chunk
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,8 +26,12 @@ func TestRenderReproducesEveryRealModuleFile(t *testing.T) {
 	var checked, diverged int
 
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
+		if err != nil {
+			return fmt.Errorf("walk %s: %w", path, err)
+		}
+
+		if entry.IsDir() {
+			return nil
 		}
 
 		base := filepath.Base(path)
@@ -34,24 +39,25 @@ func TestRenderReproducesEveryRealModuleFile(t *testing.T) {
 			return nil
 		}
 
-		source, readErr := os.ReadFile(path) //nolint:gosec // walking a test corpus.
+		source, readErr := os.ReadFile(path)
 		if readErr != nil {
-			return readErr
+			return fmt.Errorf("read %s: %w", path, readErr)
 		}
 
 		rel := strings.TrimPrefix(path, root+"/")
 
 		var chunker interface {
-			Chunks(context.Context, string, []byte) ([]entities.Decl, error)
-			Render([]byte, []entities.DeclKey) ([]byte, error)
+			Chunks(ctx context.Context, path string, source []byte) ([]entities.Decl, error)
+			Render(source []byte, keep []entities.DeclKey) ([]byte, error)
 		} = GoMod{}
+
 		if base == goWorkFileName {
 			chunker = GoWork{}
 		}
 
 		decls, chunkErr := chunker.Chunks(t.Context(), rel, source)
 		if chunkErr != nil {
-			return chunkErr
+			return fmt.Errorf("chunk %s: %w", rel, chunkErr)
 		}
 
 		all := make([]entities.DeclKey, 0, len(decls))
@@ -61,7 +67,7 @@ func TestRenderReproducesEveryRealModuleFile(t *testing.T) {
 
 		got, renderErr := chunker.Render(source, all)
 		if renderErr != nil {
-			return renderErr
+			return fmt.Errorf("render %s: %w", rel, renderErr)
 		}
 
 		checked++

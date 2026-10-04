@@ -19,7 +19,11 @@ func TestPlaceStrandedTests(t *testing.T) {
 		want  FeatureID
 	}{
 		{name: "one feature subject", needs: []entities.Decl{subjectA, shared}, want: "a"},
-		{name: "two feature subjects", needs: []entities.Decl{subjectA, subjectB}, want: LateFeature},
+		{
+			name:  "two feature subjects",
+			needs: []entities.Decl{subjectA, subjectB},
+			want:  LateFeature,
+		},
 		{name: "shared subject only", needs: []entities.Decl{shared}, want: SharedFeature},
 	}
 
@@ -76,7 +80,10 @@ func TestPlaceStrandedTestsFollowsAHelperToTheTrailingLayer(t *testing.T) {
 
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			subjectA.Key: "a", subjectB.Key: "b", support.Key: SharedFeature, test.Key: SharedFeature,
+			subjectA.Key: "a",
+			subjectB.Key: "b",
+			support.Key:  SharedFeature,
+			test.Key:     SharedFeature,
 		},
 		reach: map[entities.DeclKey]int{},
 	}

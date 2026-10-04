@@ -131,7 +131,11 @@ func (v *conversionVisitor) assign(stmt *ast.AssignStmt) {
 	checked := v.scan.pkg.TypesInfo
 
 	for index, target := range stmt.Lhs {
-		v.scan.convert(stmt.Rhs[index].Pos(), checked.TypeOf(stmt.Rhs[index]), checked.TypeOf(target))
+		v.scan.convert(
+			stmt.Rhs[index].Pos(),
+			checked.TypeOf(stmt.Rhs[index]),
+			checked.TypeOf(target),
+		)
 	}
 }
 

@@ -99,7 +99,7 @@ func generateDestinations(dir string, source []byte) []string {
 			continue
 		}
 
-		for _, field := range strings.Fields(line) {
+		for field := range strings.FieldsSeq(line) {
 			target, named := strings.CutPrefix(field, "-destination=")
 			if !named || target == "" {
 				continue

@@ -56,7 +56,7 @@ func byDependency(
 	group []entities.DeclKey,
 	groupOf func(entities.DeclKey) FeatureID,
 ) []entities.DeclKey {
-	if len(group) < 2 {
+	if len(group) <= 1 {
 		return group
 	}
 
