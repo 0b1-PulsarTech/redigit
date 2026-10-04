@@ -70,6 +70,7 @@ func assign(graph entities.Graph) ownership {
 
 	inheritTestOwnership(graph, own)
 	inheritTestFileOwnership(graph, own)
+	shareDependencies(graph, own)
 
 	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
 
