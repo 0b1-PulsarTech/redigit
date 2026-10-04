@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -180,5 +181,113 @@ func TestImportRuleMakesADirectRequireWaitForTheIndirectOnes(t *testing.T) {
 
 	if edgeBetween(edges, other.Key, indirect.Key) {
 		t.Error("a require in another go.mod waits for this one's indirect require")
+	}
+}
+
+// A package an import names is not found until one of its non-test files is in
+// the tree, and a test importing a helper package landed 40 commits before the
+// helper whenever the reference to it was one the language server could not
+// answer. A use waits for the declaration its selector names, and only when it
+// names nothing the repository holds for the package's earliest one by history.
+// Waiting on an arbitrary declaration put a port that mentions the package in a
+// cycle with the implementation the package declares first.
+func TestImportRuleMakesAUseWaitForTheDeclarationItNames(t *testing.T) {
+	t.Parallel()
+
+	source := "package lead\n\nimport (\n\t\"github.com/org/lib/store\"\n)\n\n" +
+		"func Opens() { store.Open() }\n\nfunc Guesses() { store.Missing() }\n\n" +
+		"type Port interface{ Close() }\n"
+
+	snap := treeWith(t, map[string]string{
+		"apps/lead/x.go":           source,
+		"libs/lib/store/a.go":      "package store\n",
+		"libs/lib/store/b.go":      "package store\n",
+		"libs/lib/store/c_test.go": "package store\n",
+	})
+	snap.History = []entities.SourceTouch{
+		{Position: 2, Rev: "a", Touched: []string{"libs/lib/store/a.go"}},
+		{Position: 5, Rev: "b", Touched: []string{"libs/lib/store/b.go"}},
+		{Position: 1, Rev: "c", Touched: []string{"libs/lib/store/c_test.go"}},
+	}
+
+	opens := withSpan(goDecl("apps/lead/x.go", "Opens"), source, "func Opens", "func Guesses")
+	guesses := withSpan(goDecl("apps/lead/x.go", "Guesses"), source, "func Guesses", "type Port")
+	port := withSpan(goDecl("apps/lead/x.go", "Port"), source, "type Port", "")
+	earliest := goDecl("libs/lib/store/a.go", "Earliest")
+	open := goDecl("libs/lib/store/b.go", "Open")
+	onlyTest := goDecl("libs/lib/store/c_test.go", "Open")
+	decls := []entities.Decl{
+		piece("apps/lead/go.mod", "github.com/org/lead", entities.Span{}),
+		piece("libs/lib/go.mod", "github.com/org/lib", entities.Span{}),
+		opens, guesses, port, earliest, open, onlyTest,
+	}
+
+	edges, err := (importRule{}).Edges(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	testCases := []struct {
+		name      string
+		dependent entities.Decl
+		provider  entities.Decl
+		want      bool
+	}{
+		{"a use waits for the declaration it names", opens, open, true},
+		{"a use does not wait for one it does not name", opens, earliest, false},
+		{"a use never waits for a test declaration", opens, onlyTest, false},
+		{"a use naming nothing waits for the earliest", guesses, earliest, true},
+		{"a port that never names the package waits for nothing", port, earliest, false},
+		{"a port is not tied to what the package declares", port, open, false},
+	}
+
+	for _, testCase := range testCases {
+		got := edgeBetween(edges, testCase.dependent.Key, testCase.provider.Key)
+		if got != testCase.want {
+			t.Errorf("%s: edge = %v, want %v", testCase.name, got, testCase.want)
+		}
+	}
+}
+
+// withSpan gives decl the span from the first marker to the second, or to the
+// end of source when the second is empty.
+func withSpan(decl entities.Decl, source, from, to string) entities.Decl {
+	decl.Span = entities.Span{Start: strings.Index(source, from), End: len(source)}
+	if to != "" {
+		decl.Span.End = strings.Index(source, to)
+	}
+
+	return decl
+}
+
+// A blank or dot import is kept by a render in every file it writes, so every
+// declaration of the file needs the package to exist.
+func TestImportRuleMakesEveryDeclarationWaitForABlankImport(t *testing.T) {
+	t.Parallel()
+
+	source := "package lead\n\nimport _ \"github.com/org/lib/driver\"\n\nfunc Idle() {}\n"
+
+	snap := treeWith(t, map[string]string{
+		"apps/lead/x.go":       source,
+		"libs/lib/driver/d.go": "package driver\n",
+	})
+
+	idle := goDecl("apps/lead/x.go", "Idle")
+	idle.Span = entities.Span{Start: strings.Index(source, "func Idle"), End: len(source)}
+
+	provider := goDecl("libs/lib/driver/d.go", "D")
+	decls := []entities.Decl{
+		piece("apps/lead/go.mod", "github.com/org/lead", entities.Span{}),
+		piece("libs/lib/go.mod", "github.com/org/lib", entities.Span{}),
+		idle, provider,
+	}
+
+	edges, err := (importRule{}).Edges(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if !edgeBetween(edges, idle.Key, provider.Key) {
+		t.Error("a declaration using no selector does not wait for a blank-imported package")
 	}
 }

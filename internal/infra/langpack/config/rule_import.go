@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"maps"
@@ -34,15 +35,16 @@ func (importRule) Edges(
 
 	roots := slices.Sorted(maps.Keys(headers))
 	required := requiredModules(decls)
-	byFile := map[string][]entities.DeclKey{}
+	byFile := map[string][]entities.Decl{}
 
 	for _, decl := range decls {
 		if strings.HasSuffix(decl.Key.File, ".go") {
-			byFile[decl.Key.File] = append(byFile[decl.Key.File], decl.Key)
+			byFile[decl.Key.File] = append(byFile[decl.Key.File], decl)
 		}
 	}
 
 	edges := indirectEdges(snap, decls)
+	packages := newPackageIndex(snap, decls, headers)
 
 	for _, file := range slices.Sorted(maps.Keys(byFile)) {
 		root, found := nearestModule(roots, file)
@@ -50,14 +52,23 @@ func (importRule) Edges(
 			continue
 		}
 
-		for _, provider := range providedRequires(snap, file, required[root]) {
+		parsed, fset := parseGoFile(snap, file)
+		if parsed == nil {
+			continue
+		}
+
+		for _, provider := range providedRequires(importsOf(parsed), required[root]) {
 			for _, dependent := range byFile[file] {
 				edges = append(edges, entities.Edge{
-					Dependent: dependent,
+					Dependent: dependent.Key,
 					Provider:  provider,
 					Reason:    entities.ReasonImport,
 				})
 			}
+		}
+
+		for _, use := range packages.uses(parsed, fset) {
+			edges = append(edges, packages.edges(use, byFile[file])...)
 		}
 	}
 
@@ -94,35 +105,46 @@ func requiredModules(decls []entities.Decl) map[string]map[string]entities.DeclK
 	return out
 }
 
-// providedRequires lists the require pieces of root's go.mod that provide a
-// package file imports. A file that cannot be read or parsed yields none: one
-// missing edge orders one declaration by history, while failing loses every
-// edge.
-func providedRequires(
-	snap entities.Snapshot,
-	file string,
-	required map[string]entities.DeclKey,
-) []entities.DeclKey {
+// parseGoFile parses file, or yields nil when it cannot be read or parsed: one
+// missing edge orders one declaration by history alone, while failing loses
+// every edge.
+func parseGoFile(snap entities.Snapshot, file string) (*ast.File, *token.FileSet) {
 	source, err := readSource(snap, file)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 
-	parsed, err := parser.ParseFile(token.NewFileSet(), file, source, parser.ImportsOnly)
+	fset := token.NewFileSet()
+
+	parsed, err := parser.ParseFile(fset, file, source, parser.SkipObjectResolution)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 
+	return parsed, fset
+}
+
+// importsOf lists the import paths of a parsed file.
+func importsOf(parsed *ast.File) []string {
+	out := make([]string, 0, len(parsed.Imports))
+
+	for _, spec := range parsed.Imports {
+		if imported, err := strconv.Unquote(spec.Path.Value); err == nil {
+			out = append(out, imported)
+		}
+	}
+
+	return out
+}
+
+// providedRequires lists the require pieces of one go.mod that provide a
+// package among imports, each once.
+func providedRequires(imports []string, required map[string]entities.DeclKey) []entities.DeclKey {
 	seen := map[string]bool{}
 
 	var out []entities.DeclKey
 
-	for _, spec := range parsed.Imports {
-		imported, unquoteErr := strconv.Unquote(spec.Path.Value)
-		if unquoteErr != nil {
-			continue
-		}
-
+	for _, imported := range imports {
 		module, found := owningModule(imported, required)
 		if !found || seen[module] {
 			continue
