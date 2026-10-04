@@ -65,8 +65,9 @@ func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]ent
 	// A generated file is written by its generator in ONE pass, so its
 	// declarations are born together. They STAY declarations: taking them out
 	// of the graph took every reference edge to them along, and a test landed
-	// 491 positions before the mock it uses.
-	if isGenerated(source) {
+	// 491 positions before the mock it uses. The files of one sqlc run are
+	// grouped by the sqlc rule instead, as one atom for the whole directory.
+	if isGenerated(source) && !isSqlcOutput(source) {
 		for index := range decls {
 			decls[index].Atom = path
 		}
