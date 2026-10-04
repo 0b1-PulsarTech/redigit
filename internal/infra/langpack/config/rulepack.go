@@ -29,6 +29,7 @@ type rule interface {
 var rules = []rule{
 	moduleRule{},
 	workspaceRule{},
+	importRule{},
 }
 
 // RulePack contributes the edges that make a build possible and that no

@@ -54,6 +54,10 @@ const (
 	// replaced directory even when nothing imports the module, so a replace
 	// line landing before its target exists breaks every build until it does.
 	ReasonWorkspace EdgeReason = "workspace"
+	// ReasonImport ties a declaration to the go.mod require providing a package
+	// its file imports. No reference names the module that ships a package, so
+	// without it the first importer lands long before the require it needs.
+	ReasonImport EdgeReason = "import"
 	// ReasonProse holds back what is only true of the finished tree: general
 	// documentation, a pipeline definition, an agent instruction. Written about
 	// a whole that does not exist until the end, it belongs at the end.

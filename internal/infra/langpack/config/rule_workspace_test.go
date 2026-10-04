@@ -209,6 +209,11 @@ func TestWorkspaceRuleMakesARequireWaitForItsLocalReplace(t *testing.T) {
 			libHeader.Key.File,
 		)
 	}
+
+	if !edgeBetween(edges, require.Key, replace.Key) {
+		t.Fatal("the require does not wait for its own replace line: without it the " +
+			"pseudo-version has nothing to resolve to")
+	}
 }
 
 // A require with no local replace resolves from the module proxy and needs
