@@ -118,6 +118,10 @@ func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, err
 		return Result{}, err
 	}
 
+	if err = i.applyAtoms(ctx, snap, decls); err != nil {
+		return Result{}, err
+	}
+
 	result := Result{
 		Graph: entities.NewGraph(decls, append(edges, ruleEdges...), anchors),
 		Blind: blind,
@@ -232,6 +236,35 @@ func (i Indexer) applyRules(
 	}
 
 	return edges, anchors, nil
+}
+
+// applyAtoms lets each language's rules group declarations that must be born
+// together. The decls are the slice the graph is built from, so the group is
+// written onto them in place.
+func (i Indexer) applyAtoms(
+	ctx context.Context,
+	snap entities.Snapshot,
+	decls []entities.Decl,
+) error {
+	for _, lang := range i.langs {
+		grouping, isGrouping := lang.Rules.(Atomizer)
+		if !isGrouping {
+			continue
+		}
+
+		atoms, err := grouping.Atoms(ctx, snap, decls)
+		if err != nil {
+			return fmt.Errorf("apply %s atoms: %w", lang.Name, err)
+		}
+
+		for index := range decls {
+			if name, grouped := atoms[decls[index].Key]; grouped && decls[index].Atom == "" {
+				decls[index].Atom = name
+			}
+		}
+	}
+
+	return nil
 }
 
 // resolvable keeps the declarations a language server can answer about.

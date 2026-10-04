@@ -73,6 +73,18 @@ type RulePack interface {
 	) ([]entities.Anchor, error)
 }
 
+// Atomizer is the optional part of a RulePack that groups declarations which
+// must be born in one commit: each needs the other to compile, so an edge in
+// either direction would be a cycle. A declaration that already belongs to an
+// atom (a generated file's) keeps it.
+type Atomizer interface {
+	Atoms(
+		ctx context.Context,
+		snap entities.Snapshot,
+		decls []entities.Decl,
+	) (map[entities.DeclKey]string, error)
+}
+
 // Tree reads the final content of a path. Every intermediate version is rendered
 // from the final text, never from an intermediate blob, which is what lets a
 // file grow declaration by declaration.

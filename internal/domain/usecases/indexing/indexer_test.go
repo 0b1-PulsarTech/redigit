@@ -288,3 +288,81 @@ func TestIndexerAppliesRuleEdgesAndAnchors(t *testing.T) {
 		t.Fatalf("anchors = %v, want one test-of anchor", anchors)
 	}
 }
+
+// atomRules is a rule pack that also groups declarations.
+type atomRules struct {
+	*MockRulePack
+
+	atoms map[entities.DeclKey]string
+}
+
+func (r atomRules) Atoms(
+	context.Context,
+	entities.Snapshot,
+	[]entities.Decl,
+) (map[entities.DeclKey]string, error) {
+	return r.atoms, nil
+}
+
+func TestIndexerGroupsDeclarationsTheRulesName(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	typ := goDecl("a.go", "Err", 0, 10)
+	method := goDecl("b.go", "Err.Error", 0, 10)
+	generated := goDecl("c.go", "Impl", 0, 10)
+	generated.Atom = "c.go"
+	loose := goDecl("d.go", "Loose", 0, 10)
+
+	tree := NewMockTree(ctrl)
+	tree.EXPECT().Read(gomock.Any(), gomock.Any()).Return([]byte(goSource), nil).AnyTimes()
+
+	byFile := map[string]entities.Decl{
+		"a.go": typ, "b.go": method, "c.go": generated, "d.go": loose,
+	}
+
+	syntax := NewMockSyntax(ctrl)
+	syntax.EXPECT().
+		Declarations(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, file string, _ []byte) ([]entities.Decl, error) {
+			return []entities.Decl{byFile[file]}, nil
+		}).
+		AnyTimes()
+
+	rules := NewMockRulePack(ctrl)
+	rules.EXPECT().Edges(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+	rules.EXPECT().Anchors(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+
+	grouping := atomRules{MockRulePack: rules, atoms: map[entities.DeclKey]string{
+		typ.Key: "set", method.Key: "set", generated.Key: "set",
+	}}
+
+	result, err := New(quietResolver(ctrl), tree, Config{Languages: []Language{{
+		Name:       "go",
+		Extensions: []string{".go"},
+		Syntax:     syntax,
+		Rules:      grouping,
+	}}}).Index(
+		context.Background(),
+		entities.Snapshot{Files: []string{"a.go", "b.go", "c.go", "d.go"}},
+	)
+	if err != nil {
+		t.Fatalf("Index() = %v", err)
+	}
+
+	got := map[entities.DeclKey]string{}
+	for _, decl := range result.Graph.Decls() {
+		got[decl.Key] = decl.Atom
+	}
+
+	want := map[entities.DeclKey]string{
+		typ.Key: "set", method.Key: "set", generated.Key: "c.go", loose.Key: "",
+	}
+
+	for key, atom := range want {
+		if got[key] != atom {
+			t.Fatalf("atom of %s = %q, want %q", key, got[key], atom)
+		}
+	}
+}

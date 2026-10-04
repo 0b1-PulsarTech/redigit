@@ -76,7 +76,7 @@ func TestLoadChunkMapFailsOnAMissingFile(t *testing.T) {
 func TestValidateChunkMap(t *testing.T) {
 	t.Parallel()
 
-	specific := specificLanguages(config.NewSyntax(configChunkers(nil)))
+	specific := specificLanguages(config.NewSyntax(configChunkers(nil)), nil)
 	snap := entities.Snapshot{Files: []string{"main.go", "go.mod", "engines/wwebjs/src/main.ts"}}
 
 	testCases := []struct {

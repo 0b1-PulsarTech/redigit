@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockRevisionTree is a mock of RevisionTree interface.
@@ -313,6 +312,45 @@ func (m *MockRulePack) Name() string {
 func (mr *MockRulePackMockRecorder) Name() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockRulePack)(nil).Name))
+}
+
+// MockAtomizer is a mock of Atomizer interface.
+type MockAtomizer struct {
+	ctrl     *gomock.Controller
+	recorder *MockAtomizerMockRecorder
+	isgomock struct{}
+}
+
+// MockAtomizerMockRecorder is the mock recorder for MockAtomizer.
+type MockAtomizerMockRecorder struct {
+	mock *MockAtomizer
+}
+
+// NewMockAtomizer creates a new mock instance.
+func NewMockAtomizer(ctrl *gomock.Controller) *MockAtomizer {
+	mock := &MockAtomizer{ctrl: ctrl}
+	mock.recorder = &MockAtomizerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockAtomizer) EXPECT() *MockAtomizerMockRecorder {
+	return m.recorder
+}
+
+// Atoms mocks base method.
+func (m *MockAtomizer) Atoms(ctx context.Context, snap entities.Snapshot, decls []entities.Decl) (map[entities.DeclKey]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Atoms", ctx, snap, decls)
+	ret0, _ := ret[0].(map[entities.DeclKey]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Atoms indicates an expected call of Atoms.
+func (mr *MockAtomizerMockRecorder) Atoms(ctx, snap, decls any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Atoms", reflect.TypeOf((*MockAtomizer)(nil).Atoms), ctx, snap, decls)
 }
 
 // MockTree is a mock of Tree interface.

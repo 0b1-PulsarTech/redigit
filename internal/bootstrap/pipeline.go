@@ -126,7 +126,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 
 	indexCfg := cfg.Indexing
 	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
-	specific := specificLanguages(configSyntax)
+	specific := specificLanguages(configSyntax, cfg.BuildTags)
 
 	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
 		_ = session.Close(ctx)
@@ -337,13 +337,13 @@ func (p *Pipeline) Close(ctx context.Context) error {
 // Kept apart from opaqueLanguage so validateChunkMap can check a supplied
 // chunk map against real ownership before the catch-all pack - which would
 // otherwise also claim every path - is added.
-func specificLanguages(configSyntax config.Syntax) []indexing.Language {
+func specificLanguages(configSyntax config.Syntax, tags []string) []indexing.Language {
 	return []indexing.Language{
 		{
 			Name:       "go",
 			Extensions: []string{".go"},
 			Syntax:     golang.NewSyntax(),
-			Rules:      golang.NewRulePack(),
+			Rules:      golang.NewRulePack(tags),
 			Resolved:   true,
 		},
 		{

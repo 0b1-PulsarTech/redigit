@@ -12,7 +12,7 @@ import (
 func TestRulePackName(t *testing.T) {
 	t.Parallel()
 
-	if got := NewRulePack().Name(); got != "go" {
+	if got := NewRulePack(nil).Name(); got != "go" {
 		t.Fatalf("Name() = %q, want %q", got, "go")
 	}
 }
@@ -37,7 +37,7 @@ const (
 
 	decls := declareAll(t, syntax, root, []string{"weekday.go"})
 
-	pack := NewRulePack()
+	pack := NewRulePack(nil)
 
 	edges, err := pack.Edges(context.Background(), snap, decls)
 	if err != nil {
@@ -80,7 +80,7 @@ func TestFSGet(t *testing.T) {}
 
 	decls := declareAll(t, syntax, root, []string{"fs.go", "fs_test.go"})
 
-	anchors, err := NewRulePack().Anchors(context.Background(), snap, decls)
+	anchors, err := NewRulePack(nil).Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
