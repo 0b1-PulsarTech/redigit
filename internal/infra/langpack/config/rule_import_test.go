@@ -141,3 +141,44 @@ func TestImportRuleReadsTheNearestModulesRequires(t *testing.T) {
 		t.Error("the file waits for the outer module's require")
 	}
 }
+
+// Go prunes the module graph: a module providing a package the build imports
+// only through a dependency must be listed in the main go.mod, as an indirect
+// require, or the go command answers "updates to go.mod needed".
+func TestImportRuleMakesADirectRequireWaitForTheIndirectOnes(t *testing.T) {
+	t.Parallel()
+
+	const modFile = "apps/lead/go.mod"
+
+	body := "module m\n\ngo 1.26\n\nrequire example.com/direct v1.0.0\n\n" +
+		"require example.com/transitive v1.0.0 // indirect\n"
+	boundary := len("module m\n\ngo 1.26\n\nrequire example.com/direct v1.0.0\n\n")
+
+	snap := treeWith(t, map[string]string{modFile: body})
+
+	header := piece(modFile, "m", entities.Span{Start: 0, End: 17})
+	direct := piece(modFile, "require example.com/direct", entities.Span{Start: 17, End: boundary})
+	indirect := piece(
+		modFile, "require example.com/transitive", entities.Span{Start: boundary, End: len(body)},
+	)
+	other := piece("libs/lib/go.mod", "require example.com/direct", entities.Span{})
+
+	edges, err := (importRule{}).Edges(
+		t.Context(), snap, []entities.Decl{header, direct, indirect, other},
+	)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if !edgeBetween(edges, direct.Key, indirect.Key) {
+		t.Error("the direct require does not wait for the indirect one")
+	}
+
+	if edgeBetween(edges, indirect.Key, direct.Key) {
+		t.Error("the indirect require waits for the direct one")
+	}
+
+	if edgeBetween(edges, other.Key, indirect.Key) {
+		t.Error("a require in another go.mod waits for this one's indirect require")
+	}
+}

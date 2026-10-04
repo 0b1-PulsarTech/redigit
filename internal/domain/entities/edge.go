@@ -55,7 +55,8 @@ const (
 	// line landing before its target exists breaks every build until it does.
 	ReasonWorkspace EdgeReason = "workspace"
 	// ReasonImport ties a declaration to the go.mod require providing a package
-	// its file imports. No reference names the module that ships a package, so
+	// its file imports, and a direct require to the indirect ones its module
+	// graph needs. No reference names the module that ships a package, so
 	// without it the first importer lands long before the require it needs.
 	ReasonImport EdgeReason = "import"
 	// ReasonChecksum ties a go.mod require to the go.sum holding the hashes the
