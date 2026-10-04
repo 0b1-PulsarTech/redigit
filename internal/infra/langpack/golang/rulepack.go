@@ -70,6 +70,7 @@ func NewRulePack(tags []string) RulePack {
 
 	return RulePack{rules: append(slices.Clone(rules),
 		methodSetRule{source: source},
+		typedConversionRule{source: source},
 	)}
 }
 
