@@ -107,11 +107,8 @@ func TestAssignDoesNotAnchorATestWhoseOwnNeedCrossesFeatures(t *testing.T) {
 
 	own := assign(graph)
 
-	if got := own.owner[suite.Key]; got != SharedFeature {
-		t.Fatalf(
-			"owner = %q, want the shared bucket: honoring the anchor would cycle a with b",
-			got,
-		)
+	if got := own.owner[suite.Key]; got != "b" {
+		t.Fatalf("owner = %q, want b: honoring the anchor would cycle a with b", got)
 	}
 }
 
@@ -137,11 +134,8 @@ func TestAssignAlwaysInheritsASharedAnchorTarget(t *testing.T) {
 
 	own := assign(graph)
 
-	if got := own.owner[suite.Key]; got != SharedFeature {
-		t.Fatalf(
-			"owner = %q, want the shared bucket: a shared target is always safe to inherit",
-			got,
-		)
+	if got := own.owner[suite.Key]; got != "b" {
+		t.Fatalf("owner = %q, want b: the test follows the helper it needs, not the reverse", got)
 	}
 }
 
@@ -162,7 +156,7 @@ func TestAssignDoesNotFoldATestWhoseOwnNeedCrossesFeatures(t *testing.T) {
 
 	own := assign(graph)
 
-	if got := own.owner[suite.Key]; got != SharedFeature {
-		t.Fatalf("owner = %q, want the shared bucket: folding it in would cycle a with b", got)
+	if got := own.owner[suite.Key]; got != "b" {
+		t.Fatalf("owner = %q, want b: folding it into a would cycle a with b", got)
 	}
 }
