@@ -3,6 +3,8 @@ package chunk
 import (
 	"context"
 	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
 func TestGoWorkHandles(t *testing.T) {
@@ -67,5 +69,53 @@ func TestGoWorkChunks(t *testing.T) {
 			assertReconstructs(t, testCase.source, decls)
 			assertDeclNames(t, decls, testCase.wantNames)
 		})
+	}
+}
+
+// A use line and the go.mod header of the module it names are born together:
+// a go.work listing a module before its go.mod exists, or missing one that
+// does, stops every go command.
+func TestGoWorkUseLineSharesAnAtomWithTheModulesHeader(t *testing.T) {
+	t.Parallel()
+
+	source := "go 1.26\n\nuse (\n\t./modules/lead\n\t.\n)\n"
+
+	workDecls, err := (GoWork{}).Chunks(context.Background(), "go.work", []byte(source))
+	if err != nil {
+		t.Fatalf("GoWork.Chunks() error = %v", err)
+	}
+
+	modDecls, err := (GoMod{}).Chunks(
+		context.Background(), "modules/lead/go.mod", []byte("module github.com/org/lead\n"),
+	)
+	if err != nil {
+		t.Fatalf("GoMod.Chunks() error = %v", err)
+	}
+
+	rootDecls, err := (GoMod{}).Chunks(
+		context.Background(), "go.mod", []byte("module github.com/org/root\n"),
+	)
+	if err != nil {
+		t.Fatalf("GoMod.Chunks() error = %v", err)
+	}
+
+	testCases := []struct {
+		name string
+		decl entities.Decl
+		want string
+	}{
+		{"the go.work header belongs to no module", workDecls[0], ""},
+		{"a use line shares its module's atom", workDecls[1], modDecls[0].Atom},
+		{"use . shares the root module's atom", workDecls[2], rootDecls[0].Atom},
+	}
+
+	for _, testCase := range testCases {
+		if testCase.decl.Atom != testCase.want {
+			t.Errorf("%s: Atom = %q, want %q", testCase.name, testCase.decl.Atom, testCase.want)
+		}
+	}
+
+	if modDecls[0].Atom != "workspace:modules/lead" || rootDecls[0].Atom != "workspace:." {
+		t.Errorf("header atoms = %q, %q", modDecls[0].Atom, rootDecls[0].Atom)
 	}
 }

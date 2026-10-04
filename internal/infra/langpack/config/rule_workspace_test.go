@@ -241,3 +241,57 @@ func TestWorkspaceRuleLeavesAnOrdinaryRequireAlone(t *testing.T) {
 		t.Fatalf("got %d edge(s) for a require nothing replaces: %v", len(edges), edges)
 	}
 }
+
+// The final go.mod files lean on go.work for the siblings they replace, so
+// every tree before the workspace stops at a missing require. The workspace
+// has to grow with the modules: the header waits for nothing but the earliest
+// module it lists, and each use line lands with its own module.
+func TestWorkspaceRuleGrowsTheWorkspaceModuleByModule(t *testing.T) {
+	t.Parallel()
+
+	snap := treeWith(t, map[string]string{"go.work": "go 1.26\n\nuse ./libs/a\nuse ./libs/b\n"})
+
+	header := piece("go.work", "<file>", entities.Span{Start: 0, End: 9})
+	useA := piece("go.work", "use ./libs/a", entities.Span{Start: 9, End: 22})
+	useB := piece("go.work", "use ./libs/b", entities.Span{Start: 22, End: 35})
+	headerA := piece("libs/a/go.mod", "github.com/org/a", entities.Span{Start: 0, End: 20})
+	headerB := piece("libs/b/go.mod", "github.com/org/b", entities.Span{Start: 0, End: 20})
+	decls := []entities.Decl{header, useA, useB, headerA, headerB}
+
+	edges, err := (workspaceRule{}).Edges(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	anchors, err := (workspaceRule{}).Anchors(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Anchors() = %v", err)
+	}
+
+	wantAnchors := []entities.Anchor{
+		{Decl: useA.Key, To: headerA.Key, Reason: entities.ReasonWorkspace},
+		{Decl: header.Key, To: headerA.Key, Reason: entities.ReasonWorkspace},
+		{Decl: useB.Key, To: headerB.Key, Reason: entities.ReasonWorkspace},
+		{Decl: header.Key, To: headerB.Key, Reason: entities.ReasonWorkspace},
+	}
+
+	for _, use := range []entities.Decl{useA, useB} {
+		if !edgeBetween(edges, use.Key, header.Key) {
+			t.Errorf("%s does not wait for the go.work header", use.Key.Name)
+		}
+	}
+
+	if edgeBetween(edges, header.Key, headerA.Key) {
+		t.Error("the go.work header waits for a module: it must exist from the first one on")
+	}
+
+	if len(anchors) != len(wantAnchors) {
+		t.Fatalf("got %d anchor(s), want %d: %v", len(anchors), len(wantAnchors), anchors)
+	}
+
+	for index, want := range wantAnchors {
+		if anchors[index] != want {
+			t.Errorf("anchor[%d] = %v, want %v", index, anchors[index], want)
+		}
+	}
+}

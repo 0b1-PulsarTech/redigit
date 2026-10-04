@@ -16,6 +16,11 @@ const goWorkFileName = "go.work"
 // for the "go" directive. A workspace lists every module directory from its
 // first commit while the go.mod files that make them real arrive across
 // hundreds of commits, so every "use" line needs a birth of its own too.
+//
+// A use line and the go.mod header of the module it names are one Atom: a
+// go.work that lists a module before its go.mod exists, or leaves one out once
+// it does, stops every go command ("directory prefix . does not contain
+// modules listed in go.work").
 type GoWork struct{}
 
 var _ indexing.Chunker = GoWork{}
@@ -47,10 +52,18 @@ func (GoWork) Chunks(_ context.Context, path string, source []byte) ([]entities.
 				Name: entry.DeclName(),
 			},
 			Unit:     unit,
+			Atom:     workspaceAtom(filepath.Join(filepath.Dir(path), entry.Name)),
 			Span:     entities.Span{Start: starts[i], End: starts[i+1]},
 			Selector: locationAt(path, source, lines, entry.NameOffset),
 		})
 	}
 
 	return decls, nil
+}
+
+// workspaceAtom names the atom a module directory's go.mod header and its
+// go.work use line share. The directory is cleaned so "./a" beside the go.work
+// and the go.mod found at "a/go.mod" agree.
+func workspaceAtom(dir string) string {
+	return "workspace:" + filepath.ToSlash(filepath.Clean(dir))
 }

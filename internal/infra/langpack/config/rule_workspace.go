@@ -30,6 +30,8 @@ func (workspaceRule) Edges(
 	sources := map[string][]byte{}
 	replaced := map[string]string{}
 
+	works := workHeaders(decls)
+
 	var edges []entities.Edge
 
 	for _, decl := range decls {
@@ -52,17 +54,17 @@ func (workspaceRule) Edges(
 			Provider:  provider,
 			Reason:    entities.ReasonWorkspace,
 		})
+
+		if work, hasWork := works[decl.Key.File]; hasWork && isUse(decl.Key) {
+			edges = append(edges, entities.Edge{
+				Dependent: decl.Key,
+				Provider:  work,
+				Reason:    entities.ReasonWorkspace,
+			})
+		}
 	}
 
 	return append(edges, requireEdges(decls, headers, replaced)...), nil
-}
-
-func (workspaceRule) Anchors(
-	_ context.Context,
-	_ entities.Snapshot,
-	_ []entities.Decl,
-) ([]entities.Anchor, error) {
-	return nil, nil
 }
 
 // localTarget reports the repository-relative directory a piece names. A

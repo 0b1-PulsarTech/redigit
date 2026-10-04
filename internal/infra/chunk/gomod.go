@@ -41,6 +41,7 @@ func (GoMod) Chunks(_ context.Context, path string, source []byte) ([]entities.D
 	decls = append(decls, entities.Decl{
 		Key:      entities.DeclKey{File: path, Kind: entities.KindOther, Name: header.Name},
 		Unit:     unit,
+		Atom:     workspaceAtom(filepath.Dir(path)),
 		Span:     entities.Span{Start: 0, End: starts[0]},
 		Selector: locationAt(path, source, lines, header.NameOffset),
 	})
