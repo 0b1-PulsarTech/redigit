@@ -20,8 +20,10 @@ func (p Planner) cut(
 	in bucket,
 ) []entities.PlannedCommit {
 	keys := sortForBirth(graph, order, in.keys, nil)
+	lastOf := atomExtent(graph, keys)
 
 	var (
+		start    int
 		out      []entities.PlannedCommit
 		current  []entities.DeclKey
 		files    = map[string]bool{}
@@ -43,6 +45,7 @@ func (p Planner) cut(
 		})
 
 		current = slices.Clone(current[upTo:])
+		start += upTo
 		files = map[string]bool{}
 
 		for _, key := range current {
@@ -58,14 +61,15 @@ func (p Planner) cut(
 		}
 
 		// Roll back to the last package boundary instead of the raw cap, or a
-		// package with no boundary yet before it: the cap stays an upper bound.
+		// package with no boundary yet before it: the cap stays an upper bound,
+		// except where holding it would split an atom.
 		if !files[key.File] && len(files) >= p.cfg.MaxFiles {
 			cutAt := boundary
 			if cutAt == 0 {
 				cutAt = len(current)
 			}
 
-			flush(cutAt)
+			flush(safeCut(lastOf, start, cutAt))
 		}
 
 		current = append(current, key)
@@ -76,4 +80,60 @@ func (p Planner) cut(
 	flush(len(current))
 
 	return out
+}
+
+// atomExtent maps each key's index to the index of the last member of its atom,
+// or to its own when it belongs to none. An atom is born in one commit, and
+// members that tied at one position arrive interleaved with unrelated
+// declarations, so a cut between two of them is not a cut the plan may make.
+func atomExtent(graph entities.Graph, keys []entities.DeclKey) []int {
+	last := map[string]int{}
+	atomOf := make([]string, len(keys))
+
+	for index, key := range keys {
+		decl, found := graph.Decl(key)
+		if !found || decl.Atom == "" {
+			continue
+		}
+
+		atomOf[index] = decl.Atom
+		last[decl.Atom] = index
+	}
+
+	extent := make([]int, len(keys))
+
+	for index := range keys {
+		extent[index] = index
+
+		if atomOf[index] != "" {
+			extent[index] = last[atomOf[index]]
+		}
+	}
+
+	return extent
+}
+
+// safeCut is the largest cut at or before want that leaves no atom in two
+// commits: current[:cut] holds keys start..start+cut-1, and none of them may
+// have an atom sibling at start+cut or later. It reports 0, which flushes
+// nothing, when every cut would split one: a commit over the file cap is
+// better than a commit that cannot compile.
+func safeCut(extent []int, start, want int) int {
+	for cut := want; cut > 0; cut-- {
+		if cutKeepsAtoms(extent, start, cut) {
+			return cut
+		}
+	}
+
+	return 0
+}
+
+func cutKeepsAtoms(extent []int, start, cut int) bool {
+	for index := start; index < start+cut; index++ {
+		if extent[index] >= start+cut {
+			return false
+		}
+	}
+
+	return true
 }

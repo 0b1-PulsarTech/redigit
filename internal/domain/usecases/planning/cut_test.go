@@ -81,3 +81,49 @@ func TestCutFallsBackToTheCapWhenOnePackageAloneExceedsIt(t *testing.T) {
 		}
 	}
 }
+
+func TestCutNeverSplitsAnAtom(t *testing.T) {
+	t.Parallel()
+
+	// The members of one atom tie at a position and arrive with unrelated
+	// declarations of other files between them; the cap of two files would cut
+	// right through the gap.
+	first := decl("lib/a.go", "Kind", "lib")
+	first.Atom = "kind"
+	second := decl("lib/z.go", "Kind.Error", "lib")
+	second.Atom = "kind"
+
+	var decls []entities.Decl
+
+	decls = append(decls, first)
+
+	for i := 1; i <= 4; i++ {
+		decls = append(decls, decl(fmt.Sprintf("lib/m%d.go", i), fmt.Sprintf("M%d", i), "lib"))
+	}
+
+	decls = append(decls, second)
+
+	keys := make([]entities.DeclKey, 0, len(decls))
+	for _, d := range decls {
+		keys = append(keys, d.Key)
+	}
+
+	commits := New(Config{MaxFiles: 2}).cut(
+		entities.NewGraph(decls, nil, nil),
+		entities.Ordering{},
+		bucket{keys: keys, shape: entities.ShapeLayer, feature: SharedFeature, reason: "test"},
+	)
+
+	for _, commit := range commits {
+		holdsFirst, holdsSecond := false, false
+
+		for _, key := range commit.Decls {
+			holdsFirst = holdsFirst || key == first.Key
+			holdsSecond = holdsSecond || key == second.Key
+		}
+
+		if holdsFirst != holdsSecond {
+			t.Fatalf("commit %q holds one half of an atom: %v", commit.Subject, commit.Decls)
+		}
+	}
+}
