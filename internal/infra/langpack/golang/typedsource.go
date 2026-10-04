@@ -24,8 +24,9 @@ import (
 //
 // Packages of the tree are checked from source, tests included, under the run's
 // build tags; what they import from outside the tree comes from export data.
-// The first call loads and every later one reuses the result, which is only
-// sound because one run indexes one snapshot.
+// A file the tags hide is checked in a pass of its own, under tags that show it
+// (see hiddenPasses). The first call loads and every later one reuses the
+// result, which is only sound because one run indexes one snapshot.
 type typedSource struct {
 	tags []string
 
@@ -43,49 +44,73 @@ func (s *typedSource) Facts(
 	decls []entities.Decl,
 ) (typedFacts, error) {
 	s.once.Do(func() {
-		pkgs, err := typeCheck(ctx, snap, s.tags)
-		if err != nil {
-			s.err = err
-
-			return
-		}
-
-		s.facts = collectFacts(pkgs, snap.Root, newDeclLocator(decls))
+		s.facts, s.err = s.check(ctx, snap, decls)
 	})
 
 	return s.facts, s.err
 }
 
-// typeCheck loads every package of every module the snapshot holds. A tree with
-// no go.mod has nothing to load, which is an answer and not a failure.
-func typeCheck(
+func (s *typedSource) check(
 	ctx context.Context,
 	snap entities.Snapshot,
-	tags []string,
-) ([]*packages.Package, error) {
-	patterns, err := modulePatterns(snap)
+	decls []entities.Decl,
+) (typedFacts, error) {
+	modules, err := modulesOf(snap)
 	if err != nil {
-		return nil, err
+		return typedFacts{}, err
 	}
 
-	if len(patterns) == 0 {
-		return nil, nil
+	if len(modules) == 0 {
+		return typedFacts{}, nil
 	}
 
+	passes, err := hiddenPasses(snap, s.tags, modules)
+	if err != nil {
+		return typedFacts{}, err
+	}
+
+	passes = append([]loadPass{{tags: s.tags, patterns: allPatterns(modules)}}, passes...)
+	locator := newDeclLocator(decls)
+
+	var facts typedFacts
+
+	for _, pass := range passes {
+		pkgs, loadErr := typeCheck(ctx, snap.Root, pass)
+		if loadErr != nil {
+			return typedFacts{}, loadErr
+		}
+
+		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
+	}
+
+	return facts.sorted(), nil
+}
+
+// loadPass is one load of the tree: the packages to check, under which tags.
+type loadPass struct {
+	tags     []string
+	patterns []string
+}
+
+func typeCheck(
+	ctx context.Context,
+	root string,
+	pass loadPass,
+) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Context: ctx,
-		Dir:     snap.Root,
+		Dir:     root,
 		Tests:   true,
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports |
 			packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo |
 			packages.NeedTypesSizes,
 	}
 
-	if len(tags) > 0 {
-		cfg.BuildFlags = []string{"-tags=" + strings.Join(tags, ",")}
+	if len(pass.tags) > 0 {
+		cfg.BuildFlags = []string{"-tags=" + strings.Join(pass.tags, ",")}
 	}
 
-	pkgs, err := packages.Load(cfg, patterns...)
+	pkgs, err := packages.Load(cfg, pass.patterns...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
 	}
@@ -95,7 +120,7 @@ func typeCheck(
 	// Said out loud, because a tree full of them answers almost nothing.
 	if broken := brokenPackages(pkgs); broken > 0 {
 		slog.Warn("some packages did not type-check; their type facts are partial",
-			"count", broken, "of", len(pkgs))
+			"count", broken, "of", len(pkgs), "tags", pass.tags)
 	}
 
 	return pkgs, nil
@@ -113,10 +138,15 @@ func brokenPackages(pkgs []*packages.Package) int {
 	return broken
 }
 
-// modulePatterns is "<module path>/..." for each go.mod in the snapshot, which
-// is how a workspace of several modules is named to the go command.
-func modulePatterns(snap entities.Snapshot) ([]string, error) {
-	var patterns []string
+// module is a go.mod of the snapshot: the directory it sits in, relative to the
+// root, and the path its packages are imported under.
+type module struct {
+	dir  string
+	path string
+}
+
+func modulesOf(snap entities.Snapshot) ([]module, error) {
+	var modules []module
 
 	for _, file := range snap.Files {
 		if path.Base(file) != "go.mod" {
@@ -128,12 +158,23 @@ func modulePatterns(snap entities.Snapshot) ([]string, error) {
 			return nil, err
 		}
 
-		if module := modfile.ModulePath(source); module != "" {
-			patterns = append(patterns, module+"/...")
+		if name := modfile.ModulePath(source); name != "" {
+			modules = append(modules, module{dir: path.Dir(file), path: name})
 		}
+	}
+
+	return modules, nil
+}
+
+// allPatterns is "<module path>/..." for each module, which is how a workspace
+// of several modules is named to the go command.
+func allPatterns(modules []module) []string {
+	patterns := make([]string, 0, len(modules))
+	for _, found := range modules {
+		patterns = append(patterns, found.path+"/...")
 	}
 
 	slices.Sort(patterns)
 
-	return patterns, nil
+	return patterns
 }

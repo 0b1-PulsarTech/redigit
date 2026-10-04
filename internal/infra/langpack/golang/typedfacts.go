@@ -33,6 +33,15 @@ type typedFacts struct {
 	Uses []use
 }
 
+// merged is the facts of two passes together.
+func (f typedFacts) merged(other typedFacts) typedFacts {
+	return typedFacts{
+		Forced:    append(f.Forced, other.Forced...),
+		Converted: append(f.Converted, other.Converted...),
+		Uses:      append(f.Uses, other.Uses...),
+	}
+}
+
 // use says Dependent names Provider somewhere in its text.
 type use struct {
 	Dependent, Provider entities.DeclKey
@@ -56,7 +65,7 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) ty
 		}
 	}
 
-	return scan.facts.sorted()
+	return scan.facts
 }
 
 // sorted makes the facts independent of map iteration order: the checker keeps
