@@ -28,6 +28,14 @@ type typedFacts struct {
 	// Converted are the methods of a concrete value that an interface it is
 	// handed to demands.
 	Converted []requirement
+	// Uses are the declarations each declaration names, whichever way: a call,
+	// a type, a value, a method reached through a selector.
+	Uses []use
+}
+
+// use says Dependent names Provider somewhere in its text.
+type use struct {
+	Dependent, Provider entities.DeclKey
 }
 
 func collectFacts(pkgs []*packages.Package, root string, locator declLocator) typedFacts {
@@ -41,6 +49,7 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) ty
 		scan.pkg = pkg
 
 		scan.instances()
+		scan.uses()
 
 		for _, file := range pkg.Syntax {
 			ast.Walk(&conversionVisitor{scan: scan}, file)
@@ -56,6 +65,15 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) ty
 func (f typedFacts) sorted() typedFacts {
 	slices.SortStableFunc(f.Forced, compareRequirements)
 	slices.SortStableFunc(f.Converted, compareRequirements)
+
+	slices.SortFunc(f.Uses, func(a, b use) int {
+		return cmp.Or(
+			cmp.Compare(a.Dependent.String(), b.Dependent.String()),
+			cmp.Compare(a.Provider.String(), b.Provider.String()),
+		)
+	})
+
+	f.Uses = slices.Compact(f.Uses)
 
 	return f
 }
