@@ -378,3 +378,32 @@ func TestRenderKeepsAVersionedImport(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderPrunesAnImportShadowedByALocal(t *testing.T) {
+	t.Parallel()
+
+	const src = `package sample
+
+import "example.com/m/operator"
+
+func Use(items []Item) {
+	for _, operator := range items {
+		_ = operator.ID
+	}
+}
+
+var _ operator.Reader = Item{}
+`
+
+	got, err := NewSyntax().Render(
+		context.Background(),
+		[]byte(src), []entities.DeclKey{{Kind: entities.KindFunc, Name: "Use"}},
+	)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	if strings.Contains(string(got), "example.com/m/operator") {
+		t.Fatalf("Render kept an import only a local variable of that name reaches:\n%s", got)
+	}
+}

@@ -7,14 +7,14 @@ import (
 )
 
 // usedIdents collects every selector prefix ("pkg" in "pkg.Symbol") the kept
-// declarations reach. It is a syntactic approximation, not a type-checked
-// one: a local identifier that happens to share a package's name would be
-// counted as a use.
+// declarations reach through the file scope. A prefix the parser resolved to a
+// local object (a parameter, a range variable, a := binding) is that local,
+// not the package: counting it keeps an import nothing uses, and Go rejects
+// an unused import. This needs the file parsed WITH object resolution.
 //
-// simplification: no type information is available at this layer, so a
-// shadowing local variable can produce a false positive (an import kept that
-// nothing actually reaches). It never produces a false negative, which is
-// the direction that would break the build.
+// simplification: resolution is per file and syntactic, so a package-level
+// declaration sharing a package's name is also treated as a local. Go already
+// rejects that file, so it cannot occur in a tree that builds.
 func usedIdents(decls []ast.Decl) map[string]bool {
 	used := map[string]bool{}
 
@@ -25,7 +25,7 @@ func usedIdents(decls []ast.Decl) map[string]bool {
 				return true
 			}
 
-			if ident, ok := sel.X.(*ast.Ident); ok {
+			if ident, ok := sel.X.(*ast.Ident); ok && ident.Obj == nil {
 				used[ident.Name] = true
 			}
 

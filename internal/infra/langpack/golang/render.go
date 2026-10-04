@@ -58,7 +58,7 @@ func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) 
 		fset,
 		"",
 		source,
-		parser.ParseComments|parser.SkipObjectResolution,
+		parser.ParseComments,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("parse source for render: %w", err)
