@@ -65,7 +65,8 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 
 func isStructural(reason entities.EdgeReason) bool {
 	switch reason {
-	case entities.ReasonModule, entities.ReasonHosts, entities.ReasonWorkspace:
+	case entities.ReasonModule, entities.ReasonHosts, entities.ReasonWorkspace,
+		entities.ReasonChecksum:
 		return true
 	default:
 		return false

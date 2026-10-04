@@ -58,6 +58,10 @@ const (
 	// its file imports. No reference names the module that ships a package, so
 	// without it the first importer lands long before the require it needs.
 	ReasonImport EdgeReason = "import"
+	// ReasonChecksum ties a go.mod require to the go.sum holding the hashes the
+	// go command verifies it against; without them the build stops on "missing
+	// go.sum entry" even though the require is present.
+	ReasonChecksum EdgeReason = "checksum"
 	// ReasonProse holds back what is only true of the finished tree: general
 	// documentation, a pipeline definition, an agent instruction. Written about
 	// a whole that does not exist until the end, it belongs at the end.

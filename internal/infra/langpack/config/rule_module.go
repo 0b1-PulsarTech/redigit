@@ -19,6 +19,7 @@ const (
 	usePrefix     = "use "
 	goModFile     = "go.mod"
 	goWorkFile    = "go.work"
+	goSumFile     = "go.sum"
 )
 
 // moduleRule is the edge no reference query can see: a package compiles only
