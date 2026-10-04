@@ -228,5 +228,6 @@ func warnBlind(result indexing.Result) {
 		slog.Int("of", result.Graph.Len()),
 		slog.String("first", result.Blind[0].Decl.String()),
 		slog.String("query", result.Blind[0].Query),
+		slog.String("reason", result.Blind[0].Reason),
 	)
 }
