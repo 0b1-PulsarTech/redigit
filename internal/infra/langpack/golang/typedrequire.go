@@ -98,4 +98,5 @@ func (s *factScan) convert(at token.Pos, value, target types.Type) {
 	}
 
 	s.require(&s.facts.Converted, dependent, value, iface)
+	s.escape(dependent, value)
 }

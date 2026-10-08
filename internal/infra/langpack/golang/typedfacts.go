@@ -28,6 +28,9 @@ type typedFacts struct {
 	// Converted are the methods of a concrete value that an interface it is
 	// handed to demands.
 	Converted []requirement
+	// Escaped are the methods of a concrete value that an interface it is
+	// handed to can reach without any type naming them.
+	Escaped []requirement
 	// Uses are the declarations each declaration names, whichever way: a call,
 	// a type, a value, a method reached through a selector.
 	Uses []use
@@ -38,6 +41,7 @@ func (f typedFacts) merged(other typedFacts) typedFacts {
 	return typedFacts{
 		Forced:    append(f.Forced, other.Forced...),
 		Converted: append(f.Converted, other.Converted...),
+		Escaped:   append(f.Escaped, other.Escaped...),
 		Uses:      append(f.Uses, other.Uses...),
 	}
 }
@@ -48,7 +52,7 @@ type use struct {
 }
 
 func collectFacts(pkgs []*packages.Package, root string, locator declLocator) typedFacts {
-	scan := &factScan{where: newPositions(root, locator)}
+	scan := &factScan{where: newPositions(root, locator), dynamic: dynamicNames(pkgs)}
 
 	for _, pkg := range pkgs {
 		if pkg.TypesInfo == nil {
@@ -74,6 +78,7 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) ty
 func (f typedFacts) sorted() typedFacts {
 	slices.SortStableFunc(f.Forced, compareRequirements)
 	slices.SortStableFunc(f.Converted, compareRequirements)
+	slices.SortStableFunc(f.Escaped, compareRequirements)
 
 	slices.SortFunc(f.Uses, func(a, b use) int {
 		return cmp.Or(
@@ -96,9 +101,10 @@ func compareRequirements(a, b requirement) int {
 
 // factScan is the working state of one collectFacts call.
 type factScan struct {
-	where positions
-	pkg   *packages.Package
-	facts typedFacts
+	where   positions
+	pkg     *packages.Package
+	facts   typedFacts
+	dynamic map[string]bool
 }
 
 // instances reads every generic instantiation of the package. A type argument
