@@ -28,11 +28,6 @@ func isQueryFile(path string) bool {
 	return strings.Contains(path, "database/queries/") && strings.HasSuffix(path, ".sql")
 }
 
-// isDBGenFile reports whether path is a sqlc-generated Go source, dbgen/*.sql.go.
-func isDBGenFile(path string) bool {
-	return strings.Contains(path, "dbgen/") && strings.HasSuffix(path, ".sql.go")
-}
-
 func queryFiles(files []string) []string {
 	var out []string
 
@@ -43,4 +38,31 @@ func queryFiles(files []string) []string {
 	}
 
 	return out
+}
+
+// queryBlock is one sqlc query: its name and its text, which runs from its
+// "-- name:" line to the next one.
+type queryBlock struct {
+	name string
+	text []byte
+}
+
+// extractQueryBlocks cuts a query file at its "-- name:" lines.
+func extractQueryBlocks(source []byte) []queryBlock {
+	matches := queryNamePattern.FindAllSubmatchIndex(source, -1)
+	blocks := make([]queryBlock, len(matches))
+
+	for index, match := range matches {
+		end := len(source)
+		if index+1 < len(matches) {
+			end = matches[index+1][0]
+		}
+
+		blocks[index] = queryBlock{
+			name: string(source[match[2]:match[3]]),
+			text: source[match[0]:end],
+		}
+	}
+
+	return blocks
 }

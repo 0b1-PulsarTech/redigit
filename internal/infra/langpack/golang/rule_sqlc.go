@@ -3,16 +3,15 @@ package golang
 import (
 	"bytes"
 	"context"
-	"path"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// sqlcRule links a generated dbgen/*.sql.go function to the "-- name: Name"
-// query it came from in database/queries/*.sql. The generated file is Go,
-// the query is SQL text with no Go declaration of its own, so the query is
-// represented as a KindOther node: its file and the query name are all the
-// identity it has.
+// sqlcRule links what sqlc generates to what it generated from. A query
+// function waits for the "-- name:" block it came from, the block for every
+// table it reads, and a table's struct for the generated package root. Linked
+// by directory, every query landed hundreds of commits before the table it
+// reads, and a function was born with no caller.
 type sqlcRule struct{}
 
 func (sqlcRule) Name() string { return "sqlc" }
@@ -22,31 +21,35 @@ func (sqlcRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := groupByFile(decls)
+	model, err := loadSQLModel(snap, decls)
+	if err != nil {
+		return nil, err
+	}
 
 	var edges []entities.Edge
 
-	for _, qf := range queryFiles(snap.Files) {
-		source, err := readSource(snap, qf)
-		if err != nil {
-			return nil, err
+	for _, query := range model.queries {
+		for _, name := range query.tables {
+			if create, created := model.tables[name].create(); created {
+				edges = append(edges, entities.Edge{
+					Dependent: query.block, Provider: create, Reason: entities.ReasonQuery,
+				})
+			}
 		}
 
-		for _, name := range extractQueryNames(source) {
-			queryKey := entities.DeclKey{File: qf, Kind: entities.KindOther, Name: name}
+		if query.method != (entities.DeclKey{}) {
+			edges = append(edges, entities.Edge{
+				Dependent: query.method, Provider: query.block, Reason: entities.ReasonQuery,
+			})
+		}
+	}
 
-			for file, candidates := range byFile {
-				if !isDBGenFile(file) {
-					continue
-				}
-
-				if generated, found := findDecl(candidates, file, entities.KindFunc, name); found {
-					edges = append(edges, entities.Edge{
-						Dependent: generated,
-						Provider:  queryKey,
-						Reason:    entities.ReasonQuery,
-					})
-				}
+	for _, name := range model.order {
+		for _, root := range model.dbInit {
+			if table := model.tables[name]; table.model != (entities.DeclKey{}) {
+				edges = append(edges, entities.Edge{
+					Dependent: table.model, Provider: root, Reason: entities.ReasonQuery,
+				})
 			}
 		}
 	}
@@ -60,31 +63,6 @@ func (sqlcRule) Anchors(
 	[]entities.Decl,
 ) ([]entities.Anchor, error) {
 	return nil, nil
-}
-
-// Atoms makes every file one sqlc run wrote into a directory a single atom.
-// sqlc emits db.go, models.go and each query file in one pass, and the query
-// files use the Queries and DBTX types db.go declares: split across commits,
-// the tree between them does not compile (undefined: Queries).
-func (sqlcRule) Atoms(
-	_ context.Context,
-	snap entities.Snapshot,
-	decls []entities.Decl,
-) (map[entities.DeclKey]string, error) {
-	atoms := map[entities.DeclKey]string{}
-
-	for file, fileDecls := range groupByFile(decls) {
-		source, err := readSource(snap, file)
-		if err != nil || !isSqlcOutput(source) {
-			continue
-		}
-
-		for _, decl := range fileDecls {
-			atoms[decl.Key] = "sqlc:" + path.Dir(file)
-		}
-	}
-
-	return atoms, nil
 }
 
 func isSqlcOutput(source []byte) bool {

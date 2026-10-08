@@ -34,6 +34,7 @@ var rules = []rule{
 	mockgenRule{},
 	generateRule{},
 	sqlcRule{},
+	sqlAtomRule{},
 	migrationRule{},
 	testAnchorRule{},
 	enclosesRule{},

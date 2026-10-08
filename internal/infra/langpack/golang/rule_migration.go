@@ -2,120 +2,109 @@ package golang
 
 import (
 	"context"
-	"path/filepath"
-	"regexp"
+	"path"
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// migrationRule places a migration between the ORM schema it was generated
-// from and the queries that read the table it creates: after the schema,
-// before the queries. Fixing only the query side pushed 9 of 12 migrations
-// ahead of their own source, one by 735 commits - the schema side is not
-// optional.
+// migrationRule orders the statements of a migration against what they build
+// on: a statement after the table it adds to, a foreign key after the table
+// it points at, a table after the ORM type it was generated from. Placed by
+// file, 9 of 12 migrations landed ahead of their own source, one by 735
+// commits, and the 12 files arrived in a single commit at the end.
 type migrationRule struct{}
 
 func (migrationRule) Name() string { return "migration" }
-
-// createTablePattern matches a CREATE TABLE statement's name, optionally
-// backticked, optionally guarded by IF NOT EXISTS.
-var createTablePattern = regexp.MustCompile(
-	`(?i)CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+` + "`?" + `(\w+)` + "`?",
-)
 
 func (migrationRule) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
+	model, err := loadSQLModel(snap, decls)
+	if err != nil {
+		return nil, err
+	}
+
 	var edges []entities.Edge
 
-	for _, mf := range migrationFiles(snap.Files) {
-		source, err := readSource(snap, mf)
-		if err != nil {
-			return nil, err
+	for _, name := range model.order {
+		edges = append(edges, model.tableEdges(model.tables[name])...)
+	}
+
+	return append(edges, model.genesisEdges(snap, decls)...), nil
+}
+
+// tableEdges are the table's own: its later statements wait for the CREATE
+// TABLE, the CREATE TABLE for its ORM type, and a statement holding a foreign
+// key for the CREATE TABLE of the table it references.
+func (model sqlModel) tableEdges(table *sqlTable) []entities.Edge {
+	create, created := table.create()
+	if !created {
+		return nil
+	}
+
+	var edges []entities.Edge
+
+	if table.entType.Name != "" {
+		edges = append(edges, schemaEdge(create, table.entType))
+	}
+
+	for _, stmt := range table.stmts {
+		if stmt.key != create {
+			edges = append(edges, schemaEdge(stmt.key, create))
 		}
 
-		for _, table := range createTablePattern.FindAllSubmatch(source, -1) {
-			found, err := tableEdges(snap, decls, mf, string(table[1]))
-			if err != nil {
-				return nil, err
+		for _, ref := range stmt.refs {
+			if target, known := model.tables[ref]; known {
+				targetCreate, _ := target.create()
+				edges = append(edges, schemaEdge(stmt.key, targetCreate))
 			}
-
-			edges = append(edges, found...)
 		}
 	}
 
-	return edges, nil
+	return edges
 }
 
-// tableEdges links one migration-created table both ways: to the schema
-// declaration it was generated from, and forward to every query that
-// mentions the table, which can only run once the migration has landed.
-func tableEdges(
+// genesisEdges keep the Go files that embed or apply a migration directory
+// behind the first table: the directory must not exist before it does.
+func (model sqlModel) genesisEdges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
-	migrationFile, table string,
-) ([]entities.Edge, error) {
-	migrationKey := entities.DeclKey{File: migrationFile, Kind: entities.KindOther, Name: table}
+) []entities.Edge {
+	genesis, found := genesisOf(snap, model)
+	if !found {
+		return nil
+	}
+
+	create, _ := genesis.table.create()
 
 	var edges []entities.Edge
 
-	if schemaKey, found := findSchemaDecl(decls, table); found {
-		edges = append(edges, entities.Edge{
-			Dependent: migrationKey,
-			Provider:  schemaKey,
-			Reason:    entities.ReasonSchema,
-		})
-	}
-
-	for _, qf := range queryFiles(snap.Files) {
-		source, err := readSource(snap, qf)
-		if err != nil {
-			return nil, err
-		}
-
-		// simplification: a query file "reads the migration" when its text
-		// mentions the table anywhere, not per matched query - sqlc query
-		// files are conventionally one file per entity, so this is close to
-		// exact without re-parsing each query's own SQL body.
-		if !strings.Contains(strings.ToLower(string(source)), strings.ToLower(table)) {
-			continue
-		}
-
-		for _, name := range extractQueryNames(source) {
-			edges = append(edges, entities.Edge{
-				Dependent: entities.DeclKey{File: qf, Kind: entities.KindOther, Name: name},
-				Provider:  migrationKey,
-				Reason:    entities.ReasonQuery,
-			})
+	for _, decl := range decls {
+		if isGoIn(decl.Key.File, path.Dir(create.File)) {
+			edges = append(edges, schemaEdge(decl.Key, create))
 		}
 	}
 
-	return edges, nil
+	return edges
 }
 
-// findSchemaDecl matches a created table to the ORM schema type that
-// generated it: a KindType declaration under an entschema directory, named
-// for the table (exactly, or singularized by trimming a trailing "s").
-func findSchemaDecl(decls []entities.Decl, table string) (entities.DeclKey, bool) {
-	candidates := []string{table, strings.TrimSuffix(table, "s")}
+func isGoIn(file, dir string) bool {
+	return strings.HasSuffix(file, ".go") && path.Dir(file) == dir
+}
 
-	for _, d := range decls {
-		if d.Key.Kind != entities.KindType ||
-			!strings.Contains(filepath.ToSlash(d.Key.File), "entschema/") {
-			continue
-		}
+func schemaEdge(dependent, provider entities.DeclKey) entities.Edge {
+	return entities.Edge{Dependent: dependent, Provider: provider, Reason: entities.ReasonSchema}
+}
 
-		for _, name := range candidates {
-			if strings.EqualFold(d.Key.Name, name) {
-				return d.Key, true
-			}
-		}
-	}
-
-	return entities.DeclKey{}, false
+func (migrationRule) Anchors(
+	context.Context,
+	entities.Snapshot,
+	[]entities.Decl,
+) ([]entities.Anchor, error) {
+	return nil, nil
 }
 
 func migrationFiles(files []string) []string {
@@ -128,12 +117,4 @@ func migrationFiles(files []string) []string {
 	}
 
 	return out
-}
-
-func (migrationRule) Anchors(
-	context.Context,
-	entities.Snapshot,
-	[]entities.Decl,
-) ([]entities.Anchor, error) {
-	return nil, nil
 }
