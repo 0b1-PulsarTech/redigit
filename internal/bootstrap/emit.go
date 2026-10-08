@@ -7,6 +7,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
+	"github.com/wrapped-owls/redigit/internal/infra/atlassum"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 )
 
@@ -54,7 +55,8 @@ func (p *Pipeline) Emit(
 	graph entities.Graph,
 	sink emitting.Sink,
 ) ([]emitting.Commit, error) {
-	commits, err := emitting.New(p.source, p.renderer, sink).Emit(ctx, plan, graph)
+	commits, err := emitting.New(p.source, p.renderer, sink, atlassum.Deriver{}).
+		Emit(ctx, plan, graph)
 	if err != nil {
 		return nil, fmt.Errorf("emit: %w", err)
 	}

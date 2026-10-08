@@ -44,4 +44,17 @@ type Sink interface {
 	Write(ctx context.Context, path string, content []byte, mode FileMode) (Handle, error)
 }
 
+// Deriver recomputes a file that is a function of other files rather than a
+// slice of its own final text: a checksum file holds the hash of every
+// migration beside it, and that hash changes with each statement a migration
+// gains. Slicing the final file leaves a stale sum in every commit between.
+type Deriver interface {
+	// Output reports whether path is a file this deriver writes.
+	Output(path string) bool
+	// Feeds reports whether input is one of the files output is computed from.
+	Feeds(output, input string) bool
+	// Derive computes output from its inputs, each as rendered in the commit.
+	Derive(output string, inputs map[string][]byte) ([]byte, error)
+}
+
 //go:generate go tool -modfile=../../../../tools/go.mod mockgen -source=ports.go -destination=ports_mock_test.go -package=emitting

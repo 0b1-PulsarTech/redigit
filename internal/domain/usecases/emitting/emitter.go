@@ -17,10 +17,13 @@ type Emitter struct {
 	source   Source
 	renderer Renderer
 	sink     Sink
+	derivers []Deriver
+	// derived is set by Emit for the run in flight; see deriving.
+	derived *derivation
 }
 
-func New(source Source, renderer Renderer, sink Sink) Emitter {
-	return Emitter{source: source, renderer: renderer, sink: sink}
+func New(source Source, renderer Renderer, sink Sink, derivers ...Deriver) Emitter {
+	return Emitter{source: source, renderer: renderer, sink: sink, derivers: derivers}
 }
 
 // Emit materialises every commit in the plan, in order. graph supplies what
@@ -40,6 +43,7 @@ func (e Emitter) Emit(
 		return nil, err
 	}
 
+	e = e.deriving(plan)
 	born := map[string][]entities.DeclKey{}
 	cache := map[string]sourceFile{}
 	commits := make([]Commit, 0, plan.Len())
@@ -53,6 +57,11 @@ func (e Emitter) Emit(
 		}
 
 		blobs, err := e.renderTouched(ctx, touched, born, cache)
+		if err != nil {
+			return nil, err
+		}
+
+		blobs, err = e.deriveTouched(ctx, touched, blobs, cache)
 		if err != nil {
 			return nil, err
 		}

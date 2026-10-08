@@ -36,6 +36,10 @@ func (e Emitter) renderTouched(
 	blobs := make([]Blob, 0, len(paths))
 
 	for _, path := range paths {
+		if e.derived.owns(path) {
+			continue
+		}
+
 		file, cached := cache[path]
 		if !cached {
 			content, mode, err := e.source.Read(ctx, path)
