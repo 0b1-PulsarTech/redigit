@@ -45,19 +45,24 @@ func (table *sqlTable) create() (entities.DeclKey, bool) {
 // sqlQuery is one "-- name:" block, the tables it reads and the generated
 // declarations sqlc wrote for it.
 type sqlQuery struct {
-	name      string
-	block     entities.DeclKey
-	tables    []string
-	generated []entities.DeclKey
-	method    entities.DeclKey
+	name   string
+	block  entities.DeclKey
+	tables []string
+	// extensions are the migration statements that create the extensions
+	// whose names the query mentions: sqlc cannot resolve unaccent() without.
+	extensions []entities.DeclKey
+	generated  []entities.DeclKey
+	method     entities.DeclKey
 }
 
 // sqlModel is the schema as the migration files, the ORM schema, the query
 // files and the sqlc output describe it together.
 type sqlModel struct {
-	tables  map[string]*sqlTable
-	order   []string
-	queries []*sqlQuery
+	tables map[string]*sqlTable
+	order  []string
+	// extensions maps an extension name to the statement creating it.
+	extensions map[string]entities.DeclKey
+	queries    []*sqlQuery
 	// dbInit is the sqlc output every query function and model needs and that
 	// belongs to no table or query: the Queries type and its transaction hook.
 	dbInit []entities.DeclKey
@@ -71,7 +76,11 @@ type sqlModel struct {
 // leaves its field empty: a repository with no ORM schema has tables without
 // an ent type, and the rules below skip what is missing.
 func loadSQLModel(snap entities.Snapshot, decls []entities.Decl) (sqlModel, error) {
-	model := sqlModel{tables: map[string]*sqlTable{}, decls: groupByFile(decls)}
+	model := sqlModel{
+		tables:     map[string]*sqlTable{},
+		extensions: map[string]entities.DeclKey{},
+		decls:      groupByFile(decls),
+	}
 
 	if err := model.readMigrations(snap); err != nil {
 		return sqlModel{}, err
@@ -96,6 +105,10 @@ func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
 
 		for _, stmt := range sqlstmt.Split(source) {
 			key := entities.DeclKey{File: file, Kind: entities.KindOther, Name: stmt.Name}
+
+			if name, isExtension := strings.CutPrefix(stmt.Name, "extension:"); isExtension {
+				model.extensions[name] = key
+			}
 
 			if stmt.Kind == sqlstmt.CreateTable {
 				model.tables[stmt.Table] = &sqlTable{name: stmt.Table}
@@ -234,6 +247,10 @@ func (model *sqlModel) readQueries(snap entities.Snapshot) error {
 				_, isTable := model.tables[word]
 				if isTable && !slices.Contains(query.tables, word) {
 					query.tables = append(query.tables, word)
+				}
+
+				if extension, isExtension := model.extensions[word]; isExtension {
+					query.extensions = append(query.extensions, extension)
 				}
 			}
 

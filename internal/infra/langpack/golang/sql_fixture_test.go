@@ -32,12 +32,13 @@ func schemaTree(t *testing.T) (entities.Snapshot, []entities.Decl) {
 			"-- Create index \"account_id\" to table: \"accounts\"\nCREATE INDEX \"account_id\" ON \"accounts\" (\"id\");\n" +
 			"-- Create \"templates\" table\nCREATE TABLE \"templates\" (\"id\" uuid, \"account_id\" uuid);\n" +
 			"-- Modify \"templates\" table\nALTER TABLE \"templates\" ADD CONSTRAINT \"fk\" " +
-			"FOREIGN KEY (\"account_id\") REFERENCES \"accounts\" (\"id\");\n",
+			"FOREIGN KEY (\"account_id\") REFERENCES \"accounts\" (\"id\");\n" +
+			"CREATE EXTENSION IF NOT EXISTS \"unaccent\";\n",
 		"database/migrations/embed.go":  "package migrations\n\nvar FS int\n",
 		"database/migrations/atlas.sum": "h1:x\n",
 		"database/queries/account.sql":  "-- name: GetAccount :one\nSELECT id FROM accounts WHERE id = $1;\n",
 		"database/queries/template.sql": "-- name: ListTemplates :many\n" +
-			"SELECT t.id FROM templates t JOIN accounts a ON a.id = t.account_id;\n",
+			"SELECT unaccent(t.id) FROM templates t JOIN accounts a ON a.id = t.account_id;\n",
 		"database/go.mod":    "module example.com/database\n\ngo 1.26\n",
 		"database/sqlc.yaml": "version: \"2\"\n",
 		"dbgen/db.go":        sqlcHeader + "type Queries struct{}\n",

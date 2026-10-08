@@ -38,6 +38,10 @@ func TestSqlcRuleEdges(t *testing.T) {
 			queryEdge(block, key(migration, entities.KindOther, "table:accounts")),
 		},
 		{
+			"a query after the extension it calls",
+			queryEdge(block, key(migration, entities.KindOther, "extension:unaccent")),
+		},
+		{
 			"a generated function after its query",
 			queryEdge(
 				key("dbgen/template.sql.go", entities.KindMethod, "Queries.ListTemplates"),

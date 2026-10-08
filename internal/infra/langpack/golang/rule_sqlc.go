@@ -37,6 +37,12 @@ func (sqlcRule) Edges(
 			}
 		}
 
+		for _, extension := range query.extensions {
+			edges = append(edges, entities.Edge{
+				Dependent: query.block, Provider: extension, Reason: entities.ReasonQuery,
+			})
+		}
+
 		if query.method != (entities.DeclKey{}) {
 			edges = append(edges, entities.Edge{
 				Dependent: query.method, Provider: query.block, Reason: entities.ReasonQuery,
