@@ -1,6 +1,9 @@
 package chunk
 
-import "github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+)
 
 // Registry lists every built-in Chunker in the order Handles should be
 // tried. WholeFile is last because it claims every path, so a more specific
@@ -12,5 +15,5 @@ var Registry = []indexing.Chunker{
 	SQLMigrations{},
 	GoMod{},
 	GoWork{},
-	WholeFile{},
+	WholeFile{MaxLines: entities.DefaultMaxAddedLines},
 }
