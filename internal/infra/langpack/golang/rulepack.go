@@ -89,7 +89,12 @@ func (p RulePack) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	return collectEdges(ctx, snap, decls, p.rules)
+	edges, err := collectEdges(ctx, snap, decls, p.rules)
+	if err != nil {
+		return nil, err
+	}
+
+	return dropSqlcConstruction(snap, edges), nil
 }
 
 func (p RulePack) Anchors(
