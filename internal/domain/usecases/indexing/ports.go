@@ -85,6 +85,13 @@ type Atomizer interface {
 	) (map[entities.DeclKey]string, error)
 }
 
+// EdgeFilter is the optional part of a RulePack that removes edges from the
+// merged set, the reference graph's and every rule's alike. It is for edges a
+// language knows to be noise whichever side produced them.
+type EdgeFilter interface {
+	FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge
+}
+
 // Tree reads the final content of a path. Every intermediate version is rendered
 // from the final text, never from an intermediate blob, which is what lets a
 // file grow declaration by declaration.

@@ -115,7 +115,7 @@ func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, err
 	}
 
 	result := Result{
-		Graph: entities.NewGraph(decls, append(edges, ruleEdges...), anchors),
+		Graph: entities.NewGraph(decls, i.filterEdges(snap, append(edges, ruleEdges...)), anchors),
 		Blind: blind,
 	}
 
@@ -236,6 +236,18 @@ func (i Indexer) applyRules(
 	}
 
 	return edges, anchors, nil
+}
+
+// filterEdges lets each language's rules drop the edges they know to be noise.
+func (i Indexer) filterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
+	for _, lang := range i.langs {
+		filter, isFilter := lang.Rules.(EdgeFilter)
+		if isFilter {
+			edges = filter.FilterEdges(snap, edges)
+		}
+	}
+
+	return edges
 }
 
 // applyAtoms lets each language's rules group declarations that must be born

@@ -368,3 +368,74 @@ func TestIndexerGroupsDeclarationsTheRulesName(t *testing.T) {
 		}
 	}
 }
+
+// filterRules is a rule pack that also removes the edges it calls noise.
+type filterRules struct {
+	*MockRulePack
+
+	drop entities.EdgeReason
+}
+
+func (r filterRules) FilterEdges(_ entities.Snapshot, edges []entities.Edge) []entities.Edge {
+	kept := edges[:0:0]
+
+	for _, edge := range edges {
+		if edge.Reason != r.drop {
+			kept = append(kept, edge)
+		}
+	}
+
+	return kept
+}
+
+func TestIndexerLetsTheRulesDropMergedEdges(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	mock := goDecl("a_mock.go", "MockRepo", 0, 20)
+	port := goDecl("a.go", "Repo", 11, 24)
+
+	tree := NewMockTree(ctrl)
+	tree.EXPECT().Read(gomock.Any(), gomock.Any()).Return([]byte(goSource), nil).AnyTimes()
+
+	syntax := NewMockSyntax(ctrl)
+	syntax.EXPECT().
+		Declarations(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, file string, _ []byte) ([]entities.Decl, error) {
+			if file == "a.go" {
+				return []entities.Decl{port}, nil
+			}
+
+			return []entities.Decl{mock}, nil
+		}).
+		AnyTimes()
+
+	rules := NewMockRulePack(ctrl)
+	rules.EXPECT().Edges(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		[]entities.Edge{
+			{Dependent: mock.Key, Provider: port.Key, Reason: entities.ReasonMirrors},
+			{Dependent: mock.Key, Provider: port.Key, Reason: entities.ReasonImplements},
+		},
+		nil,
+	)
+	rules.EXPECT().Anchors(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+
+	result, err := New(quietResolver(ctrl), tree, Config{Languages: []Language{{
+		Name:       "go",
+		Extensions: []string{".go"},
+		Syntax:     syntax,
+		Rules:      filterRules{MockRulePack: rules, drop: entities.ReasonImplements},
+	}}}).Index(
+		context.Background(),
+		entities.Snapshot{Files: []string{"a.go", "a_mock.go"}},
+	)
+	if err != nil {
+		t.Fatalf("Index() = %v", err)
+	}
+
+	needs := result.Graph.Needs(mock.Key)
+	if len(needs) != 1 || needs[0].Reason != entities.ReasonMirrors {
+		t.Fatalf("mock needs %v, want only the mirrors edge", needs)
+	}
+}

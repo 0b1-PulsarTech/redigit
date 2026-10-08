@@ -89,12 +89,13 @@ func (p RulePack) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	edges, err := collectEdges(ctx, snap, decls, p.rules)
-	if err != nil {
-		return nil, err
-	}
+	return collectEdges(ctx, snap, decls, p.rules)
+}
 
-	return dropSqlcConstruction(snap, edges), nil
+// FilterEdges drops the structural edges the sqlc output would otherwise
+// carry, whichever side found them.
+func (p RulePack) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
+	return dropSqlcConstruction(snap, edges)
 }
 
 func (p RulePack) Anchors(

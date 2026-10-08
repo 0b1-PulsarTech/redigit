@@ -81,6 +81,7 @@ type declDTO struct {
 	Key      string `json:"key"`
 	Unit     string `json:"unit"`
 	IsTest   bool   `json:"is_test"`
+	Atom     string `json:"atom,omitempty"`
 	Position int    `json:"position"`
 }
 

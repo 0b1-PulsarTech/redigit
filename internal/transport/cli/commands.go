@@ -126,6 +126,7 @@ func runGraph(ctx context.Context, cfg bootstrap.Config, out io.Writer, start st
 				Key:      decl.Key.String(),
 				Unit:     string(decl.Unit),
 				IsTest:   decl.IsTest,
+				Atom:     decl.Atom,
 				Position: int(order.Of(decl.Key)),
 			})
 		}
