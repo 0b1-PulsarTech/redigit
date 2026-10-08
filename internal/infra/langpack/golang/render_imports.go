@@ -2,6 +2,7 @@ package golang
 
 import (
 	"go/ast"
+	"go/token"
 	"strconv"
 	"strings"
 )
@@ -39,7 +40,11 @@ func usedIdents(decls []ast.Decl) map[string]bool {
 // filterImports keeps every import the kept declarations reach by selector,
 // plus every blank (_) and dot (.) import: neither can be reached by a
 // selector, so both are always kept.
-func filterImports(importDecls []ast.Decl, used map[string]bool) []ast.Decl {
+func filterImports(
+	fset *token.FileSet,
+	importDecls []ast.Decl,
+	used map[string]bool,
+) []ast.Decl {
 	var out []ast.Decl
 
 	for _, decl := range importDecls {
@@ -56,10 +61,82 @@ func filterImports(importDecls []ast.Decl, used map[string]bool) []ast.Decl {
 			}
 		}
 
-		out = append(out, finishGenDecl(gen, specs)...)
+		if len(specs) == 0 {
+			continue
+		}
+
+		closeGroupGaps(fset, gen.Specs, specs)
+
+		gen.Specs = specs
+		out = append(out, gen)
 	}
 
 	return out
+}
+
+// closeGroupGaps moves the surviving specs of each blank-line separated group
+// onto the lines the group's first specs held. A dropped sibling then leaves
+// no stray blank line, and the groups (standard library, then the rest) stay
+// apart: detaching every position instead merges the block, and the printer
+// sorts the merged block into one run.
+func closeGroupGaps(fset *token.FileSet, original, kept []ast.Spec) {
+	for _, spec := range kept {
+		if is, ok := spec.(*ast.ImportSpec); !ok || is.Doc != nil || is.Comment != nil {
+			return
+		}
+	}
+
+	keptSet := make(map[ast.Spec]bool, len(kept))
+	for _, spec := range kept {
+		keptSet[spec] = true
+	}
+
+	var (
+		group    []ast.Spec
+		survivor []ast.Spec
+		lastLine int
+	)
+
+	flush := func() {
+		for index, spec := range survivor {
+			place(spec, group[index].Pos())
+		}
+
+		group, survivor = nil, nil
+	}
+
+	for _, spec := range original {
+		line := fset.Position(spec.Pos()).Line
+		if len(group) > 0 && line-lastLine > 1 {
+			flush()
+		}
+
+		group = append(group, spec)
+
+		if keptSet[spec] {
+			survivor = append(survivor, spec)
+		}
+
+		lastLine = fset.Position(spec.End()).Line
+	}
+
+	flush()
+}
+
+func place(spec ast.Spec, at token.Pos) {
+	is, ok := spec.(*ast.ImportSpec)
+	if !ok {
+		return
+	}
+
+	is.Path.ValuePos = at
+
+	if is.Name != nil {
+		is.Name.NamePos = at
+		is.Path.ValuePos = at + token.Pos(len(is.Name.Name)+1)
+	}
+
+	is.EndPos = token.NoPos
 }
 
 func importIsUsed(spec *ast.ImportSpec, used map[string]bool) bool {

@@ -82,7 +82,7 @@ func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) 
 		return []byte{}, nil
 	}
 
-	imports := filterImports(importDecls, usedIdents(kept))
+	imports := filterImports(fset, importDecls, usedIdents(kept))
 	file.Decls = append(imports, kept...)
 	file.Comments = cmap.Filter(file).Comments()
 

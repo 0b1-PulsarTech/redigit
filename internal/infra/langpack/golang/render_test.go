@@ -431,3 +431,26 @@ func TestRenderSlicesSqlcOutputAndKeepsItsMarker(t *testing.T) {
 		t.Fatalf("Render() =\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestRenderKeepsImportGroupsWhenSiblingsAreDropped(t *testing.T) {
+	t.Parallel()
+
+	const src = "package p\n\nimport (\n\t\"database/sql\"\n\t\"encoding/json\"\n\t\"time\"\n\n" +
+		"\t\"example.com/ids\"\n\t\"example.com/pg\"\n)\n\n" +
+		"type A struct {\n\tN sql.NullString\n\tT time.Time\n\tI ids.ID\n}\n\n" +
+		"type B struct{ J json.RawMessage; P pg.Text }\n"
+
+	got, err := NewSyntax().Render(
+		context.Background(), []byte(src),
+		[]entities.DeclKey{{Kind: entities.KindType, Name: "A"}},
+	)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	want := "package p\n\nimport (\n\t\"database/sql\"\n\t\"time\"\n\n\t\"example.com/ids\"\n)\n\n" +
+		"type A struct {\n\tN sql.NullString\n\tT time.Time\n\tI ids.ID\n}\n"
+	if string(got) != want {
+		t.Fatalf("Render() =\n%s\nwant\n%s", got, want)
+	}
+}
