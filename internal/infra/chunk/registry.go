@@ -9,6 +9,7 @@ import "github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 // any particular run's map.
 var Registry = []indexing.Chunker{
 	SQLQueries{},
+	SQLMigrations{},
 	GoMod{},
 	GoWork{},
 	WholeFile{},
