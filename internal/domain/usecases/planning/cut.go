@@ -29,6 +29,7 @@ func (p Planner) cut(
 		files    = map[string]bool{}
 		pkg      string
 		boundary int
+		size     tally
 	)
 
 	flush := func(upTo int) {
@@ -41,12 +42,13 @@ func (p Planner) cut(
 			Shape:   in.shape,
 			Feature: string(in.feature),
 			Decls:   slices.Clone(current[:upTo]),
-			Reason:  in.reason,
+			Reason:  annotate(in.reason, tallyOf(graph, current[:upTo]), p.cfg.MaxAddedLines),
 		})
 
 		current = slices.Clone(current[upTo:])
 		start += upTo
 		files = map[string]bool{}
+		size = tallyOf(graph, current)
 
 		for _, key := range current {
 			files[key.File] = true
@@ -60,10 +62,13 @@ func (p Planner) cut(
 			boundary = len(current)
 		}
 
+		weighed := weightOf(graph, key)
+
 		// Roll back to the last package boundary instead of the raw cap, or a
 		// package with no boundary yet before it: the cap stays an upper bound,
 		// except where holding it would split an atom.
-		if !files[key.File] && len(files) >= p.cfg.MaxFiles {
+		tooWide := !files[key.File] && len(files) >= p.cfg.MaxFiles
+		if tooWide || size.overflows(weighed, p.cfg.MaxAddedLines) {
 			cutAt := boundary
 			if cutAt == 0 {
 				cutAt = len(current)
@@ -72,9 +77,22 @@ func (p Planner) cut(
 			flush(safeCut(lastOf, start, cutAt))
 		}
 
+		// The package boundary only picks where the first cut falls. What stays
+		// behind may still be too long to take the key, and is cut whole.
+		for size.overflows(weighed, p.cfg.MaxAddedLines) {
+			cutAt := safeCut(lastOf, start, len(current))
+			if cutAt == 0 {
+				break
+			}
+
+			flush(cutAt)
+		}
+
 		current = append(current, key)
 		files[key.File] = true
 		pkg = dirOf(key.File)
+
+		size.add(weighed)
 	}
 
 	flush(len(current))

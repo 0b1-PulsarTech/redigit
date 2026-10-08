@@ -16,6 +16,9 @@ type Config struct {
 	// packages cannot be named truthfully.
 	MaxFiles int
 
+	// MaxAddedLines caps the hand-written lines one commit adds.
+	MaxAddedLines int
+
 	// Capabilities replaces the reachability walk with a slicing the caller
 	// read out of the published history. Empty means derive it.
 	Capabilities Capabilities
@@ -26,6 +29,10 @@ const defaultMaxFiles = 12
 func (c Config) withDefaults() Config {
 	if c.MaxFiles < 1 {
 		c.MaxFiles = defaultMaxFiles
+	}
+
+	if c.MaxAddedLines < 1 {
+		c.MaxAddedLines = entities.DefaultMaxAddedLines
 	}
 
 	return c

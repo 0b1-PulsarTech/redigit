@@ -79,10 +79,14 @@ func (p Planner) emitByCapability(
 		return own.owner[key]
 	})
 
-	run := &commitRun{maxFiles: p.cfg.MaxFiles, files: map[string]bool{}}
+	run := &commitRun{
+		maxFiles: p.cfg.MaxFiles,
+		maxLines: p.cfg.MaxAddedLines,
+		files:    map[string]bool{},
+	}
 
 	for _, key := range keys {
-		run.take(key, own.owner[key], atoms[key])
+		run.take(key, own.owner[key], atoms[key], weightOf(graph, key))
 	}
 
 	run.flush()
@@ -94,6 +98,7 @@ func (p Planner) emitByCapability(
 // order, closing one whenever the next declaration cannot join it.
 type commitRun struct {
 	maxFiles int
+	maxLines int
 
 	commits []entities.PlannedCommit
 	current []entities.DeclKey
@@ -102,22 +107,25 @@ type commitRun struct {
 	atom    string
 	pkg     string
 	started bool
+	size    tally
 }
 
 // take adds one declaration, closing the open commit when it belongs to
-// another package or the open one already spans MaxFiles.
+// another package, the open one spans MaxFiles, or MaxAddedLines is passed.
 //
 // The cut follows the PACKAGE, the slice deciding order rather than
 // boundaries: cutting on the slice put 31% of commits at one file each,
 // because the slice changes at almost every commit.
-func (r *commitRun) take(key entities.DeclKey, owner FeatureID, atom string) {
+func (r *commitRun) take(key entities.DeclKey, owner FeatureID, atom string, size weight) {
 	// A commit never splits an atom, whatever else changes. Its members were
 	// written by a tool in one pass, and they carry different slices only
 	// because each was DATED separately.
 	inAtom := r.started && atom != "" && atom == r.atom
 
 	tooWide := !r.files[key.File] && len(r.files) >= r.maxFiles
-	if r.started && !inAtom && (dirOf(key.File) != r.pkg || tooWide) {
+	tooLong := r.size.overflows(size, r.maxLines)
+
+	if r.started && !inAtom && (dirOf(key.File) != r.pkg || tooWide || tooLong) {
 		r.flush()
 	}
 
@@ -126,6 +134,7 @@ func (r *commitRun) take(key entities.DeclKey, owner FeatureID, atom string) {
 	r.pkg = dirOf(key.File)
 	r.started = true
 	r.files[key.File] = true
+	r.size.add(size)
 
 	r.current = append(r.current, key)
 }
@@ -141,13 +150,16 @@ func (r *commitRun) flush() {
 		Shape:    entities.ShapeFeature,
 		Feature:  string(r.slice),
 		Decls:    slices.Clone(r.current),
-		Reason:   "one package, in the order the fixed point settled",
+		Reason: annotate(
+			"one package, in the order the fixed point settled", r.size, r.maxLines,
+		),
 	})
 
 	r.current = r.current[:0]
 	r.files = map[string]bool{}
 	r.atom = ""
 	r.pkg = ""
+	r.size = tally{}
 }
 
 // dirOf is the package a file belongs to: its directory, which is what Go

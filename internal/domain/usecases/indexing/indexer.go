@@ -167,6 +167,8 @@ func (i Indexer) read(
 				return fmt.Errorf("read declarations of %s: %w", file, err)
 			}
 
+			measure(file, source, found)
+
 			guard.Lock()
 			defer guard.Unlock()
 

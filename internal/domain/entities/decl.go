@@ -107,4 +107,22 @@ type Decl struct {
 	// siblings per FILE gets that wrong whenever a file holds two enums or
 	// one enum plus a loose constant.
 	GroupSize int
+	// Lines is how many lines the declaration adds to its file, the blank
+	// lines up to the next declaration included. The planner reads it to keep
+	// a commit reviewable: a test package of three files can add 2700 lines
+	// in one commit, which no reviewer reads.
+	Lines int
+	// Frame is how many lines of the file precede its first declaration
+	// (package clause, imports, build tags). Whichever commit first touches
+	// the file adds them, so the cost of a file is charged once per commit.
+	Frame int
+	// Generated marks a declaration of a file a tool wrote. Its lines do not
+	// count toward the cap on hand-written lines, and when there are more of
+	// them than the cap they stand in a commit of their own.
+	Generated bool
 }
+
+// DefaultMaxAddedLines is the most hand-written lines one commit adds, shared
+// by the planner that enforces it and the chunker that splits a text file
+// which alone passes it.
+const DefaultMaxAddedLines = 900
