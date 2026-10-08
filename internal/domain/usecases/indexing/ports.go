@@ -76,7 +76,7 @@ type RulePack interface {
 // Atomizer is the optional part of a RulePack that groups declarations which
 // must be born in one commit: each needs the other to compile, so an edge in
 // either direction would be a cycle. A declaration that already belongs to an
-// atom (a generated file's) keeps it.
+// atom brings the whole atom into the rule's group.
 type Atomizer interface {
 	Atoms(
 		ctx context.Context,

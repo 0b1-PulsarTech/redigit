@@ -257,11 +257,7 @@ func (i Indexer) applyAtoms(
 			return fmt.Errorf("apply %s atoms: %w", lang.Name, err)
 		}
 
-		for index := range decls {
-			if name, grouped := atoms[decls[index].Key]; grouped && decls[index].Atom == "" {
-				decls[index].Atom = name
-			}
-		}
+		absorbAtoms(decls, atoms)
 	}
 
 	return nil
@@ -278,4 +274,32 @@ func resolvable(indexer Indexer, decls []entities.Decl) []entities.Decl {
 	}
 
 	return out
+}
+
+// absorbAtoms writes the groups a rule named onto the declarations. One that
+// already belongs to an atom brings the whole atom along: the two must be born
+// together, and leaving the old members behind would split the group the rule
+// asked for (a go.mod header and its go.work line are an atom of their own).
+func absorbAtoms(decls []entities.Decl, atoms map[entities.DeclKey]string) {
+	renamed := map[string]string{}
+
+	for _, decl := range decls {
+		if name, grouped := atoms[decl.Key]; grouped && decl.Atom != "" && decl.Atom != name {
+			if _, taken := renamed[decl.Atom]; !taken {
+				renamed[decl.Atom] = name
+			}
+		}
+	}
+
+	for index := range decls {
+		if name, absorbed := renamed[decls[index].Atom]; absorbed {
+			decls[index].Atom = name
+
+			continue
+		}
+
+		if name, grouped := atoms[decls[index].Key]; grouped && decls[index].Atom == "" {
+			decls[index].Atom = name
+		}
+	}
 }

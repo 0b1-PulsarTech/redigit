@@ -314,12 +314,14 @@ func TestIndexerGroupsDeclarationsTheRulesName(t *testing.T) {
 	generated := goDecl("c.go", "Impl", 0, 10)
 	generated.Atom = "c.go"
 	loose := goDecl("d.go", "Loose", 0, 10)
+	mate := goDecl("e.go", "Mate", 0, 10)
+	mate.Atom = "c.go"
 
 	tree := NewMockTree(ctrl)
 	tree.EXPECT().Read(gomock.Any(), gomock.Any()).Return([]byte(goSource), nil).AnyTimes()
 
 	byFile := map[string]entities.Decl{
-		"a.go": typ, "b.go": method, "c.go": generated, "d.go": loose,
+		"a.go": typ, "b.go": method, "c.go": generated, "d.go": loose, "e.go": mate,
 	}
 
 	syntax := NewMockSyntax(ctrl)
@@ -345,7 +347,7 @@ func TestIndexerGroupsDeclarationsTheRulesName(t *testing.T) {
 		Rules:      grouping,
 	}}}).Index(
 		context.Background(),
-		entities.Snapshot{Files: []string{"a.go", "b.go", "c.go", "d.go"}},
+		entities.Snapshot{Files: []string{"a.go", "b.go", "c.go", "d.go", "e.go"}},
 	)
 	if err != nil {
 		t.Fatalf("Index() = %v", err)
@@ -357,7 +359,7 @@ func TestIndexerGroupsDeclarationsTheRulesName(t *testing.T) {
 	}
 
 	want := map[entities.DeclKey]string{
-		typ.Key: "set", method.Key: "set", generated.Key: "c.go", loose.Key: "",
+		typ.Key: "set", method.Key: "set", generated.Key: "set", mate.Key: "set", loose.Key: "",
 	}
 
 	for key, atom := range want {
