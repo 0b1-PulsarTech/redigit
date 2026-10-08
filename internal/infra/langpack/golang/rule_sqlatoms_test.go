@@ -112,6 +112,12 @@ func atomCases() []atomCase {
 			true,
 		},
 		{
+			"the first table with the module of the sqlc configuration",
+			key(migration, entities.KindOther, "table:accounts"),
+			key("database/go.mod", entities.KindOther, "example.com/database"),
+			true,
+		},
+		{
 			"the first table with the migration checksum",
 			key(migration, entities.KindOther, "table:accounts"),
 			key("database/migrations/atlas.sum", entities.KindOther, fileDeclName),

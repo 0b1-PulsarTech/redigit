@@ -40,7 +40,7 @@ func genesisOf(snap entities.Snapshot, model sqlModel) (sqlGenesis, bool) {
 		genesis := sqlGenesis{table: table, query: query}
 		genesis.members = slices.Concat(
 			model.dbInit, infra, query.generated, []entities.DeclKey{query.block},
-			configKeys(snap), checksumKeys(snap),
+			configKeys(snap), checksumKeys(snap), model.moduleKeys(snap),
 		)
 
 		return genesis, true
@@ -226,6 +226,29 @@ func configKeys(snap entities.Snapshot) []entities.DeclKey {
 		case "sqlc.yaml", "sqlc.yml", "sqlc.json":
 			if holdsAny(path.Dir(file), queryFiles(snap.Files)) {
 				keys = append(keys, wholeFileKey(file))
+			}
+		}
+	}
+
+	return keys
+}
+
+// moduleKeys are the go.mod and go.sum of the module that holds the ORM schema
+// and of the one that holds the sqlc configuration: a tree where either
+// module exists before the first migration is a tree the schema tools reject.
+func (model sqlModel) moduleKeys(snap entities.Snapshot) []entities.DeclKey {
+	dirs := map[string]bool{model.ormDir: model.ormDir != ""}
+
+	for _, file := range configKeys(snap) {
+		dirs[path.Dir(file.File)] = true
+	}
+
+	var keys []entities.DeclKey
+
+	for _, file := range slices.Sorted(maps.Keys(model.decls)) {
+		if name := path.Base(file); (name == "go.mod" || name == "go.sum") && dirs[path.Dir(file)] {
+			for _, decl := range model.decls[file] {
+				keys = append(keys, decl.Key)
 			}
 		}
 	}

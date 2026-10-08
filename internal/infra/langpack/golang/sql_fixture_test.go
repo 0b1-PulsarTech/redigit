@@ -38,6 +38,7 @@ func schemaTree(t *testing.T) (entities.Snapshot, []entities.Decl) {
 		"database/queries/account.sql":  "-- name: GetAccount :one\nSELECT id FROM accounts WHERE id = $1;\n",
 		"database/queries/template.sql": "-- name: ListTemplates :many\n" +
 			"SELECT t.id FROM templates t JOIN accounts a ON a.id = t.account_id;\n",
+		"database/go.mod":    "module example.com/database\n\ngo 1.26\n",
 		"database/sqlc.yaml": "version: \"2\"\n",
 		"dbgen/db.go":        sqlcHeader + "type Queries struct{}\n",
 		"dbgen/models.go":    sqlcHeader + "type Account struct{}\n\ntype Template struct{}\n",
