@@ -1,17 +1,16 @@
 package golang
 
 import (
-	"path"
-
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// dropSqlcConstruction removes the edges that make sqlc's own db.go wait for
-// every query method. New and WithTx name Queries, a type bound to an
-// interface elsewhere, so the bound-type rules tied each of them to all 606
-// methods; the closure of any repository then held every query and every
-// table, and none could be born with its first caller. Building the struct
-// calls no method.
+// dropSqlcConstruction removes the structural edges whose dependent is sqlc
+// output. New and WithTx name Queries, a type bound to interfaces elsewhere,
+// so the bound-type rules tied each of them to all 606 methods, and Queries
+// itself to the consumer ports it satisfies (a leadsense interface, whose
+// module then waited on the database module): every closure held every table
+// and none could be born with its first caller. Generated code calls no
+// method and waits for no consumer.
 func dropSqlcConstruction(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
 	generated := map[string]bool{}
 	isGenerated := func(file string) bool {
@@ -29,10 +28,8 @@ func dropSqlcConstruction(snap entities.Snapshot, edges []entities.Edge) []entit
 	for _, edge := range edges {
 		structural := edge.Reason == entities.ReasonImplements ||
 			edge.Reason == entities.ReasonMethodSet
-		sameOutput := path.Dir(edge.Dependent.File) == path.Dir(edge.Provider.File)
 
-		if structural && sameOutput && isGenerated(edge.Dependent.File) &&
-			isGenerated(edge.Provider.File) {
+		if structural && isGenerated(edge.Dependent.File) {
 			continue
 		}
 
