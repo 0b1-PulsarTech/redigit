@@ -65,3 +65,37 @@ func TestClassifyPlacesEveryPieceOfALongFile(t *testing.T) {
 		t.Errorf("classify = %v, want both pieces placed as scaffold", got)
 	}
 }
+
+func TestClassifyPlacesAModulesRootFiles(t *testing.T) {
+	t.Parallel()
+
+	appHeader := piece("apps/lead/go.mod", "example.com/app", entities.Span{})
+	appCode := goDecl("apps/lead/svc/svc.go", "Serve")
+	toolsHeader := piece("tools/go.mod", "example.com/tools", entities.Span{})
+	decls := []entities.Decl{appHeader, appCode, toolsHeader}
+
+	testCases := []struct {
+		name string
+		file string
+		want role
+	}{
+		{"a module's README", "apps/lead/README.md", roleModuleOwn},
+		{"a module's build file", "apps/lead/Taskfile.yml", roleModuleOwn},
+		{"a file in a package of the module", "apps/lead/svc/notes.md", roleNone},
+		{"a file of a module with no code", "tools/Taskfile.yml", roleScaffold},
+		{"a file outside every module", "build/Taskfile.build.yml", roleNone},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			file := piece(testCase.file, wholeFilePrefix, entities.Span{})
+
+			got := classify(append([]entities.Decl{file}, decls...))[file.Key]
+			if got != testCase.want {
+				t.Errorf("classify(%s) = %v, want %v", testCase.file, got, testCase.want)
+			}
+		})
+	}
+}

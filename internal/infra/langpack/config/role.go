@@ -1,6 +1,7 @@
 package config
 
 import (
+	"maps"
 	"path"
 	"slices"
 	"strings"
@@ -22,6 +23,9 @@ const (
 	// roleScaffold is born before the first module: the repository's own
 	// dotfiles, editor and lint configuration, root documents.
 	roleScaffold
+	// roleModuleOwn is born with the go.mod of the module whose root holds it:
+	// its README, Taskfile, configuration samples.
+	roleModuleOwn
 )
 
 // placements maps a whole-file declaration to the role its path gives it.
@@ -36,14 +40,52 @@ type placements map[entities.DeclKey]role
 // every Taskfile and the lint configuration to the last 1.5% of the history.
 func classify(decls []entities.Decl) placements {
 	out := placements{}
+	roots := slices.Sorted(maps.Keys(moduleHeaders(decls)))
+	coded := codedModules(roots, decls)
 
 	for _, decl := range decls {
 		if !isWholeFile(decl.Key) || isInert(decl.Key.File) {
 			continue
 		}
 
-		if isScaffoldPath(decl.Key.File) {
-			out[decl.Key] = roleScaffold
+		out[decl.Key] = place(decl.Key.File, roots, coded)
+	}
+
+	return out
+}
+
+// place decides one file. A module's own file waits for its module, but a
+// module with no code has no first package to be born with, so its files are
+// scaffold: nothing would ever pull them out of the trailing commit.
+func place(file string, roots []string, coded map[string]bool) role {
+	if isScaffoldPath(file) {
+		return roleScaffold
+	}
+
+	root, found := nearestModule(roots, file)
+	if !found || path.Dir(file) != root {
+		return roleNone
+	}
+
+	if coded[root] {
+		return roleModuleOwn
+	}
+
+	return roleScaffold
+}
+
+// codedModules marks the modules holding a declaration of a format the tool
+// reads, which is what a README can be born beside.
+func codedModules(roots []string, decls []entities.Decl) map[string]bool {
+	out := map[string]bool{}
+
+	for _, decl := range decls {
+		if decl.Key.Kind == entities.KindOther {
+			continue
+		}
+
+		if root, found := nearestModule(roots, decl.Key.File); found {
+			out[root] = true
 		}
 	}
 

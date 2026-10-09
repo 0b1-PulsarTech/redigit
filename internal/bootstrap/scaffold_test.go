@@ -35,39 +35,10 @@ func commitOf(
 ) map[string]entities.Position {
 	t.Helper()
 
-	root := t.TempDir()
-	snap := entities.Snapshot{Root: root}
-
-	var decls []entities.Decl
-
-	for name, body := range files {
-		full := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := os.WriteFile(full, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-
-		snap.Files = append(snap.Files, name)
-
-		pieces := wholeFiles(t, name, body)
-		decls = append(decls, pieces...)
-	}
-
-	var edges []entities.Edge
+	snap, decls := writeFixture(t, files)
 
 	for _, each := range code {
 		decls = append(decls, goDecl(each.file, each.name))
-
-		for _, read := range each.reads {
-			edges = append(edges, entities.Edge{
-				Dependent: goDecl(each.file, each.name).Key,
-				Provider:  goDecl(read, read).Key,
-				Reason:    entities.ReasonReference,
-			})
-		}
 	}
 
 	pack := config.NewRulePack()
@@ -82,7 +53,18 @@ func commitOf(
 		t.Fatalf("Anchors() = %v", err)
 	}
 
-	graph := entities.NewGraph(decls, append(edges, found...), anchors)
+	atoms, err := pack.Atoms(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Atoms() = %v", err)
+	}
+
+	for index := range decls {
+		if name, grouped := atoms[decls[index].Key]; grouped && decls[index].Atom == "" {
+			decls[index].Atom = name
+		}
+	}
+
+	graph := entities.NewGraph(decls, append(readEdges(code), found...), anchors)
 
 	order, err := ordering.New(ordering.Config{}).Order(graph, snap)
 	if err != nil {
@@ -94,6 +76,58 @@ func commitOf(
 		t.Fatalf("Plan() = %v", err)
 	}
 
+	return firstCommits(plan)
+}
+
+// writeFixture puts the files on disk, where the rules read them, and chunks
+// each as the indexer would.
+func writeFixture(t *testing.T, files map[string]string) (entities.Snapshot, []entities.Decl) {
+	t.Helper()
+
+	snap := entities.Snapshot{Root: t.TempDir()}
+
+	decls := make([]entities.Decl, 0, len(files))
+
+	for name, body := range files {
+		full := filepath.Join(snap.Root, name)
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.WriteFile(full, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		snap.Files = append(snap.Files, name)
+		decls = append(decls, wholeFiles(t, name, body)...)
+	}
+
+	return snap, decls
+}
+
+func readEdges(code []fixtureCode) []entities.Edge {
+	byName := map[string]fixtureCode{}
+
+	for _, each := range code {
+		byName[each.name] = each
+	}
+
+	var edges []entities.Edge
+
+	for _, each := range code {
+		for _, read := range each.reads {
+			edges = append(edges, entities.Edge{
+				Dependent: goDecl(each.file, each.name).Key,
+				Provider:  goDecl(byName[read].file, read).Key,
+				Reason:    entities.ReasonReference,
+			})
+		}
+	}
+
+	return edges
+}
+
+func firstCommits(plan entities.Plan) map[string]entities.Position {
 	born := map[string]entities.Position{}
 
 	for _, commit := range plan.Commits {
@@ -141,7 +175,7 @@ func TestScaffoldIsBornBeforeProductCode(t *testing.T) {
 	}
 	code := []fixtureCode{
 		{file: "apps/app/svc/svc.go", name: "Serve"},
-		{file: "apps/app/main.go", name: "Main", reads: []string{"apps/app/svc/svc.go"}},
+		{file: "apps/app/main.go", name: "Main", reads: []string{"Serve"}},
 	}
 
 	born := commitOf(t, files, code)
@@ -154,5 +188,47 @@ func TestScaffoldIsBornBeforeProductCode(t *testing.T) {
 
 	if born["apps/app/main.go"] == 0 {
 		t.Errorf("product code is born in the root commit, beside the scaffold")
+	}
+}
+
+func TestModuleFilesAreBornWithTheirGoMod(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{
+		"apps/app/go.mod":       "module example.com/app\n\ngo 1.26\n",
+		"apps/app/README.md":    "# app\n",
+		"apps/app/Taskfile.yml": "version: '3'\n",
+		"apps/lib/go.mod":       "module example.com/lib\n\ngo 1.26\n",
+		"apps/lib/README.md":    "# lib\n",
+		"go.work":               "go 1.26\n\nuse (\n\t./apps/app\n\t./apps/lib\n)\n",
+	}
+	code := []fixtureCode{
+		{file: "apps/lib/lib.go", name: "Helper"},
+		{file: "apps/app/svc/svc.go", name: "Serve", reads: []string{"Helper"}},
+		{file: "apps/app/main.go", name: "Main", reads: []string{"Serve"}},
+	}
+
+	born := commitOf(t, files, code)
+
+	for _, module := range []string{"apps/app", "apps/lib"} {
+		for _, file := range []string{"README.md", "Taskfile.yml"} {
+			path := module + "/" + file
+			if _, exists := files[path]; !exists {
+				continue
+			}
+
+			if born[path] != born[module+"/go.mod"] {
+				t.Errorf(
+					"%s born in commit %d, its go.mod in %d",
+					path,
+					born[path],
+					born[module+"/go.mod"],
+				)
+			}
+		}
+	}
+
+	if born["apps/app/go.mod"] > born["apps/app/main.go"] {
+		t.Errorf("go.mod is born after the module's code: %v", born)
 	}
 }

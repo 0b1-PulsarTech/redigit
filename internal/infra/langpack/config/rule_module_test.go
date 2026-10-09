@@ -110,7 +110,8 @@ func TestModuleRuleSkipsTheScaffold(t *testing.T) {
 	taskfile := piece("tools/Taskfile.yml", "<file>", entities.Span{})
 
 	edges, err := (moduleRule{}).Edges(
-		t.Context(), entities.Snapshot{}, []entities.Decl{header, lint, taskfile},
+		t.Context(), entities.Snapshot{},
+		[]entities.Decl{header, lint, taskfile, goDecl("tools/tools.go", "Tool")},
 	)
 	if err != nil {
 		t.Fatalf("Edges() = %v", err)

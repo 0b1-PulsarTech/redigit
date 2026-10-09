@@ -16,7 +16,9 @@ func TestScaffoldRuleMakesEveryModuleHeaderWaitForTheScaffold(t *testing.T) {
 	appHeader := piece("apps/lead/go.mod", "example.com/app", entities.Span{})
 	toolsHeader := piece("tools/go.mod", "example.com/tools", entities.Span{})
 	readme := piece("apps/lead/README.md", "<file>", entities.Span{})
-	decls := []entities.Decl{ignore, lint, appHeader, toolsHeader, readme}
+	decls := []entities.Decl{
+		ignore, lint, appHeader, toolsHeader, readme, goDecl("apps/lead/lead.go", "Serve"),
+	}
 
 	edges, err := (scaffoldRule{}).Edges(t.Context(), entities.Snapshot{}, decls)
 	if err != nil {
