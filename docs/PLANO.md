@@ -393,6 +393,10 @@ Uma feature tambem espera as raizes dos modulos que ela le, mas so como
 preferencia: modulos que se leem mutuamente nao tem o que esperar, e o plano
 sai mesmo assim.
 
+O `go.mod` de uma biblioteca nasce com a biblioteca: a linha `require` de quem
+a consome puxa o manifesto cedo, e o corpo so chegava com o primeiro codigo
+lido, centenas de commits depois.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

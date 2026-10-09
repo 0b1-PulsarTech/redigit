@@ -157,3 +157,31 @@ func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 		t.Fatalf("unbornProviders() = %v, want none: everything it needs is already born", got)
 	}
 }
+
+func TestUnbornProvidersPullsALibraryWithItsManifest(t *testing.T) {
+	t.Parallel()
+
+	member := decl("app/main.go", "Main", "app")
+	manifest := decl("libs/kit/go.mod", "require", "kit")
+	body := decl("libs/kit/kit.go", "Kit", "kit")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{member, manifest, body},
+		[]entities.Edge{needs(member, manifest)},
+		nil,
+	)
+
+	own := ownership{
+		owner: map[entities.DeclKey]FeatureID{
+			member.Key: "app", manifest.Key: SharedFeature, body.Key: SharedFeature,
+		},
+		library:   map[entities.DeclKey]string{body.Key: "libs/kit"},
+		libraries: map[string][]entities.DeclKey{"libs/kit": {body.Key}},
+	}
+
+	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
+
+	if !slices.Contains(got, body.Key) || !slices.Contains(got, manifest.Key) {
+		t.Fatalf("unbornProviders() = %v, want the manifest and the library body together", got)
+	}
+}

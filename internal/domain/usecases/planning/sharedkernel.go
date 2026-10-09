@@ -3,6 +3,7 @@ package planning
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
@@ -76,6 +77,12 @@ func (index sharedIndex) siblingsOf(
 
 	// A library is born whole by its first consumer.
 	out = append(out, index.own.libraries[index.own.library[current]]...)
+
+	// A library's manifest arrives with the library: a module file born alone
+	// leaves its first package hundreds of commits behind it.
+	if dir, manifest := strings.CutSuffix(current.File, "/go.mod"); manifest {
+		out = append(out, index.own.libraries[dir]...)
+	}
 
 	// A generated file's declarations carry no edge to each other, only the
 	// Atom they share, so a sibling is folded in by hand or one half of the
