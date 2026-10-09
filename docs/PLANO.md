@@ -174,7 +174,9 @@ seus consumidores.
 
 - consumidores num cluster so -> nasce COM aquela feature (vertical)
 - consumidores atravessando muitos clusters -> e nucleo compartilhado e nasce
-  ANTES deles, num commit de camada (horizontal)
+  na feature que PRIMEIRO precisa dele, nos commits logo antes dos dela. Um
+  bloco de camada antes de todas as features e uma centena de commits que
+  nenhuma feature explica, lidos pela primeira vez centenas de commits depois.
 
 E a mesma forma da regra 7 do documento de aprendizados (um pacote nasce quando
 alguem DE FORA precisa dele), contando features em vez de pacotes.

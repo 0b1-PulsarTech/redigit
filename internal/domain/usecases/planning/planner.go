@@ -105,17 +105,19 @@ func (p Planner) emit(
 	for _, feature := range features {
 		members := byFeature[feature]
 
-		// Whatever this feature needs from the shared kernel is born first,
-		// in its own layer commit. That is what keeps vertical compatible
-		// with nothing being born before what needs it.
+		// What several features need is born by the first of them to need it,
+		// in the commits just before that feature's own. A kernel emitted ahead
+		// of every feature is a block of hundreds of commits that no feature
+		// explains, and the declarations in it are read for the first time
+		// hundreds of commits later.
 		if shared := unbornProviders(graph, own, members, born); len(shared) > 0 {
 			plan.Commits = append(
 				plan.Commits,
 				p.cut(graph, order, bucket{
 					keys:    shared,
-					shape:   entities.ShapeLayer,
-					feature: SharedFeature,
-					reason:  "shared by several features",
+					shape:   entities.ShapeFeature,
+					feature: feature,
+					reason:  "shared by several features, born with the first that needs it",
 				})...,
 			)
 

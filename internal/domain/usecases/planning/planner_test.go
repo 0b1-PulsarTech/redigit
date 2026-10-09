@@ -63,7 +63,7 @@ func twoFeatures() (entities.Graph, entities.Ordering, map[string]entities.Decl)
 		}
 }
 
-func TestPlannerSplitsFeatureFromSharedKernel(t *testing.T) {
+func TestPlannerBornWithTheFirstFeatureThatNeedsIt(t *testing.T) {
 	t.Parallel()
 
 	graph, order, named := twoFeatures()
@@ -77,39 +77,43 @@ func TestPlannerSplitsFeatureFromSharedKernel(t *testing.T) {
 		t.Fatalf("Unplaced = %v, want none", plan.Unplaced)
 	}
 
-	shapes := map[entities.DeclKey]entities.CommitShape{}
+	features := map[entities.DeclKey]string{}
 
 	for _, commit := range plan.Commits {
+		if commit.Shape != entities.ShapeFeature {
+			t.Fatalf(
+				"commit %q is shape %q, want only feature commits",
+				commit.Subject,
+				commit.Shape,
+			)
+		}
+
 		for _, key := range commit.Decls {
-			shapes[key] = commit.Shape
+			features[key] = commit.Feature
 		}
 	}
 
 	testCases := []struct {
 		name string
 		decl entities.Decl
-		want entities.CommitShape
+		want string
 	}{
 		{
-			"a declaration two features reach is kernel, not either one's",
+			"a declaration two features reach is born by the first one",
 			named["kernel"],
-			entities.ShapeLayer,
+			"lead/api",
 		},
-		{
-			"a use case only its own feature reaches travels with it",
-			named["leadUse"],
-			entities.ShapeFeature,
-		},
-		{"so does its repository", named["leadRepo"], entities.ShapeFeature},
-		{"and the other feature's use case", named["billUse"], entities.ShapeFeature},
+		{"a use case only its own feature reaches travels with it", named["leadUse"], "lead/api"},
+		{"so does its repository", named["leadRepo"], "lead/api"},
+		{"and the other feature's use case", named["billUse"], "bill/api"},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := shapes[testCase.decl.Key]; got != testCase.want {
-				t.Fatalf("shape = %q, want %q", got, testCase.want)
+			if got := features[testCase.decl.Key]; got != testCase.want {
+				t.Fatalf("feature = %q, want %q", got, testCase.want)
 			}
 		})
 	}
