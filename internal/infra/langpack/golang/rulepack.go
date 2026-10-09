@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"path"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -90,7 +91,7 @@ func (p RulePack) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	return collectEdges(ctx, snap, decls, p.rules)
+	return collectEdges(ctx, snap, goScope(decls), p.rules)
 }
 
 // FilterEdges drops the structural edges the sqlc output would otherwise
@@ -104,7 +105,23 @@ func (p RulePack) Anchors(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
-	return collectAnchors(ctx, snap, decls, p.rules)
+	return collectAnchors(ctx, snap, goScope(decls), p.rules)
+}
+
+// goScope keeps what the Go rules may read: Go declarations, and the chunks
+// of the files a build needs (go.mod, query files), which are all KindOther.
+// A declaration another language pack read is not Go source, and a rule that
+// parses its file fails the whole run.
+func goScope(decls []entities.Decl) []entities.Decl {
+	out := make([]entities.Decl, 0, len(decls))
+
+	for _, decl := range decls {
+		if path.Ext(decl.Key.File) == ".go" || decl.Key.Kind == entities.KindOther {
+			out = append(out, decl)
+		}
+	}
+
+	return out
 }
 
 // Atoms unions the groups every rule that makes them names. A declaration two
@@ -117,13 +134,15 @@ func (p RulePack) Atoms(
 ) (map[entities.DeclKey]string, error) {
 	atoms := map[entities.DeclKey]string{}
 
+	scoped := goScope(decls)
+
 	for _, r := range p.rules {
 		grouping, isGrouping := r.(atomRule)
 		if !isGrouping {
 			continue
 		}
 
-		found, err := grouping.Atoms(ctx, snap, decls)
+		found, err := grouping.Atoms(ctx, snap, scoped)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", r.Name(), err)
 		}

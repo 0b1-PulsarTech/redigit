@@ -127,3 +127,89 @@ func TestRulePackWrapsFailingRuleName(t *testing.T) {
 		t.Fatalf("collectAnchors() error = %v, want it to name the failing rule", err)
 	}
 }
+
+// A pack for another language hands the indexer declarations whose files are
+// not Go. Every Go rule receives them, and one that parses its declarations'
+// files failed the whole run on the first Dart class it met.
+func TestRulePackLeavesOtherLanguagesAlone(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	writeFile(t, root, "lib/money.dart", "import 'x.dart';\n\nfinal class Money {}\n")
+	writeFile(t, root, "test/money_test.dart", "void main() {}\n")
+
+	snap := entities.Snapshot{Root: root, Files: []string{"lib/money.dart", "test/money_test.dart"}}
+	decls := []entities.Decl{
+		{
+			Key:  entities.DeclKey{File: "lib/money.dart", Kind: entities.KindType, Name: "Money"},
+			Span: entities.Span{Start: 18, End: 38},
+		},
+		{
+			Key: entities.DeclKey{
+				File: "test/money_test.dart",
+				Kind: entities.KindFunc,
+				Name: "main",
+			},
+			Span:   entities.Span{Start: 0, End: 14},
+			IsTest: true,
+		},
+	}
+
+	pack := NewRulePack(nil)
+
+	if _, err := pack.Edges(context.Background(), snap, decls); err != nil {
+		t.Fatalf("Edges() error = %v", err)
+	}
+
+	if _, err := pack.Anchors(context.Background(), snap, decls); err != nil {
+		t.Fatalf("Anchors() error = %v", err)
+	}
+
+	if _, err := pack.Atoms(context.Background(), snap, decls); err != nil {
+		t.Fatalf("Atoms() error = %v", err)
+	}
+}
+
+func TestGoScope(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		key  entities.DeclKey
+		want bool
+	}{
+		{"a Go type", entities.DeclKey{File: "a/b.go", Kind: entities.KindType, Name: "B"}, true},
+		{
+			"a go.mod chunk",
+			entities.DeclKey{File: "go.mod", Kind: entities.KindOther, Name: "module"},
+			true,
+		},
+		{
+			"a query chunk",
+			entities.DeclKey{File: "q/x.sql", Kind: entities.KindOther, Name: "Get"},
+			true,
+		},
+		{
+			"a Dart class",
+			entities.DeclKey{File: "lib/a.dart", Kind: entities.KindType, Name: "A"},
+			false,
+		},
+		{
+			"a Dart function",
+			entities.DeclKey{File: "lib/a.dart", Kind: entities.KindFunc, Name: "f"},
+			false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := goScope([]entities.Decl{{Key: testCase.key}})
+			if (len(got) == 1) != testCase.want {
+				t.Fatalf("goScope kept %d of 1, want kept = %v", len(got), testCase.want)
+			}
+		})
+	}
+}
