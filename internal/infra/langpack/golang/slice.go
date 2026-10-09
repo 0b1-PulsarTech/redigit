@@ -170,12 +170,10 @@ func (cut bodyCut) slice() indexing.Sliced {
 	groups := newGroups(len(cut.stmts) + 1)
 	head := len(cut.stmts)
 
-	anchor := 0
 	if cut.decl.Type.Results != nil && len(cut.decl.Type.Results.List) > 0 {
-		anchor = len(cut.stmts) - 1
+		groups.join(head, len(cut.stmts)-1)
 	}
 
-	groups.join(head, anchor)
 	flow.joinDeclarations(groups)
 
 	out := indexing.Sliced{Head: cut.head(), Members: cut.members()}
