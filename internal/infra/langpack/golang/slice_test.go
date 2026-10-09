@@ -177,13 +177,14 @@ func TestSliceBirthsTheDeclarationWithItsFirstReader(t *testing.T) {
 	}
 }
 
-func TestSliceBirthsAFunctionWithoutResultsApartFromItsStatements(t *testing.T) {
+func TestSliceBirthsAFunctionWithoutResultsWithItsFirstStatement(t *testing.T) {
 	t.Parallel()
 
 	head, _, members, _ := sliceOf(t, "Register")
 
-	if head.Atom != "" || members[0].Atom != "" || members[1].Atom != "" {
-		t.Fatalf("atoms head=%q first=%q second=%q, want each piece on its own",
+	// A signature born alone would render as the whole function.
+	if head.Atom == "" || head.Atom != members[0].Atom || members[1].Atom != "" {
+		t.Fatalf("atoms head=%q first=%q second=%q, want only the head and the first together",
 			head.Atom, members[0].Atom, members[1].Atom)
 	}
 }

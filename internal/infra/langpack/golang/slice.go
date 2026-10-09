@@ -170,10 +170,15 @@ func (cut bodyCut) slice() indexing.Sliced {
 	groups := newGroups(len(cut.stmts) + 1)
 	head := len(cut.stmts)
 
+	// A signature born alone would render as the whole function, since a render
+	// that finds no statement of a function writes it whole. A function with
+	// results is born with its final statement, one without with its first.
+	anchor := 0
 	if cut.decl.Type.Results != nil && len(cut.decl.Type.Results.List) > 0 {
-		groups.join(head, len(cut.stmts)-1)
+		anchor = len(cut.stmts) - 1
 	}
 
+	groups.join(head, anchor)
 	flow.joinDeclarations(groups)
 
 	out := indexing.Sliced{Head: cut.head(), Members: cut.members()}
