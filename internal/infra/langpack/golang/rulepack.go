@@ -35,7 +35,6 @@ var rules = []rule{
 	generateRule{},
 	sqlcRule{},
 	sqlAtomRule{},
-	testMainRule{},
 	migrationRule{},
 	testAnchorRule{},
 	enclosesRule{},
@@ -44,6 +43,7 @@ var rules = []rule{
 	boundRule{},
 	buildTagsRule{},
 	embedRule{},
+	routePathRule{},
 }
 
 // atomRule is the optional second output of a rule: declarations that must be

@@ -18,6 +18,14 @@ func (index sharedIndex) safeToPull(
 		current := queue[0]
 		queue = queue[1:]
 
+		// A subject the shared commit does not carry is born after it, so the test
+		// would land ahead of the code it exercises.
+		for _, subject := range index.subjects[current] {
+			if !born[subject] && !index.walked[subject] {
+				return false
+			}
+		}
+
 		for _, edge := range graph.Needs(current) {
 			provider := edge.Provider
 
