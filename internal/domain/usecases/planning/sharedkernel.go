@@ -20,7 +20,7 @@ func unbornProviders(
 		inFeature[key] = true
 	}
 
-	index := sharedIndex{atoms: atomGroups(graph), testsOf: testAnchors(graph)}
+	index := sharedIndex{atoms: atomGroups(graph), testsOf: testAnchors(graph), own: own}
 	queue := slices.Clone(members)
 
 	add := func(key entities.DeclKey) {
@@ -51,6 +51,7 @@ func unbornProviders(
 type sharedIndex struct {
 	atoms   map[string][]entities.DeclKey
 	testsOf map[entities.DeclKey][]entities.DeclKey
+	own     ownership
 }
 
 // siblingsOf is everything current's place in the shared kernel drags along
@@ -72,6 +73,9 @@ func (index sharedIndex) siblingsOf(
 			out = append(out, edge.Provider)
 		}
 	}
+
+	// A library is born whole by its first consumer.
+	out = append(out, index.own.libraries[index.own.library[current]]...)
 
 	// A generated file's declarations carry no edge to each other, only the
 	// Atom they share, so a sibling is folded in by hand or one half of the

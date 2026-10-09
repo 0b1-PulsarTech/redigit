@@ -356,6 +356,28 @@ feature, e o puxado pelo sujeito compartilhado). O recuo por arquivo irmao
 agora ignora todo teste que uma ancora ja resolveu, sujeito compartilhado ou
 nao.
 
+### 3.6 A raiz de composicao nao e consumidora, e testes esperam o que exercitam
+
+Num monolito com injecao de dependencia a raiz (`main`, o injetor, a tabela de
+rotas) consome todo handler, sink e worker; nada sobrava sem consumidor alem
+da propria raiz, e o programa inteiro virava uma feature compartilhada (47% da
+historia, uma corrida de 323 commits `chore(shared)`). `findWiring` acha essas
+declaracoes sem nomea-las: uma declaracao de producao cujo fecho cobre 1/20 do
+programa (e ao menos `wiringFloor` declaracoes). Arestas dela nao contam como
+consumo, entao os handlers viram pontas, e a raiz nasce depois da ultima
+feature que ela registra.
+
+Testes e tudo que mora em `_test.go` (helpers, mocks) sao adiados juntos com a
+raiz: nascem logo depois da feature que completa o que precisam, nunca por
+heranca de dono (a heranca por ancora e por arquivo irmao foi removida, porque
+colocava o teste na feature que por acaso vinha primeiro). Um modulo lido de
+fora que nao tem ponta ligada na raiz e uma biblioteca: nasce inteira com o
+primeiro consumidor. As features saem em ordem gulosa: continuidade do modulo,
+depois custo (fecho), depois posicao mais antiga.
+
+Limite conhecido: o corpo unico de `DoInjections`/`run` registra tudo de uma
+vez, entao a raiz nao cresce por declaracao.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

@@ -23,7 +23,7 @@ func shareDependencies(graph entities.Graph, own ownership) {
 	queue := make([]entities.DeclKey, 0, graph.Len())
 
 	for _, decl := range graph.Decls() {
-		if own.owner[decl.Key] == SharedFeature {
+		if own.owner[decl.Key] == SharedFeature && !own.deferred[decl.Key] {
 			queue = append(queue, decl.Key)
 		}
 	}

@@ -65,7 +65,7 @@ func TestSortFeatures(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, cyclic := sortFeatures(testCase.features, testCase.needs, testCase.at)
+			got, cyclic := sortFeatures(testCase.features, testCase.needs, testCase.at, nil, nil)
 			if !slices.Equal(got, testCase.want) {
 				t.Fatalf("sortFeatures() = %v, want %v", got, testCase.want)
 			}
@@ -143,6 +143,8 @@ func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 		own.order,
 		featureNeeds(graph, own),
 		earliest(own, entities.Ordering{}),
+		nil,
+		nil,
 	)
 	if len(cyclic) != 0 {
 		t.Fatalf("features %v need each other, which ownership should make impossible", cyclic)

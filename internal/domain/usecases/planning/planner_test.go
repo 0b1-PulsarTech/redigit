@@ -99,9 +99,9 @@ func TestPlannerBornWithTheFirstFeatureThatNeedsIt(t *testing.T) {
 		want string
 	}{
 		{
-			"a declaration two features reach is born by the first one",
+			"a declaration two features reach is born by the first, the cheaper one",
 			named["kernel"],
-			"lead/api",
+			"bill/api",
 		},
 		{"a use case only its own feature reaches travels with it", named["leadUse"], "lead/api"},
 		{"so does its repository", named["leadRepo"], "lead/api"},

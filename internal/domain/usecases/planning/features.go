@@ -23,19 +23,19 @@ const SharedFeature FeatureID = ""
 //
 // A test consumer does not make a declaration an entry point. Counting tests
 // would make every tested function a feature of its own.
-func entryPoints(graph entities.Graph) []entities.Decl {
+func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 	var out []entities.Decl
 
 	for _, decl := range graph.Decls() {
-		if decl.IsTest {
+		if isTestSide(decl) {
 			continue
 		}
 
-		if isOrphanProse(graph, decl) {
+		if roots[decl.Key] || isOrphanProse(graph, decl) {
 			continue
 		}
 
-		if hasProductionConsumer(graph, decl.Key) {
+		if hasProductionConsumer(graph, decl.Key, roots) {
 			continue
 		}
 
@@ -73,10 +73,10 @@ func isStructural(reason entities.EdgeReason) bool {
 	}
 }
 
-func hasProductionConsumer(graph entities.Graph, key entities.DeclKey) bool {
+func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
-		if found && !consumer.IsTest {
+		if found && !isTestSide(consumer) && !roots[edge.Dependent] {
 			return true
 		}
 	}

@@ -74,7 +74,13 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		)
 	}
 
-	sorted, cyclic := sortFeatures(own.order, featureNeeds(graph, own), earliest(own, order))
+	sorted, cyclic := sortFeatures(
+		own.order,
+		featureNeeds(graph, own),
+		earliest(own, order),
+		own.group,
+		own.cost,
+	)
 
 	// Reachability ownership should make this unreachable: if a declaration
 	// of feature A needs one of feature B, everything that reaches the first
@@ -110,6 +116,8 @@ func (p Planner) emit(
 		// of every feature is a block of hundreds of commits that no feature
 		// explains, and the declarations in it are read for the first time
 		// hundreds of commits later.
+		fresh := map[entities.DeclKey]bool{}
+
 		if shared := unbornProviders(graph, own, members, born); len(shared) > 0 {
 			plan.Commits = append(
 				plan.Commits,
@@ -122,6 +130,7 @@ func (p Planner) emit(
 			)
 
 			markBorn(born, shared)
+			markBorn(fresh, shared)
 		}
 
 		plan.Commits = append(
@@ -135,6 +144,9 @@ func (p Planner) emit(
 		)
 
 		markBorn(born, members)
+		markBorn(fresh, members)
+
+		plan.Commits = append(plan.Commits, p.cutReady(graph, order, own, feature, born, fresh)...)
 	}
 
 	// Anything no feature reached is still part of the final tree. Emitting it
@@ -180,4 +192,29 @@ func groupByFeature(graph entities.Graph, own ownership) map[FeatureID][]entitie
 	}
 
 	return out
+}
+
+// cutReady emits the deferred declarations the feature just built made possible,
+// with whatever shared code they bring along.
+func (p Planner) cutReady(
+	graph entities.Graph,
+	order entities.Ordering,
+	own ownership,
+	feature FeatureID,
+	born, fresh map[entities.DeclKey]bool,
+) []entities.PlannedCommit {
+	ready := readyDeferred(graph, own, born, fresh)
+	if len(ready) == 0 {
+		return nil
+	}
+
+	keys := append(unbornProviders(graph, own, ready, born), ready...)
+	markBorn(born, keys)
+
+	return p.cut(graph, order, bucket{
+		keys:    keys,
+		shape:   entities.ShapeFeature,
+		feature: feature,
+		reason:  "assembles the features built so far",
+	})
 }

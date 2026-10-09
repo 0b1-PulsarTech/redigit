@@ -8,7 +8,7 @@ import (
 )
 
 func entryPointNames(graph entities.Graph) []string {
-	entries := entryPoints(graph)
+	entries := entryPoints(graph, nil)
 	got := make([]string, 0, len(entries))
 
 	for _, entry := range entries {

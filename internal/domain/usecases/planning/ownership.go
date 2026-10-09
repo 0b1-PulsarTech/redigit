@@ -15,6 +15,20 @@ type ownership struct {
 	owner map[entities.DeclKey]FeatureID
 	reach map[entities.DeclKey]int
 	order []FeatureID
+	// deferred is the wiring and its tests: owned only once the features are
+	// in build order, by the last one they need.
+	deferred wiring
+	roots    wiring
+	// group is the module a feature's entry point is built in, so the features
+	// of one module are ordered together.
+	group map[FeatureID]string
+	// cost is how many declarations a feature needs in all, its own and the
+	// shared ones, so the smallest working feature can come first.
+	cost map[FeatureID]int
+	// library maps a declaration of a module with no entry point to that
+	// module, and libraries lists the module's production declarations.
+	library   map[entities.DeclKey]string
+	libraries map[string][]entities.DeclKey
 }
 
 // assign walks back from every entry point and counts, per declaration, how
@@ -27,18 +41,32 @@ type ownership struct {
 func assign(graph entities.Graph) ownership {
 	reachedBy := map[entities.DeclKey]map[FeatureID]bool{}
 	seen := map[FeatureID]bool{}
+	entryModules := map[string]bool{}
 
 	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{},
-		reach: map[entities.DeclKey]int{},
+		owner:     map[entities.DeclKey]FeatureID{},
+		reach:     map[entities.DeclKey]int{},
+		group:     map[FeatureID]string{},
+		cost:      map[FeatureID]int{},
+		library:   map[entities.DeclKey]string{},
+		libraries: map[string][]entities.DeclKey{},
 	}
 
-	for _, entry := range entryPoints(graph) {
+	roots := findWiring(graph)
+	own.roots = roots
+	own.deferred = deferTests(graph, roots)
+
+	for _, entry := range entryPoints(graph, roots) {
 		feature := featureOf(entry)
 		if !seen[feature] {
 			seen[feature] = true
 
 			own.order = append(own.order, feature)
+			own.group[feature] = moduleDir(graph, entry)
+		}
+
+		if isHead(graph, entry, roots) {
+			entryModules[moduleDir(graph, entry)] = true
 		}
 
 		for key := range reachFrom(graph, entry.Key) {
@@ -53,6 +81,10 @@ func assign(graph entities.Graph) ownership {
 	unionAtoms(graph, reachedBy)
 
 	for key, features := range reachedBy {
+		for feature := range features {
+			own.cost[feature]++
+		}
+
 		own.reach[key] = len(features)
 		own.owner[key] = soleOwner(features)
 	}
@@ -68,9 +100,14 @@ func assign(graph entities.Graph) ownership {
 		}
 	}
 
-	inheritTestOwnership(graph, own)
-	inheritTestFileOwnership(graph, own)
-	placeStrandedTests(graph, own)
+	shareLibraries(graph, own, entryModules)
+
+	// What is deferred is born when it is ready, not with a feature that
+	// happens to own part of what it needs.
+	for key := range own.deferred {
+		own.owner[key] = SharedFeature
+	}
+
 	shareDependencies(graph, own)
 
 	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })

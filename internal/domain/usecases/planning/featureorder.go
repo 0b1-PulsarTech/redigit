@@ -53,13 +53,24 @@ func earliest(own ownership, order entities.Ordering) map[FeatureID]entities.Pos
 // ordered because they need each other. A cycle is returned, never silently
 // broken: two features that need each other are one feature, or one of the
 // edges between them is wrong, and both are answers a reader must see.
+//
+// Among the features ready to build, the next one is from the same group as the
+// last: a module's features arriving back to back are an arc a reader can
+// follow, and taking every ready feature of every module in rounds scatters
+// each module over the whole history.
 func sortFeatures(
 	features []FeatureID,
 	needs map[FeatureID]map[FeatureID]bool,
 	at map[FeatureID]entities.Position,
+	group map[FeatureID]string,
+	cost map[FeatureID]int,
 ) (sorted []FeatureID, cyclic []FeatureID) {
 	pending := slices.Clone(features)
 	slices.SortFunc(pending, func(a, b FeatureID) int {
+		if left, right := cost[a], cost[b]; left != right {
+			return cmp.Compare(left, right)
+		}
+
 		if left, right := at[a], at[b]; left != right {
 			return cmp.Compare(left, right)
 		}
@@ -68,34 +79,50 @@ func sortFeatures(
 	})
 
 	done := map[FeatureID]bool{}
+	last := ""
 
 	for len(pending) > 0 {
-		ready := pending[:0:0]
-		blocked := pending[:0:0]
-
-		for _, feature := range pending {
-			if readyToBuild(feature, needs, done) {
-				ready = append(ready, feature)
-
-				continue
-			}
-
-			blocked = append(blocked, feature)
+		next := nextFeature(pending, needs, done, group, last)
+		if next < 0 {
+			return sorted, pending
 		}
 
-		if len(ready) == 0 {
-			return sorted, blocked
-		}
-
-		for _, feature := range ready {
-			done[feature] = true
-		}
-
-		sorted = append(sorted, ready...)
-		pending = blocked
+		feature := pending[next]
+		done[feature] = true
+		last = group[feature]
+		sorted = append(sorted, feature)
+		pending = slices.Delete(pending, next, next+1)
 	}
 
 	return sorted, nil
+}
+
+// nextFeature is the index of the first ready feature in the last group, else
+// of the first ready feature; pending is already in chronological order.
+func nextFeature(
+	pending []FeatureID,
+	needs map[FeatureID]map[FeatureID]bool,
+	done map[FeatureID]bool,
+	group map[FeatureID]string,
+	last string,
+) int {
+	first := -1
+
+	for index, feature := range pending {
+		if !readyToBuild(feature, needs, done) {
+			continue
+		}
+
+		if last != "" && group[feature] == last {
+			return index
+		}
+
+		if first < 0 {
+			first = index
+		}
+	}
+
+	return first
 }
 
 func readyToBuild(
