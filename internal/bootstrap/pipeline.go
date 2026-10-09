@@ -15,6 +15,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
 	"github.com/wrapped-owls/redigit/internal/infra/lsp"
 )
@@ -120,8 +121,9 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	}
 
 	indexCfg := cfg.Indexing
-	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
-	specific := specificLanguages(configSyntax, cfg.BuildTags)
+	configSyntax, dartSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap)),
+		dart.NewSyntax(snapshot.Files, reader)
+	specific := specificLanguages(configSyntax, dartSyntax, cfg.BuildTags)
 
 	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
 		release(ctx, session, checkout)
@@ -177,7 +179,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		source:    source,
 		renderer: newRenderer(
 			configSyntax,
-			renderersByExtension(golang.NewSyntax(), configSyntax),
+			renderersByExtension(golang.NewSyntax(), dartSyntax, configSyntax),
 		),
 	}, nil
 }
@@ -354,7 +356,14 @@ func (p *Pipeline) Close(ctx context.Context) error {
 // Kept apart from opaqueLanguage so validateChunkMap can check a supplied
 // chunk map against real ownership before the catch-all pack - which would
 // otherwise also claim every path - is added.
-func specificLanguages(configSyntax config.Syntax, tags []string) []indexing.Language {
+//
+// Dart is not Resolved: the one language server a run starts is gopls, so its
+// rule pack carries the reference edges itself.
+func specificLanguages(
+	configSyntax config.Syntax,
+	dartSyntax dart.Syntax,
+	tags []string,
+) []indexing.Language {
 	return []indexing.Language{
 		{
 			Name:       "go",
@@ -362,6 +371,12 @@ func specificLanguages(configSyntax config.Syntax, tags []string) []indexing.Lan
 			Syntax:     golang.NewSyntax(),
 			Rules:      golang.NewRulePack(tags),
 			Resolved:   true,
+		},
+		{
+			Name:       "dart",
+			Extensions: []string{".dart"},
+			Syntax:     dartSyntax,
+			Rules:      dart.NewRulePack(),
 		},
 		{
 			Name:       "config",

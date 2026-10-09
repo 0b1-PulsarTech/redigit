@@ -100,9 +100,10 @@ func TestRenderersByExtensionFallsBackToConfig(t *testing.T) {
 	t.Parallel()
 
 	goSyntax := stubRenderer{tag: "go"}
+	dartSyntax := stubRenderer{tag: "dart"}
 	configSyntax := stubRenderer{tag: "config"}
 
-	byExt := renderersByExtension(goSyntax, configSyntax)
+	byExt := renderersByExtension(goSyntax, dartSyntax, configSyntax)
 	dispatch := newRenderer(configSyntax, byExt)
 
 	testCases := []struct {
@@ -111,6 +112,7 @@ func TestRenderersByExtensionFallsBackToConfig(t *testing.T) {
 		want string
 	}{
 		{"a Go file reads with the Go syntax", "apps/lead/main.go", "go"},
+		{"a Dart file reads with the Dart syntax", "web/src/routes/+page.server.dart", "dart"},
 		{"a known config extension reads with the config syntax", "apps/lead/go.mod", "config"},
 		{
 			"an extension neither pack lists falls back to config, not go",

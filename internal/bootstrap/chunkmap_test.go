@@ -9,6 +9,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
 )
 
 func TestParseChunkMap(t *testing.T) {
@@ -76,7 +77,11 @@ func TestLoadChunkMapFailsOnAMissingFile(t *testing.T) {
 func TestValidateChunkMap(t *testing.T) {
 	t.Parallel()
 
-	specific := specificLanguages(config.NewSyntax(configChunkers(nil)), nil)
+	specific := specificLanguages(
+		config.NewSyntax(configChunkers(nil)),
+		dart.NewSyntax(nil, nil),
+		nil,
+	)
 	snap := entities.Snapshot{Files: []string{"main.go", "go.mod", "engines/wwebjs/src/main.ts"}}
 
 	testCases := []struct {
