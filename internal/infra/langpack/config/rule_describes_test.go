@@ -92,9 +92,9 @@ func TestDescribesRuleNamesAModuleByItsPath(t *testing.T) {
 func TestDescribesRuleLeavesADocumentNamingNothingToTheScaffold(t *testing.T) {
 	t.Parallel()
 
-	snap := treeWith(t, map[string]string{"docs/CHANGELOG.md": "# Changelog\n"})
+	snap := treeWith(t, map[string]string{"docs/NOTES.md": "# Notes\n"})
 
-	doc := piece("docs/CHANGELOG.md", "<file>", entities.Span{})
+	doc := piece("docs/NOTES.md", "<file>", entities.Span{})
 	header := piece("apps/app/go.mod", "example.com/app", entities.Span{})
 	code := goDecl("apps/app/load.go", "Load")
 	decls := []entities.Decl{doc, header, code}

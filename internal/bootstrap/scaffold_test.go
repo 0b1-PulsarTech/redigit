@@ -253,15 +253,27 @@ func TestDocumentIsBornWithTheFirstCodeItNames(t *testing.T) {
 
 	first := min(born["apps/app/worker/queue.go"], born["apps/app/worker/worker.go"])
 
-	for _, doc := range []string{"docs/worker.md", "apps/app/worker/README.md"} {
-		if born[doc] != first {
-			t.Errorf("%s born in commit %d, the package's first code in %d", doc, born[doc], first)
-		}
+	// A spec is a commit of documents, the one right before the code it names.
+	if born["docs/worker.md"] != first-1 {
+		t.Errorf(
+			"docs/worker.md born in commit %d, want %d, just before the code",
+			born["docs/worker.md"],
+			first-1,
+		)
 	}
 
-	if born["docs/CHANGELOG.md"] != 0 {
+	if born["apps/app/worker/README.md"] != first {
 		t.Errorf(
-			"a document naming nothing born in commit %d, want the scaffold",
+			"the package README born in commit %d, the package's first code in %d",
+			born["apps/app/worker/README.md"],
+			first,
+		)
+	}
+
+	// A changelog naming no route has no feature to follow: it closes the history.
+	if born["docs/CHANGELOG.md"] <= born["apps/app/main.go"] {
+		t.Errorf(
+			"a changelog naming nothing born in commit %d, want the end",
 			born["docs/CHANGELOG.md"],
 		)
 	}

@@ -35,6 +35,7 @@ var rules = []rule{
 	scaffoldRule{},
 	moduleFilesRule{},
 	describesRule{},
+	changelogRule{},
 }
 
 // atomRule is the optional second output of a rule: declarations that must be

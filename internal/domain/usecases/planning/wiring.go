@@ -85,7 +85,7 @@ func closureSize(graph entities.Graph, start entities.DeclKey) int {
 }
 
 // deferTests adds to the wiring every test, and whatever else a test file
-// declares. A test belongs after the code it exercises and a test of the
+// declares, and every afterword. A test belongs after the code it exercises and a test of the
 // injector needs the whole program, so none of them is owned by a capability
 // up front; each arrives once what it needs exists.
 func deferTests(graph entities.Graph, roots wiring) wiring {
@@ -95,7 +95,7 @@ func deferTests(graph entities.Graph, roots wiring) wiring {
 	}
 
 	for _, decl := range graph.Decls() {
-		if isTestSide(decl) {
+		if isTestSide(decl) || isAfterword(graph, decl.Key) {
 			out[decl.Key] = true
 		}
 	}

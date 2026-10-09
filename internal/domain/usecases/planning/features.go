@@ -27,7 +27,7 @@ func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 			continue
 		}
 
-		if roots[decl.Key] || isOrphanProse(graph, decl) {
+		if roots[decl.Key] || isOrphanProse(graph, decl) || isAfterword(graph, decl.Key) {
 			continue
 		}
 
