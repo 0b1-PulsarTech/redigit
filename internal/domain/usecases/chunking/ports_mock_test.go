@@ -13,8 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
 	gomock "go.uber.org/mock/gomock"
+
+	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
 // MockSource is a mock of Source interface.

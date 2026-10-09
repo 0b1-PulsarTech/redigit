@@ -31,6 +31,7 @@ var rules = []rule{
 	workspaceRule{},
 	importRule{},
 	checksumRule{},
+	scaffoldRule{},
 }
 
 // RulePack contributes the edges that make a build possible and that no

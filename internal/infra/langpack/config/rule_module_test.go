@@ -99,3 +99,28 @@ func TestModuleRuleWithNoModuleIsSilent(t *testing.T) {
 		t.Fatalf("got %d edge(s) with no go.mod in the tree", len(edges))
 	}
 }
+
+// The scaffold is provider of the go.mod header, so a module edge back from it
+// would be a cycle the ordering cannot place.
+func TestModuleRuleSkipsTheScaffold(t *testing.T) {
+	t.Parallel()
+
+	header := piece("tools/go.mod", "example.com/tools", entities.Span{})
+	lint := piece("tools/.golangci.yml", "<file>", entities.Span{})
+	taskfile := piece("tools/Taskfile.yml", "<file>", entities.Span{})
+
+	edges, err := (moduleRule{}).Edges(
+		t.Context(), entities.Snapshot{}, []entities.Decl{header, lint, taskfile},
+	)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if edgeBetween(edges, lint.Key, header.Key) {
+		t.Error("the lint configuration waits for the go.mod that waits for it")
+	}
+
+	if !edgeBetween(edges, taskfile.Key, header.Key) {
+		t.Error("a module's own file stopped waiting for its go.mod")
+	}
+}

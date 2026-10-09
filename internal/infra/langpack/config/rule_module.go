@@ -26,6 +26,9 @@ const (
 // where a go.mod makes its directory a module, and a go.mod names none of the
 // packages it covers. Without it, every tree before the go.mod lands has
 // source and no module to build it, which made `go build` unverifiable.
+//
+// A scaffold file waits for no module: the headers wait for it (scaffoldRule),
+// and the edge back would close the cycle.
 type moduleRule struct{}
 
 func (moduleRule) Name() string { return "module" }
@@ -41,12 +44,14 @@ func (moduleRule) Edges(
 	}
 
 	roots := slices.Sorted(maps.Keys(headers))
+	placed := classify(decls)
 
 	var edges []entities.Edge
 
 	for _, decl := range decls {
 		root, found := nearestModule(roots, decl.Key.File)
-		if !found || decl.Key.File == path.Join(root, goModFile) {
+		if !found || decl.Key.File == path.Join(root, goModFile) ||
+			placed[decl.Key] == roleScaffold {
 			continue
 		}
 

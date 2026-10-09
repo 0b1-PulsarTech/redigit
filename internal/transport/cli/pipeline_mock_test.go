@@ -13,11 +13,12 @@ import (
 	context "context"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
 	auditing "github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
 	emitting "github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	indexing "github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // Mockpipeline is a mock of pipeline interface.
