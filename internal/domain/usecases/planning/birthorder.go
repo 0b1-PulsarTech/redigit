@@ -62,8 +62,7 @@ func byDependency(
 
 	nodes := atomNodes(graph, group)
 
-	needs := make(map[entities.DeclKey][]entities.DeclKey, len(nodes.leaders))
-	pending := make(map[entities.DeclKey]int, len(nodes.leaders))
+	var links []link
 
 	for _, key := range group {
 		dependent := nodes.leaderOf[key]
@@ -74,19 +73,27 @@ func byDependency(
 				continue
 			}
 
-			needs[provider] = append(needs[provider], dependent)
-			pending[dependent]++
+			links = append(
+				links,
+				link{provider: provider, dependent: dependent, soft: isSoft(edge.Reason)},
+			)
 		}
 	}
 
-	ordered := drain(nodes.leaders, needs, pending, groupOf)
+	ordered, stuck := drainLinks(nodes.leaders, links, groupOf, false)
 
-	// Whatever a cycle left behind, in the order it came in.
-	for _, leader := range nodes.leaders {
-		if pending[leader] > 0 {
-			ordered = append(ordered, leader)
-		}
+	// A cycle that runs through a soft edge is not a cycle the code has: the
+	// generator directive a mock is written from sits in the file that uses the
+	// mock, and the mock is read by the code beside the directive. Dropping the
+	// soft edges, and only for what is stuck, keeps the reads ahead of the use.
+	if len(stuck) > 0 {
+		more, rest := drainLinks(stuck, links, groupOf, true)
+		ordered = append(ordered, more...)
+		stuck = rest
 	}
+
+	// Whatever a hard cycle left behind, in the order it came in.
+	ordered = append(ordered, stuck...)
 
 	out := make([]entities.DeclKey, 0, len(group))
 	for _, leader := range ordered {
@@ -94,6 +101,57 @@ func byDependency(
 	}
 
 	return out
+}
+
+// link is one wait between two nodes of a position: the dependent is emitted
+// after the provider.
+type link struct {
+	provider, dependent entities.DeclKey
+	soft                bool
+}
+
+// isSoft is an edge that orders without being read: generated output follows
+// its directive and a double follows what it mirrors, yet neither is needed for
+// the other to compile.
+func isSoft(reason entities.EdgeReason) bool {
+	return reason == entities.ReasonGeneratedBy || reason == entities.ReasonMirrors
+}
+
+// drainLinks runs the ready queue over nodes, counting only the links with both
+// ends among them, and leaves out the soft ones when asked. It returns what it
+// emitted and what a cycle kept back.
+func drainLinks(
+	nodes []entities.DeclKey,
+	links []link,
+	groupOf func(entities.DeclKey) FeatureID,
+	hardOnly bool,
+) (emitted, stuck []entities.DeclKey) {
+	inside := make(map[entities.DeclKey]bool, len(nodes))
+	for _, node := range nodes {
+		inside[node] = true
+	}
+
+	needs := make(map[entities.DeclKey][]entities.DeclKey, len(nodes))
+	pending := make(map[entities.DeclKey]int, len(nodes))
+
+	for _, wait := range links {
+		if !inside[wait.provider] || !inside[wait.dependent] || hardOnly && wait.soft {
+			continue
+		}
+
+		needs[wait.provider] = append(needs[wait.provider], wait.dependent)
+		pending[wait.dependent]++
+	}
+
+	emitted = drain(nodes, needs, pending, groupOf)
+
+	for _, node := range nodes {
+		if pending[node] > 0 {
+			stuck = append(stuck, node)
+		}
+	}
+
+	return emitted, stuck
 }
 
 // atomNodes folds a position's atoms into single nodes. The leader of a node is

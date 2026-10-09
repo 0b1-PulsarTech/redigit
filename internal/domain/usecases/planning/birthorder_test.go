@@ -69,3 +69,57 @@ func TestSortForBirthWaitsForWhatAnAtomMemberNeeds(t *testing.T) {
 		t.Fatalf("order = %v, want the helper before the atom", got)
 	}
 }
+
+func TestSortForBirthIgnoresAGeneratedByEdgeThatClosesACycle(t *testing.T) {
+	t.Parallel()
+
+	// The mock is generated from a directive on the helper that reads the mock.
+	// Name order puts the helper first, so only dropping the soft edge puts the
+	// mock, which the helper reads, ahead of it.
+	helper := testDecl("pkg/a_test.go", "newUseCaseWithMocks", "pkg")
+	mock := testDecl("pkg/z_mock_test.go", "NewMockStore", "pkg")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{helper, mock},
+		[]entities.Edge{
+			needs(helper, mock),
+			{Dependent: mock.Key, Provider: helper.Key, Reason: entities.ReasonGeneratedBy},
+		},
+		nil,
+	)
+
+	got := sortForBirth(
+		graph,
+		entities.Ordering{},
+		[]entities.DeclKey{helper.Key, mock.Key},
+		nil,
+	)
+
+	if len(got) != 2 || got[0] != mock.Key {
+		t.Fatalf("order = %v, want the mock before the helper that reads it", got)
+	}
+}
+
+func TestSortForBirthKeepsAHardCycleInArrivalOrder(t *testing.T) {
+	t.Parallel()
+
+	first := decl("pkg/a.go", "A", "pkg")
+	second := decl("pkg/b.go", "B", "pkg")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{first, second},
+		[]entities.Edge{needs(first, second), needs(second, first)},
+		nil,
+	)
+
+	got := sortForBirth(
+		graph,
+		entities.Ordering{},
+		[]entities.DeclKey{first.Key, second.Key},
+		nil,
+	)
+
+	if len(got) != 2 || got[0] != first.Key || got[1] != second.Key {
+		t.Fatalf("order = %v, want the cycle kept in arrival order", got)
+	}
+}
