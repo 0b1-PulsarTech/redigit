@@ -139,14 +139,27 @@ func (p Planner) cutReady(
 	seen births,
 ) []entities.PlannedCommit {
 	born := seen.born
-	ready := readyDeferred(graph, own, born, seen.fresh)
 
-	if len(ready) == 0 {
-		return nil
+	var keys []entities.DeclKey
+
+	// What a round brings is fresh for the next: a statement that needs only
+	// code born long ago and a registration born just now is ready only then.
+	for {
+		ready := readyDeferred(graph, own, born, seen.fresh)
+		if len(ready) == 0 {
+			break
+		}
+
+		round := append(unbornProviders(graph, own, ready, born), ready...)
+		markBorn(born, round)
+		markBorn(seen.fresh, round)
+
+		keys = append(keys, round...)
 	}
 
-	keys := append(unbornProviders(graph, own, ready, born), ready...)
-	markBorn(born, keys)
+	if len(keys) == 0 {
+		return nil
+	}
 
 	return p.cut(graph, order, bucket{
 		keys:    keys,
