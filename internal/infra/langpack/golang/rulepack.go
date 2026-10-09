@@ -35,6 +35,7 @@ var rules = []rule{
 	generateRule{},
 	sqlcRule{},
 	sqlAtomRule{},
+	testMainRule{},
 	migrationRule{},
 	testAnchorRule{},
 	enclosesRule{},
