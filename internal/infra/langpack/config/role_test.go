@@ -36,7 +36,7 @@ func TestClassifyPlacesScaffoldByPathRole(t *testing.T) {
 
 			decl := piece(testCase.file, wholeFilePrefix, entities.Span{})
 
-			if got := classify([]entities.Decl{decl})[decl.Key]; got != testCase.want {
+			if got := classify(entities.Snapshot{}, []entities.Decl{decl})[decl.Key].role; got != testCase.want {
 				t.Errorf("classify(%s) = %v, want %v", testCase.file, got, testCase.want)
 			}
 		})
@@ -48,7 +48,7 @@ func TestClassifyLeavesPiecesOfAFormatAlone(t *testing.T) {
 
 	require := piece(".idea/go.mod", "require example.com/a", entities.Span{})
 
-	if got := classify([]entities.Decl{require})[require.Key]; got != roleNone {
+	if got := classify(entities.Snapshot{}, []entities.Decl{require})[require.Key].role; got != roleNone {
 		t.Errorf("a go.mod piece is placed as %v", got)
 	}
 }
@@ -59,9 +59,9 @@ func TestClassifyPlacesEveryPieceOfALongFile(t *testing.T) {
 	first := piece("CHANGELOG.md", "<file>", entities.Span{})
 	second := piece("CHANGELOG.md", "<file>#2", entities.Span{})
 
-	got := classify([]entities.Decl{first, second})
+	got := classify(entities.Snapshot{}, []entities.Decl{first, second})
 
-	if got[first.Key] != roleScaffold || got[second.Key] != roleScaffold {
+	if got[first.Key].role != roleScaffold || got[second.Key].role != roleScaffold {
 		t.Errorf("classify = %v, want both pieces placed as scaffold", got)
 	}
 }
@@ -81,7 +81,8 @@ func TestClassifyPlacesAModulesRootFiles(t *testing.T) {
 	}{
 		{"a module's README", "apps/lead/README.md", roleModuleOwn},
 		{"a module's build file", "apps/lead/Taskfile.yml", roleModuleOwn},
-		{"a file in a package of the module", "apps/lead/svc/notes.md", roleNone},
+		{"a note beside the code it describes", "apps/lead/svc/notes.md", roleProse},
+		{"a nested file no format claims", "apps/lead/svc/data.bin", roleNone},
 		{"a file of a module with no code", "tools/Taskfile.yml", roleScaffold},
 		{"a file outside every module", "build/Taskfile.build.yml", roleNone},
 	}
@@ -92,7 +93,7 @@ func TestClassifyPlacesAModulesRootFiles(t *testing.T) {
 
 			file := piece(testCase.file, wholeFilePrefix, entities.Span{})
 
-			got := classify(append([]entities.Decl{file}, decls...))[file.Key]
+			got := classify(entities.Snapshot{}, append([]entities.Decl{file}, decls...))[file.Key].role
 			if got != testCase.want {
 				t.Errorf("classify(%s) = %v, want %v", testCase.file, got, testCase.want)
 			}

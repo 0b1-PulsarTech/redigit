@@ -24,12 +24,12 @@ func (scaffoldRule) Name() string { return "scaffold" }
 
 func (scaffoldRule) Edges(
 	_ context.Context,
-	_ entities.Snapshot,
+	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
 	var edges []entities.Edge
 
-	forEachScaffoldHeader(decls, func(file, header entities.DeclKey) {
+	forEachScaffoldHeader(snap, decls, func(file, header entities.DeclKey) {
 		edges = append(edges, entities.Edge{
 			Dependent: header,
 			Provider:  file,
@@ -45,12 +45,12 @@ func (scaffoldRule) Edges(
 // raises a header to the position of what it waits for.
 func (scaffoldRule) Anchors(
 	_ context.Context,
-	_ entities.Snapshot,
+	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
 	var anchors []entities.Anchor
 
-	forEachScaffoldHeader(decls, func(file, header entities.DeclKey) {
+	forEachScaffoldHeader(snap, decls, func(file, header entities.DeclKey) {
 		anchors = append(anchors, entities.Anchor{
 			Decl:   file,
 			To:     header,
@@ -61,13 +61,17 @@ func (scaffoldRule) Anchors(
 	return anchors, nil
 }
 
-func forEachScaffoldHeader(decls []entities.Decl, visit func(file, header entities.DeclKey)) {
+func forEachScaffoldHeader(
+	snap entities.Snapshot,
+	decls []entities.Decl,
+	visit func(file, header entities.DeclKey),
+) {
 	headers := moduleHeaders(decls)
 	roots := slices.Sorted(maps.Keys(headers))
-	placed := classify(decls)
+	placed := classify(snap, decls)
 
 	for _, decl := range decls {
-		if placed[decl.Key] != roleScaffold {
+		if placed[decl.Key].role != roleScaffold {
 			continue
 		}
 

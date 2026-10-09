@@ -35,7 +35,7 @@ func (moduleRule) Name() string { return "module" }
 
 func (moduleRule) Edges(
 	_ context.Context,
-	_ entities.Snapshot,
+	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
 	headers := moduleHeaders(decls)
@@ -44,14 +44,14 @@ func (moduleRule) Edges(
 	}
 
 	roots := slices.Sorted(maps.Keys(headers))
-	placed := classify(decls)
+	placed := classify(snap, decls)
 
 	var edges []entities.Edge
 
 	for _, decl := range decls {
 		root, found := nearestModule(roots, decl.Key.File)
 		if !found || decl.Key.File == path.Join(root, goModFile) ||
-			placed[decl.Key] == roleScaffold {
+			placed[decl.Key].role == roleScaffold {
 			continue
 		}
 

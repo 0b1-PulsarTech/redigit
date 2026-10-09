@@ -26,10 +26,19 @@ const (
 	// roleModuleOwn is born with the go.mod of the module whose root holds it:
 	// its README, Taskfile, configuration samples.
 	roleModuleOwn
+	// roleProse is born with the first code it describes: a document naming
+	// a package, a README beside one.
+	roleProse
 )
 
-// placements maps a whole-file declaration to the role its path gives it.
-type placements map[entities.DeclKey]role
+// placement is the role of one file and, for prose, the code it describes.
+type placement struct {
+	role  role
+	homes []entities.DeclKey
+}
+
+// placements maps a whole-file declaration to where its path puts it.
+type placements map[entities.DeclKey]placement
 
 // classify gives every whole-file declaration the role its path plays in the
 // repository, never a file list of one repository.
@@ -38,40 +47,73 @@ type placements map[entities.DeclKey]role
 // feature to birth it in and leaves it for the trailing "reached by no entry
 // point" commit. On a real repository that sent .gitignore, the devcontainer,
 // every Taskfile and the lint configuration to the last 1.5% of the history.
-func classify(decls []entities.Decl) placements {
+func classify(snap entities.Snapshot, decls []entities.Decl) placements {
+	headers := moduleHeaders(decls)
+	roots := slices.Sorted(maps.Keys(headers))
+	classifier := classifier{
+		roots: roots,
+		coded: codedModules(roots, decls),
+		code:  newCodeIndex(snap, headers, decls),
+		files: map[string]placement{},
+	}
 	out := placements{}
-	roots := slices.Sorted(maps.Keys(moduleHeaders(decls)))
-	coded := codedModules(roots, decls)
 
 	for _, decl := range decls {
 		if !isWholeFile(decl.Key) || isInert(decl.Key.File) {
 			continue
 		}
 
-		out[decl.Key] = place(decl.Key.File, roots, coded)
+		out[decl.Key] = classifier.place(decl.Key.File)
 	}
 
 	return out
 }
 
-// place decides one file. A module's own file waits for its module, but a
-// module with no code has no first package to be born with, so its files are
-// scaffold: nothing would ever pull them out of the trailing commit.
-func place(file string, roots []string, coded map[string]bool) role {
+type classifier struct {
+	roots []string
+	coded map[string]bool
+	code  codeIndex
+	files map[string]placement
+}
+
+// place decides one file, once: the pieces of a long file share its role. A
+// module's own file waits for its module, but a module with no code has no
+// first package to be born with, so its files are scaffold: nothing would
+// ever pull them out of the trailing commit.
+func (c classifier) place(file string) placement {
+	if found, done := c.files[file]; done {
+		return found
+	}
+
+	decided := c.decide(file)
+	c.files[file] = decided
+
+	return decided
+}
+
+func (c classifier) decide(file string) placement {
 	if isScaffoldPath(file) {
-		return roleScaffold
+		return placement{role: roleScaffold}
 	}
 
-	root, found := nearestModule(roots, file)
-	if !found || path.Dir(file) != root {
-		return roleNone
+	root, found := nearestModule(c.roots, file)
+	if found && path.Dir(file) == root {
+		if c.coded[root] {
+			return placement{role: roleModuleOwn}
+		}
+
+		return placement{role: roleScaffold}
 	}
 
-	if coded[root] {
-		return roleModuleOwn
+	if !isProse(file) {
+		return placement{role: roleNone}
 	}
 
-	return roleScaffold
+	if homes := c.code.describedBy(file); len(homes) > 0 {
+		return placement{role: roleProse, homes: homes}
+	}
+
+	return placement{role: roleScaffold}
 }
 
 // codedModules marks the modules holding a declaration of a format the tool

@@ -32,12 +32,12 @@ func (moduleFilesRule) Edges(
 // the author wrote it, and the atom is born at the latest of its members.
 func (moduleFilesRule) Anchors(
 	_ context.Context,
-	_ entities.Snapshot,
+	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
 	var anchors []entities.Anchor
 
-	forEachModuleFile(decls, func(file, header entities.Decl) {
+	forEachModuleFile(snap, decls, func(file, header entities.Decl) {
 		anchors = append(anchors, entities.Anchor{
 			Decl:   file.Key,
 			To:     header.Key,
@@ -50,12 +50,12 @@ func (moduleFilesRule) Anchors(
 
 func (moduleFilesRule) Atoms(
 	_ context.Context,
-	_ entities.Snapshot,
+	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (map[entities.DeclKey]string, error) {
 	atoms := map[entities.DeclKey]string{}
 
-	forEachModuleFile(decls, func(file, header entities.Decl) {
+	forEachModuleFile(snap, decls, func(file, header entities.Decl) {
 		if header.Atom != "" {
 			atoms[file.Key] = header.Atom
 		}
@@ -64,10 +64,14 @@ func (moduleFilesRule) Atoms(
 	return atoms, nil
 }
 
-func forEachModuleFile(decls []entities.Decl, visit func(file, header entities.Decl)) {
+func forEachModuleFile(
+	snap entities.Snapshot,
+	decls []entities.Decl,
+	visit func(file, header entities.Decl),
+) {
 	headers := moduleHeaders(decls)
 	roots := slices.Sorted(maps.Keys(headers))
-	placed := classify(decls)
+	placed := classify(snap, decls)
 
 	byKey := make(map[entities.DeclKey]entities.Decl, len(headers))
 
@@ -76,7 +80,7 @@ func forEachModuleFile(decls []entities.Decl, visit func(file, header entities.D
 	}
 
 	for _, decl := range decls {
-		if placed[decl.Key] != roleModuleOwn {
+		if placed[decl.Key].role != roleModuleOwn {
 			continue
 		}
 

@@ -232,3 +232,37 @@ func TestModuleFilesAreBornWithTheirGoMod(t *testing.T) {
 		t.Errorf("go.mod is born after the module's code: %v", born)
 	}
 }
+
+func TestDocumentIsBornWithTheFirstCodeItNames(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{
+		"apps/app/go.mod":           "module example.com/app\n\ngo 1.26\n",
+		"docs/worker.md":            "The queue consumer lives in `apps/app/worker`.\n",
+		"docs/CHANGELOG.md":         "# Changelog\n",
+		"apps/app/worker/README.md": "# worker\n",
+	}
+	code := []fixtureCode{
+		{file: "apps/app/svc/svc.go", name: "Serve"},
+		{file: "apps/app/main.go", name: "Main", reads: []string{"Serve"}},
+		{file: "apps/app/worker/queue.go", name: "Queue"},
+		{file: "apps/app/worker/worker.go", name: "Work", reads: []string{"Queue"}},
+	}
+
+	born := commitOf(t, files, code)
+
+	first := min(born["apps/app/worker/queue.go"], born["apps/app/worker/worker.go"])
+
+	for _, doc := range []string{"docs/worker.md", "apps/app/worker/README.md"} {
+		if born[doc] != first {
+			t.Errorf("%s born in commit %d, the package's first code in %d", doc, born[doc], first)
+		}
+	}
+
+	if born["docs/CHANGELOG.md"] != 0 {
+		t.Errorf(
+			"a document naming nothing born in commit %d, want the scaffold",
+			born["docs/CHANGELOG.md"],
+		)
+	}
+}
