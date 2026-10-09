@@ -86,11 +86,22 @@ func (Syntax) Slice(
 	}
 
 	decl := findFuncDecl(file, fn.Key)
-	if decl == nil || decl.Body == nil || !cuttable(decl.Body) {
+	if decl == nil || decl.Body == nil {
 		return indexing.Sliced{}, false, nil
 	}
 
 	cut := bodyCut{fset: fset, fn: fn, decl: decl, stmts: decl.Body.List}
+
+	if elements, _ := returnedElements(decl.Body); len(elements) >= minGroup {
+		cut.elements = elements
+
+		return cut.sliceElements(), true, nil
+	}
+
+	if !cuttable(decl.Body) {
+		return indexing.Sliced{}, false, nil
+	}
+
 	cut.comments = ast.NewCommentMap(fset, file, file.Comments)
 	cut.info = typeLocals(fset, file)
 
@@ -149,6 +160,7 @@ type bodyCut struct {
 	fn       entities.Decl
 	decl     *ast.FuncDecl
 	stmts    []ast.Stmt
+	elements []ast.Expr
 	comments ast.CommentMap
 	info     *types.Info
 }
@@ -207,21 +219,33 @@ func (cut bodyCut) head() entities.Decl {
 // members are the statements in source order. A statement carries the comments
 // attached to it, and its span never reaches into a neighbour's.
 func (cut bodyCut) members() []entities.Decl {
-	out := make([]entities.Decl, 0, len(cut.stmts))
+	parts := make([]ast.Node, 0, max(len(cut.stmts), len(cut.elements)))
+
+	if len(cut.elements) > 0 {
+		for _, element := range cut.elements {
+			parts = append(parts, element)
+		}
+	} else {
+		for _, stmt := range cut.stmts {
+			parts = append(parts, stmt)
+		}
+	}
+
+	out := make([]entities.Decl, 0, len(parts))
 	floor := cut.offset(cut.decl.Body.Lbrace) + 1
 
-	for index, stmt := range cut.stmts {
-		start, end := cut.offset(stmt.Pos()), cut.offset(stmt.End())
+	for index, part := range parts {
+		start, end := cut.offset(part.Pos()), cut.offset(part.End())
 
-		for _, group := range cut.comments[stmt] {
+		for _, group := range cut.comments[part] {
 			start = min(start, cut.offset(group.Pos()))
 			end = max(end, cut.offset(group.End()))
 		}
 
 		start = max(start, floor)
 
-		if index+1 < len(cut.stmts) {
-			end = min(end, cut.offset(cut.stmts[index+1].Pos()))
+		if index+1 < len(parts) {
+			end = min(end, cut.offset(parts[index+1].Pos()))
 		}
 
 		floor = end
@@ -280,4 +304,70 @@ func (cut bodyCut) edges(flow bodyFlow) []entities.Edge {
 	}
 
 	return out
+}
+
+// returnedElements are the pieces of a body that is one return of a list: the
+// elements of a composite literal, or the arguments of slices.Concat. Each can
+// be left out and the rest still compiles, and a list that grows one element
+// per feature is a registration table. The second result writes a new list.
+func returnedElements(body *ast.BlockStmt) ([]ast.Expr, func([]ast.Expr)) {
+	if len(body.List) != 1 {
+		return nil, nil
+	}
+
+	ret, isReturn := body.List[0].(*ast.ReturnStmt)
+	if !isReturn || len(ret.Results) != 1 {
+		return nil, nil
+	}
+
+	switch typed := ret.Results[0].(type) {
+	case *ast.CompositeLit:
+		return typed.Elts, func(list []ast.Expr) { typed.Elts = list }
+	case *ast.CallExpr:
+		selector, isSelector := typed.Fun.(*ast.SelectorExpr)
+		if !isSelector || selector.Sel.Name != "Concat" || typed.Ellipsis.IsValid() {
+			return nil, nil
+		}
+
+		pkg, isIdent := selector.X.(*ast.Ident)
+		if !isIdent || pkg.Name != "slices" {
+			return nil, nil
+		}
+
+		return typed.Args, func(list []ast.Expr) { typed.Args = list }
+	}
+
+	return nil, nil
+}
+
+// sliceElements cuts a one-return body into its elements. The signature is
+// born with the first, because a function with results needs its return.
+func (cut bodyCut) sliceElements() indexing.Sliced {
+	joined := newGroups(len(cut.elements) + 1)
+	head := len(cut.elements)
+	joined.join(head, 0)
+
+	out := indexing.Sliced{Head: cut.head(), Members: cut.members()}
+
+	for index := range out.Members {
+		out.Edges = append(out.Edges, entities.Edge{
+			Dependent: out.Members[index].Key,
+			Provider:  cut.fn.Key,
+			Reason:    entities.ReasonBody,
+		})
+		out.Members[index].Atom = cut.elementAtom(joined, index)
+	}
+
+	out.Head.Atom = cut.elementAtom(joined, head)
+
+	return out
+}
+
+func (cut bodyCut) elementAtom(joined groups, index int) string {
+	root := joined.find(index)
+	if joined.size(root) < minGroup {
+		return ""
+	}
+
+	return cut.fn.Key.File + ":" + cut.fn.Key.Name + "#atom" + strconv.Itoa(root)
 }

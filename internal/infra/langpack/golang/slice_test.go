@@ -50,6 +50,17 @@ func Single() {
 	run()
 }
 
+func Table() []step {
+	return []step{
+		{name: "a", run: runA},
+		{name: "b", run: runB},
+	}
+}
+
+func Chain() []step {
+	return slices.Concat(tableA(), tableB())
+}
+
 func Use() {
 	fmt.Println(os.Args)
 	println("x")
@@ -241,5 +252,37 @@ func TestRenderWritesAFunctionNoStatementNamesWhole(t *testing.T) {
 
 	if !strings.Contains(string(got), `println("x")`) || !strings.Contains(string(got), "os.Args") {
 		t.Fatalf("Render() = %s, want the whole body", got)
+	}
+}
+
+// A table of registrations grows one element per feature: each element is a
+// piece, and the function is born with the first.
+func TestSliceCutsAReturnedListByElement(t *testing.T) {
+	t.Parallel()
+
+	syntax := NewSyntax()
+	source := []byte(sliceSource)
+
+	for _, name := range []string{"Table", "Chain"} {
+		head, ok, members, _ := sliceOf(t, name)
+		if !ok || len(members) != 2 {
+			t.Fatalf("Slice(%s) = %v with %d members, want 2 elements", name, ok, len(members))
+		}
+
+		if head.Atom == "" || head.Atom != members[0].Atom || members[1].Atom != "" {
+			t.Fatalf("atoms head %q first %q second %q, want head born with the first element",
+				head.Atom, members[0].Atom, members[1].Atom)
+		}
+
+		got, err := syntax.Render(
+			context.Background(), source, []entities.DeclKey{head.Key, members[1].Key},
+		)
+		if err != nil {
+			t.Fatalf("Render() error = %v", err)
+		}
+
+		if strings.Contains(string(got), "runA") || strings.Contains(string(got), "tableA") {
+			t.Fatalf("Render(%s) = %s, want only the kept element", name, got)
+		}
 	}
 }

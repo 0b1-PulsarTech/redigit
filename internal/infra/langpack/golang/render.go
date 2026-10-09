@@ -153,6 +153,23 @@ func keepStatements(fn *ast.FuncDecl, keepSet map[declIdent]bool) {
 	}
 
 	name := funcIdent(fn).name
+
+	if elements, replace := returnedElements(fn.Body); len(elements) >= minGroup {
+		keptElements := make([]ast.Expr, 0, len(elements))
+
+		for index, element := range elements {
+			if keepSet[declIdent{entities.KindStmt, stmtName(name, index)}] {
+				keptElements = append(keptElements, element)
+			}
+		}
+
+		if len(keptElements) > 0 {
+			replace(keptElements)
+		}
+
+		return
+	}
+
 	kept := make([]ast.Stmt, 0, len(fn.Body.List))
 
 	for index, stmt := range fn.Body.List {
