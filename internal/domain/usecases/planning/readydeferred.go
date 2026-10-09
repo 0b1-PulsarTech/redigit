@@ -28,7 +28,9 @@ func readyDeferred(
 
 	// A test is born once everything it exercises is: pulling what it needs
 	// would put the code under it in the feature that happened to come first.
-	// The wiring has no feature of its own, so it may bring what only it uses.
+	// The wiring has no feature of its own, so it may bring what only it uses;
+	// what a feature also uses is born with that feature, and bringing it early
+	// would pull its whole closure into the first registration.
 	waits := func(provider entities.DeclKey, strict bool) bool {
 		switch {
 		case born[provider]:
@@ -38,7 +40,7 @@ func readyDeferred(
 		case own.owner[provider] != SharedFeature:
 			return true
 		default:
-			return strict
+			return strict || usedBeyondWiring(graph, own, provider)
 		}
 	}
 
@@ -154,6 +156,23 @@ func atomWaits(
 ) bool {
 	for _, member := range members {
 		if own.deferred[member] && !born[member] && !ready[member] {
+			return true
+		}
+	}
+
+	return false
+}
+
+// usedBeyondWiring is whether a shared declaration has a consumer that is not
+// itself wiring or a test, a consumer some feature will be built for.
+func usedBeyondWiring(graph entities.Graph, own ownership, key entities.DeclKey) bool {
+	for _, edge := range graph.Consumers(key) {
+		consumer, found := graph.Decl(edge.Dependent)
+		if !found || entities.IsTestSide(consumer) || entities.IsStructural(edge.Reason) {
+			continue
+		}
+
+		if !own.roots[edge.Dependent] && !own.deferred[edge.Dependent] {
 			return true
 		}
 	}
