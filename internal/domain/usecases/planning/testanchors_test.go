@@ -120,3 +120,29 @@ func TestProductionEdges(t *testing.T) {
 		)
 	}
 }
+
+// A helper is born with the first piece of its twin file, so a late method of
+// the same file does not carry the suite past its source.
+func TestAnchorTestsWaitsForTheEarliestOfATwin(t *testing.T) {
+	t.Parallel()
+
+	early := decl("a/store.go", "Put", "a")
+	late := decl("a/store.go", "Close", "a")
+	helper := testDecl("a/store_test.go", "errBoom", "a")
+
+	graph := entities.NewGraph([]entities.Decl{early, late, helper}, nil, nil)
+	order := entities.Ordering{At: map[entities.DeclKey]entities.Position{
+		early.Key: 3, late.Key: 90, helper.Key: 3,
+	}}
+
+	anchored, raised := anchorTests(graph, order)
+	got := testSubjects(anchored)[helper.Key]
+
+	if !slices.Equal(got, []entities.DeclKey{early.Key}) {
+		t.Fatalf("subjects = %v, want only %v", got, early.Key)
+	}
+
+	if raised.Of(helper.Key) != 3 {
+		t.Errorf("helper positioned at %d, want 3", raised.Of(helper.Key))
+	}
+}

@@ -23,7 +23,7 @@ func anchorTests(
 	order entities.Ordering,
 ) (entities.Graph, entities.Ordering) {
 	decls := graph.Decls()
-	index := newSubjectIndex(decls)
+	index := newSubjectIndex(decls, order)
 	own := testSubjects(graph)
 	anchors := append([]entities.Anchor(nil), graph.Anchors()...)
 
@@ -124,12 +124,14 @@ func testSide(graph entities.Graph, key entities.DeclKey) bool {
 // subjectIndex lists the production declarations a test can be about, by file
 // and by directory.
 type subjectIndex struct {
+	order  entities.Ordering
 	byFile map[string][]entities.DeclKey
 	byDir  map[string][]entities.DeclKey
 }
 
-func newSubjectIndex(decls []entities.Decl) subjectIndex {
+func newSubjectIndex(decls []entities.Decl, order entities.Ordering) subjectIndex {
 	index := subjectIndex{
+		order:  order,
 		byFile: map[string][]entities.DeclKey{},
 		byDir:  map[string][]entities.DeclKey{},
 	}
@@ -157,7 +159,7 @@ func (index subjectIndex) subjectsOf(
 	fileWide map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	if twin := index.twinOf(decl.Key.File); len(twin) > 0 {
-		return twin
+		return index.earliest(twin)
 	}
 
 	if len(named) > 0 {
@@ -170,10 +172,34 @@ func (index subjectIndex) subjectsOf(
 			out = append(out, key)
 		}
 
-		return out
+		return index.earliest(out)
 	}
 
-	return index.byDir[path.Dir(decl.Key.File)]
+	return index.earliest(index.byDir[path.Dir(decl.Key.File)])
+}
+
+// earliest keeps the subjects at the first position of the set. A helper is born
+// with the first piece of the code it serves; waiting for the last, a later
+// feature's method or a compile-time assertion on a port born at the end,
+// carried a whole suite hundreds of commits past its source.
+func (index subjectIndex) earliest(keys []entities.DeclKey) []entities.DeclKey {
+	first := entities.NoPosition
+
+	for _, key := range keys {
+		if at := index.order.Of(key); first == entities.NoPosition || at < first {
+			first = at
+		}
+	}
+
+	var out []entities.DeclKey
+
+	for _, key := range keys {
+		if index.order.Of(key) == first {
+			out = append(out, key)
+		}
+	}
+
+	return out
 }
 
 // twinOf is the declarations of the source file a test file is named after: the
