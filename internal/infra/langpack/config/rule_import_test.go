@@ -291,3 +291,44 @@ func TestImportRuleMakesEveryDeclarationWaitForABlankImport(t *testing.T) {
 		t.Error("a declaration using no selector does not wait for a blank-imported package")
 	}
 }
+
+// A wiring function lists every module of the program; once cut by statement,
+// each statement waits only for the require of the package it reaches.
+func TestImportRuleAttributesARequireToTheDeclarationsThatUseIt(t *testing.T) {
+	t.Parallel()
+
+	const (
+		appMod = "apps/lead/go.mod"
+		appGo  = "apps/lead/x.go"
+		source = "package lead\n\nimport (\n\t\"example.com/a/v2\"\n\t_ \"example.com/b\"\n)\n\n" +
+			"func UsesA() { a.Do() }\n\nfunc UsesNone() {}\n"
+	)
+
+	snap := treeWith(t, map[string]string{appGo: source, appMod: "module m\n"})
+
+	spanOf := func(text string) entities.Span {
+		start := strings.Index(source, text)
+
+		return entities.Span{Start: start, End: start + len(text)}
+	}
+
+	usesA := goDecl(appGo, "UsesA")
+	usesA.Span = spanOf("func UsesA() { a.Do() }")
+	usesNone := goDecl(appGo, "UsesNone")
+	usesNone.Span = spanOf("func UsesNone() {}")
+
+	decls := []entities.Decl{
+		piece(appMod, "github.com/org/lead", entities.Span{}),
+		usesA, usesNone,
+		piece(appMod, "require example.com/a", entities.Span{}),
+		piece(appMod, "require example.com/b", entities.Span{}),
+	}
+
+	edges, err := (importRule{}).Edges(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	assertRequireEdges(t, edges, usesA.Key, []string{"example.com/a", "example.com/b"}, nil)
+	assertRequireEdges(t, edges, usesNone.Key, []string{"example.com/b"}, []string{"example.com/a"})
+}

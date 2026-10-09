@@ -57,15 +57,7 @@ func (importRule) Edges(
 			continue
 		}
 
-		for _, provider := range providedRequires(importsOf(parsed), required[root]) {
-			for _, dependent := range byFile[file] {
-				edges = append(edges, entities.Edge{
-					Dependent: dependent.Key,
-					Provider:  provider,
-					Reason:    entities.ReasonImport,
-				})
-			}
-		}
+		edges = append(edges, importEdges(parsed, fset, byFile[file], required[root])...)
 
 		for _, use := range packages.uses(parsed, fset) {
 			edges = append(edges, packages.edges(use, byFile[file])...)
@@ -122,6 +114,46 @@ func parseGoFile(snap entities.Snapshot, file string) (*ast.File, *token.FileSet
 	}
 
 	return parsed, fset
+}
+
+// importEdges makes each declaration of a file wait for the require providing
+// a package it uses. The edge was once per file, and a wiring function that
+// lists every module of the program then waited for the last require on behalf
+// of each of its statements.
+func importEdges(
+	parsed *ast.File,
+	fset *token.FileSet,
+	fileDecls []entities.Decl,
+	required map[string]entities.DeclKey,
+) []entities.Edge {
+	uses := importUses(parsed, fset)
+	seen := map[entities.Edge]bool{}
+
+	var edges []entities.Edge
+
+	for _, imported := range importsOf(parsed) {
+		for _, provider := range providedRequires([]string{imported}, required) {
+			for _, dependent := range fileDecls {
+				span := declSpan{start: dependent.Span.Start, end: dependent.Span.End}
+				if !uses[imported].reaches(span) {
+					continue
+				}
+
+				edge := entities.Edge{
+					Dependent: dependent.Key,
+					Provider:  provider,
+					Reason:    entities.ReasonImport,
+				}
+				if !seen[edge] {
+					seen[edge] = true
+
+					edges = append(edges, edge)
+				}
+			}
+		}
+	}
+
+	return edges
 }
 
 // importsOf lists the import paths of a parsed file.
