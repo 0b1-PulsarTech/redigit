@@ -186,21 +186,21 @@ func TestUnbornProvidersPullsALibraryWithItsManifest(t *testing.T) {
 	}
 }
 
-func TestUnbornProvidersLeavesATestBehindWhoseSharedHelperNeedsAFeature(t *testing.T) {
+func TestUnbornProvidersLeavesATestBehindWhoseSharedSupportNeedsAFeature(t *testing.T) {
 	t.Parallel()
 
 	member := decl("a/handler.go", "Handle", "a")
 	event := decl("kernel/event.go", "Event", "kernel")
 	late := decl("b/late.go", "Late", "b")
-	helper := testDecl("kernel/helper_test.go", "runEvent", "kernel")
+	support := testDecl("kernel/support_test.go", "runEvent", "kernel")
 	eventTest := testDecl("kernel/event_test.go", "TestEvent", "kernel")
 
 	graph := entities.NewGraph(
-		[]entities.Decl{member, event, late, helper, eventTest},
+		[]entities.Decl{member, event, late, support, eventTest},
 		[]entities.Edge{
 			needs(member, event),
-			needs(eventTest, helper),
-			needs(helper, late),
+			needs(eventTest, support),
+			needs(support, late),
 		},
 		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
 	)
@@ -209,17 +209,51 @@ func TestUnbornProvidersLeavesATestBehindWhoseSharedHelperNeedsAFeature(t *testi
 		member.Key:    "a",
 		event.Key:     SharedFeature,
 		late.Key:      "b",
-		helper.Key:    SharedFeature,
+		support.Key:   SharedFeature,
 		eventTest.Key: SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
 
-	if slices.Contains(got, eventTest.Key) || slices.Contains(got, helper.Key) {
+	if slices.Contains(got, eventTest.Key) || slices.Contains(got, support.Key) {
 		t.Fatalf(
-			"unbornProviders() = %v, must leave the test and its helper behind: the helper needs %s",
+			"unbornProviders() = %v, must leave the test and its support behind: the support needs %s",
 			got,
 			late.Key,
+		)
+	}
+}
+
+func TestUnbornProvidersIgnoresAGeneratedByEdgeIntoATest(t *testing.T) {
+	t.Parallel()
+
+	member := decl("a/handler.go", "Handle", "a")
+	mock := decl("kernel/store_mock.go", "NewMockStore", "kernel")
+	support := testDecl("kernel/store_test.go", "newStore", "kernel")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{member, mock, support},
+		[]entities.Edge{
+			needs(member, mock),
+			needs(support, mock),
+			{Dependent: mock.Key, Provider: support.Key, Reason: entities.ReasonGeneratedBy},
+		},
+		nil,
+	)
+
+	own := ownership{owner: map[entities.DeclKey]FeatureID{
+		member.Key:  "a",
+		mock.Key:    SharedFeature,
+		support.Key: SharedFeature,
+	}}
+
+	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
+
+	if slices.Contains(got, support.Key) {
+		t.Fatalf(
+			"unbornProviders() = %v, must not follow the generator directive into %s",
+			got,
+			support.Key,
 		)
 	}
 }
