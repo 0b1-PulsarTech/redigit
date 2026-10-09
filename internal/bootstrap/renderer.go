@@ -8,6 +8,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 )
 
 // renderer is what byExtension dispatches to: the same Render the indexing
@@ -68,27 +69,19 @@ func configExtensions() []string {
 	})
 }
 
-// configRenderers maps every extension the config pack owns to it, so the
-// dispatch table and the language registration can never disagree about which
-// files it covers.
-func configRenderers(syntax renderer) map[string]renderer {
-	out := make(map[string]renderer, len(configExtensions()))
-	for _, ext := range configExtensions() {
-		out[ext] = syntax
+// renderersByExtension is byExtension's dispatch table: each extension a
+// language claims reads with that language's Syntax. configSyntax is
+// byExtension's fallback and the opaque pack shares it, so a path no language
+// lists still renders through the Syntax it was indexed with, never through
+// the Go syntax.
+func renderersByExtension(languages []indexing.Language) map[string]renderer {
+	out := map[string]renderer{}
+
+	for _, language := range languages {
+		for _, ext := range language.Extensions {
+			out[ext] = language.Syntax
+		}
 	}
-
-	return out
-}
-
-// renderersByExtension is byExtension's dispatch table: ".go" reads with
-// goSyntax, ".dart" with dartSyntax, every extension the config pack owns
-// reads with configSyntax, and configSyntax is also passed as byExtension's fallback - the opaque pack
-// shares configSyntax too, so a path neither list names still renders through
-// the Syntax it was indexed with, never through the Go syntax.
-func renderersByExtension(goSyntax, dartSyntax, configSyntax renderer) map[string]renderer {
-	out := configRenderers(configSyntax)
-	out[".go"] = goSyntax
-	out[".dart"] = dartSyntax
 
 	return out
 }

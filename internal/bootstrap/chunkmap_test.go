@@ -9,7 +9,6 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
-	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
 )
 
 func TestParseChunkMap(t *testing.T) {
@@ -77,12 +76,8 @@ func TestLoadChunkMapFailsOnAMissingFile(t *testing.T) {
 func TestValidateChunkMap(t *testing.T) {
 	t.Parallel()
 
-	specific := specificLanguages(
-		config.NewSyntax(configChunkers(nil)),
-		dart.NewSyntax(nil, nil),
-		nil,
-	)
-	snap := entities.Snapshot{Files: []string{"main.go", "go.mod", "engines/wwebjs/src/main.ts"}}
+	specific := specificLanguages(config.NewSyntax(configChunkers(nil)), finalTree{}, nil)
+	snap := entities.Snapshot{Files: []string{"main.go", "go.mod", "engines/wwebjs/src/main.tmpl"}}
 
 	testCases := []struct {
 		name      string
@@ -94,7 +89,9 @@ func TestValidateChunkMap(t *testing.T) {
 		{
 			name: "a path the opaque pack would otherwise own is fine",
 			chunkMap: entities.ChunkMap{
-				"engines/wwebjs/src/main.ts": {{Name: "x", Span: entities.Span{Start: 0, End: 1}}},
+				"engines/wwebjs/src/main.tmpl": {
+					{Name: "x", Span: entities.Span{Start: 0, End: 1}},
+				},
 			},
 		},
 		{

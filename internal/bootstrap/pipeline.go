@@ -17,6 +17,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/web"
 	"github.com/wrapped-owls/redigit/internal/infra/lsp"
 )
 
@@ -121,9 +122,12 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	}
 
 	indexCfg := cfg.Indexing
-	configSyntax, dartSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap)),
-		dart.NewSyntax(snapshot.Files, reader)
-	specific := specificLanguages(configSyntax, dartSyntax, cfg.BuildTags)
+	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
+	specific := specificLanguages(
+		configSyntax,
+		finalTree{snapshot.Files, reader, cfg.Virtual},
+		cfg.BuildTags,
+	)
 
 	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
 		release(ctx, session, checkout)
@@ -177,10 +181,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		unclaimed: cfg.Auditing.Unclaimed,
 		snapshot:  snapshot,
 		source:    source,
-		renderer: newRenderer(
-			configSyntax,
-			renderersByExtension(golang.NewSyntax(), dartSyntax, configSyntax),
-		),
+		renderer:  newRenderer(configSyntax, renderersByExtension(specific)),
 	}, nil
 }
 
@@ -348,6 +349,19 @@ func (p *Pipeline) Close(ctx context.Context) error {
 	return closeErr
 }
 
+// finalTree is what the Dart and web packs resolve an import against: which
+// files the tree holds, how to read one, and where each virtual module a
+// bundler plugin makes up is compiled from.
+type finalTree struct {
+	files   []string
+	reader  treeReader
+	virtual map[string]string
+}
+
+type treeReader interface {
+	Read(ctx context.Context, path string) ([]byte, error)
+}
+
 // specificLanguages is what the indexer reads a known format with. The config
 // entry covers the files a build needs and no language server reads: without
 // them a plan holds no go.mod, so every tree it describes has source and
@@ -357,11 +371,11 @@ func (p *Pipeline) Close(ctx context.Context) error {
 // chunk map against real ownership before the catch-all pack - which would
 // otherwise also claim every path - is added.
 //
-// Dart is not Resolved: the one language server a run starts is gopls, so its
-// rule pack carries the reference edges itself.
+// Dart and the web files are not Resolved: the one language server a run
+// starts is gopls, so their rule packs carry the reference edges themselves.
 func specificLanguages(
 	configSyntax config.Syntax,
-	dartSyntax dart.Syntax,
+	tree finalTree,
 	tags []string,
 ) []indexing.Language {
 	return []indexing.Language{
@@ -375,8 +389,14 @@ func specificLanguages(
 		{
 			Name:       "dart",
 			Extensions: []string{".dart"},
-			Syntax:     dartSyntax,
+			Syntax:     dart.NewSyntax(tree.files, tree.reader),
 			Rules:      dart.NewRulePack(),
+		},
+		{
+			Name:       "web",
+			Extensions: web.Extensions(),
+			Syntax:     web.NewSyntax(tree.files, tree.reader),
+			Rules:      web.NewRulePack(tree.virtual),
 		},
 		{
 			Name:       "config",
@@ -391,7 +411,7 @@ func specificLanguages(
 // It shares configSyntax's own chunker list, so it reads such a path
 // whole-file by default (chunk.WholeFile) unless a chunk map entry refines
 // the cut - see docs/PLANO-EMISSAO.md:113-133. Without it, a format this tool
-// has no reader for - .ts, .tmpl, a golden fixture - vanishes from the graph
+// has no reader for - .tmpl, a golden fixture - vanishes from the graph
 // in silence and a plan built from this run can never reproduce it.
 func opaqueLanguage(configSyntax config.Syntax) indexing.Language {
 	return indexing.Language{
