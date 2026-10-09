@@ -95,7 +95,7 @@ func (index sharedIndex) siblingsOf(
 	// early is safe only once its own needs are already met (born, or shared
 	// and walked by this same closure).
 	for _, test := range index.testsOf[current] {
-		if own.owner[test] == SharedFeature && safeToPullNow(graph, test, own, born) {
+		if own.owner[test] == SharedFeature && index.safeToPull(graph, test, born) {
 			out = append(out, test)
 		}
 	}
@@ -115,15 +115,45 @@ func testAnchors(graph entities.Graph) map[entities.DeclKey][]entities.DeclKey {
 	return out
 }
 
-func safeToPullNow(
+// safeToPull is whether a test can be born with the shared kernel: everything it
+// needs, and everything the shared tests it needs themselves need, is born or
+// shared. A shared test is pulled along with its reader, so it is checked as
+// the reader is: its own needs can belong to a feature that is not built yet.
+func (index sharedIndex) safeToPull(
 	graph entities.Graph,
 	key entities.DeclKey,
-	own ownership,
 	born map[entities.DeclKey]bool,
 ) bool {
-	for _, edge := range graph.Needs(key) {
-		if !born[edge.Provider] && own.owner[edge.Provider] != SharedFeature {
-			return false
+	seen := map[entities.DeclKey]bool{key: true}
+	queue := []entities.DeclKey{key}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		for _, edge := range graph.Needs(current) {
+			provider := edge.Provider
+
+			switch {
+			case seen[provider] || born[provider]:
+				continue
+			case index.own.owner[provider] != SharedFeature:
+				return false
+			}
+
+			seen[provider] = true
+
+			queue = append(queue, provider)
+		}
+
+		if decl, found := graph.Decl(current); found && decl.Atom != "" {
+			for _, member := range index.atoms[decl.Atom] {
+				if !seen[member] {
+					seen[member] = true
+
+					queue = append(queue, member)
+				}
+			}
 		}
 	}
 

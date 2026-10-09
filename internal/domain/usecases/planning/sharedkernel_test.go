@@ -185,3 +185,41 @@ func TestUnbornProvidersPullsALibraryWithItsManifest(t *testing.T) {
 		t.Fatalf("unbornProviders() = %v, want the manifest and the library body together", got)
 	}
 }
+
+func TestUnbornProvidersLeavesATestBehindWhoseSharedHelperNeedsAFeature(t *testing.T) {
+	t.Parallel()
+
+	member := decl("a/handler.go", "Handle", "a")
+	event := decl("kernel/event.go", "Event", "kernel")
+	late := decl("b/late.go", "Late", "b")
+	helper := testDecl("kernel/helper_test.go", "runEvent", "kernel")
+	eventTest := testDecl("kernel/event_test.go", "TestEvent", "kernel")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{member, event, late, helper, eventTest},
+		[]entities.Edge{
+			needs(member, event),
+			needs(eventTest, helper),
+			needs(helper, late),
+		},
+		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
+	)
+
+	own := ownership{owner: map[entities.DeclKey]FeatureID{
+		member.Key:    "a",
+		event.Key:     SharedFeature,
+		late.Key:      "b",
+		helper.Key:    SharedFeature,
+		eventTest.Key: SharedFeature,
+	}}
+
+	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
+
+	if slices.Contains(got, eventTest.Key) || slices.Contains(got, helper.Key) {
+		t.Fatalf(
+			"unbornProviders() = %v, must leave the test and its helper behind: the helper needs %s",
+			got,
+			late.Key,
+		)
+	}
+}
