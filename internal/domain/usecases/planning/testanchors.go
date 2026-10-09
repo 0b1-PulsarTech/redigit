@@ -64,28 +64,53 @@ func anchorTests(
 		}
 	}
 
-	return entities.NewGraph(decls, productionEdges(graph), anchors), raisedTests(order, anchors)
+	return entities.NewGraph(
+			decls,
+			productionEdges(graph),
+			anchors,
+		), raisedTests(
+			graph,
+			order,
+			anchors,
+		)
 }
 
-// raisedTests lifts each test to the position of the latest subject it waits for.
-// The ordering was settled before these anchors existed, and a cut sorts by
-// position, so a helper positioned by its kernel imports alone is cut ahead of
-// the code its suite exercises even inside one feature.
-func raisedTests(order entities.Ordering, anchors []entities.Anchor) entities.Ordering {
+// raisedTests lifts each test to the position of the latest subject it waits
+// for, and whatever reads a lifted test with it. The ordering was settled before
+// these anchors existed, and a cut sorts by position, so a helper positioned by
+// its kernel imports alone is cut ahead of the code its suite exercises, and a
+// test positioned below the helper it calls is cut ahead of it.
+func raisedTests(
+	graph entities.Graph,
+	order entities.Ordering,
+	anchors []entities.Anchor,
+) entities.Ordering {
 	raised := make(map[entities.DeclKey]entities.Position, len(order.At))
 	maps.Copy(raised, order.At)
+
+	type wait struct{ dependent, provider entities.DeclKey }
+
+	var waits []wait
+
+	for _, anchor := range anchors {
+		if anchor.Reason == entities.ReasonTestOf {
+			waits = append(waits, wait{anchor.Decl, anchor.To})
+		}
+	}
+
+	for _, edge := range graph.Edges() {
+		if testSide(graph, edge.Dependent) {
+			waits = append(waits, wait{edge.Dependent, edge.Provider})
+		}
+	}
 
 	for changed := true; changed; {
 		changed = false
 
-		for _, anchor := range anchors {
-			if anchor.Reason != entities.ReasonTestOf {
-				continue
-			}
-
-			subject, found := raised[anchor.To]
-			if found && subject > raised[anchor.Decl] {
-				raised[anchor.Decl] = subject
+		for _, each := range waits {
+			provider, found := raised[each.provider]
+			if found && provider > raised[each.dependent] {
+				raised[each.dependent] = provider
 				changed = true
 			}
 		}

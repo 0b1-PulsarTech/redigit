@@ -146,3 +146,33 @@ func TestAnchorTestsWaitsForTheEarliestOfATwin(t *testing.T) {
 		t.Errorf("helper positioned at %d, want 3", raised.Of(helper.Key))
 	}
 }
+
+// A test that calls a helper is lifted with it, or the cut sorts the test ahead
+// of the helper it cannot compile without.
+func TestAnchorTestsLiftsAReaderOfALiftedHelper(t *testing.T) {
+	t.Parallel()
+
+	source := decl("a/store.go", "Put", "a")
+	helper := testDecl("a/store_test.go", "newStore", "a")
+	reader := testDecl("a/other_test.go", "TestOther", "a")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{source, helper, reader},
+		[]entities.Edge{
+			{Dependent: reader.Key, Provider: helper.Key, Reason: entities.ReasonReference},
+		},
+		nil,
+	)
+	order := entities.Ordering{At: map[entities.DeclKey]entities.Position{
+		source.Key: 40, helper.Key: 2, reader.Key: 5,
+	}}
+
+	_, raised := anchorTests(graph, order)
+
+	if raised.Of(helper.Key) != 40 || raised.Of(reader.Key) != 40 {
+		t.Fatalf(
+			"helper at %d and reader at %d, want both at 40",
+			raised.Of(helper.Key), raised.Of(reader.Key),
+		)
+	}
+}
