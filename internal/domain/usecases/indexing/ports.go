@@ -54,6 +54,27 @@ type Syntax interface {
 	Render(ctx context.Context, source []byte, keep []entities.DeclKey) ([]byte, error)
 }
 
+// Slicer is the optional part of a Syntax that cuts a function into the
+// statements it is made of. The functions that assemble a program (the route
+// table, the injector, the bootstrap steps) are written one registration at a
+// time, each with the feature it registers, so a function born whole waits for
+// the last feature and drags the program's entry to the end of the history.
+type Slicer interface {
+	// Slice splits the function fn declares into its signature and its
+	// statements. It reports false for a function whose body cannot be cut and
+	// still compile: one with labels, or an early return between statements.
+	Slice(ctx context.Context, fn entities.Decl, source []byte) (Sliced, bool, error)
+}
+
+// Sliced is a function cut into pieces. Head keeps the key of the function and
+// spans its signature; each member is one statement, in source order, and the
+// edges say which statements a member needs from the body itself.
+type Sliced struct {
+	Head    entities.Decl
+	Members []entities.Decl
+	Edges   []entities.Edge
+}
+
 // RulePack contributes the edges no reference graph can see. Generated code
 // never names its generator; a structural double records what it mirrors only in
 // a header comment; a migration sits between the schema a generator read and the

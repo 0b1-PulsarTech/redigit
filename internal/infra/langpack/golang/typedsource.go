@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"path"
 	"slices"
@@ -25,65 +26,105 @@ import (
 // Packages of the tree are checked from source, tests included, under the run's
 // build tags; what they import from outside the tree comes from export data.
 // A file the tags hide is checked in a pass of its own, under tags that show it
-// (see hiddenPasses). The first call loads and every later one reuses the
-// result, which is only sound because one run indexes one snapshot.
+// (see hiddenPasses). The first call loads, which is only sound because one run
+// indexes one snapshot; the packages are kept, because the same facts are asked
+// again for a different set of declarations once a function is cut into
+// statements, and each statement is a dependent of its own.
 type typedSource struct {
 	tags []string
 
-	once  sync.Once
-	facts typedFacts
-	err   error
+	once   sync.Once
+	loaded [][]*packages.Package
+	err    error
+
+	guard sync.Mutex
+	facts map[uint64]typedFacts
 }
 
-func newTypedSource(tags []string) *typedSource { return &typedSource{tags: tags} }
+func newTypedSource(tags []string) *typedSource {
+	return &typedSource{tags: tags, facts: map[uint64]typedFacts{}}
+}
 
-// Facts returns what the type checker says about the snapshot's tree.
+// Facts returns what the type checker says about the snapshot's tree, with each
+// reference attributed to the declaration among decls that holds it.
 func (s *typedSource) Facts(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (typedFacts, error) {
 	s.once.Do(func() {
-		s.facts, s.err = s.check(ctx, snap, decls)
+		s.loaded, s.err = s.check(ctx, snap)
 	})
 
-	return s.facts, s.err
+	if s.err != nil {
+		return typedFacts{}, s.err
+	}
+
+	s.guard.Lock()
+	defer s.guard.Unlock()
+
+	shape := shapeOf(decls)
+	if known, found := s.facts[shape]; found {
+		return known, nil
+	}
+
+	locator := newDeclLocator(decls)
+
+	var facts typedFacts
+
+	for _, pkgs := range s.loaded {
+		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
+	}
+
+	s.facts[shape] = facts.sorted()
+
+	return s.facts[shape], nil
+}
+
+// shapeOf identifies a set of declarations by what attribution reads: each
+// one's key and where it spans.
+func shapeOf(decls []entities.Decl) uint64 {
+	hash := fnv.New64a()
+
+	for _, decl := range decls {
+		_, _ = fmt.Fprintf(hash, "%s|%d|%d\n", decl.Key, decl.Span.Start, decl.Span.End)
+	}
+
+	return hash.Sum64()
 }
 
 func (s *typedSource) check(
 	ctx context.Context,
 	snap entities.Snapshot,
-	decls []entities.Decl,
-) (typedFacts, error) {
+) ([][]*packages.Package, error) {
 	modules, err := modulesOf(snap)
 	if err != nil {
-		return typedFacts{}, err
+		return nil, err
 	}
 
 	if len(modules) == 0 {
-		return typedFacts{}, nil
+		return nil, nil
 	}
 
 	passes, err := hiddenPasses(snap, s.tags, modules)
 	if err != nil {
-		return typedFacts{}, err
+		return nil, err
 	}
 
 	passes = append([]loadPass{{tags: s.tags, patterns: allPatterns(modules)}}, passes...)
-	locator := newDeclLocator(decls)
 
-	var facts typedFacts
+	loaded := make([][]*packages.Package, 0, len(passes))
 
 	for _, pass := range passes {
 		pkgs, loadErr := typeCheck(ctx, snap.Root, pass)
 		if loadErr != nil {
-			return typedFacts{}, loadErr
+			return nil, loadErr
 		}
 
-		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
+		loaded = append(loaded, pkgs)
 	}
 
-	return facts.sorted(), nil
+	return loaded, nil
 }
 
 // loadPass is one load of the tree: the packages to check, under which tags.

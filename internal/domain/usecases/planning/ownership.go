@@ -46,7 +46,7 @@ func assign(graph entities.Graph) ownership {
 		cost:  map[FeatureID]int{},
 	}
 
-	roots := findWiring(graph)
+	roots := entities.FindWiring(graph)
 	own.roots = roots
 	own.deferred = deferTests(graph, roots)
 

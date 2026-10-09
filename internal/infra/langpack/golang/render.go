@@ -123,6 +123,8 @@ func filterDecl(
 	switch d := decl.(type) {
 	case *ast.FuncDecl:
 		if keepSet[funcIdent(d)] {
+			keepStatements(d, keepSet)
+
 			return []ast.Decl{d}
 		}
 
@@ -140,4 +142,26 @@ func funcIdent(d *ast.FuncDecl) declIdent {
 	}
 
 	return declIdent{entities.KindMethod, receiverName(d.Recv) + "." + d.Name.Name}
+}
+
+// keepStatements cuts a function down to the statements the caller kept. A
+// function none of whose statements is named was not cut when the declarations
+// were read, so it is written whole.
+func keepStatements(fn *ast.FuncDecl, keepSet map[declIdent]bool) {
+	if fn.Body == nil {
+		return
+	}
+
+	name := funcIdent(fn).name
+	kept := make([]ast.Stmt, 0, len(fn.Body.List))
+
+	for index, stmt := range fn.Body.List {
+		if keepSet[declIdent{entities.KindStmt, stmtName(name, index)}] {
+			kept = append(kept, stmt)
+		}
+	}
+
+	if len(kept) > 0 {
+		fn.Body.List = kept
+	}
 }

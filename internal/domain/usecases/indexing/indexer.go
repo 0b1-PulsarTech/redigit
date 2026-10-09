@@ -105,19 +105,24 @@ func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, err
 		return Result{}, err
 	}
 
-	ruleEdges, anchors, err := i.applyRules(ctx, snap, decls)
+	graph, err := i.assemble(ctx, snap, decls, edges)
 	if err != nil {
 		return Result{}, err
 	}
 
-	if err = i.applyAtoms(ctx, snap, decls); err != nil {
+	cut, err := i.cutWiring(ctx, graph, decls, where)
+	if err != nil {
 		return Result{}, err
 	}
 
-	result := Result{
-		Graph: entities.NewGraph(decls, i.filterEdges(snap, append(edges, ruleEdges...)), anchors),
-		Blind: blind,
+	if len(cut.replaced) > 0 {
+		graph, err = i.assembleCut(ctx, snap, graph, edges, cut, where)
+		if err != nil {
+			return Result{}, err
+		}
 	}
+
+	result := Result{Graph: graph, Blind: blind}
 
 	if ratio := result.BlindRatio(); ratio > maxBlindRatio {
 		return result, fmt.Errorf(
@@ -132,6 +137,57 @@ func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, err
 	}
 
 	return result, nil
+}
+
+// assemble turns the declarations and the edges a resolver proved into a graph,
+// adding what the rules of each language see that a resolver cannot.
+func (i Indexer) assemble(
+	ctx context.Context,
+	snap entities.Snapshot,
+	decls []entities.Decl,
+	edges []entities.Edge,
+) (entities.Graph, error) {
+	ruleEdges, anchors, err := i.applyRules(ctx, snap, decls)
+	if err != nil {
+		return entities.Graph{}, err
+	}
+
+	if err = i.applyAtoms(ctx, snap, decls); err != nil {
+		return entities.Graph{}, err
+	}
+
+	return entities.NewGraph(
+		decls, i.filterEdges(snap, append(slices.Clone(edges), ruleEdges...)), anchors,
+	), nil
+}
+
+// assembleCut builds the graph again over the cut functions: what the whole
+// function read is dropped, and each statement gets back the readers it wrote.
+func (i Indexer) assembleCut(
+	ctx context.Context,
+	snap entities.Snapshot,
+	first entities.Graph,
+	edges []entities.Edge,
+	cut wiringCut,
+	where locator,
+) (entities.Graph, error) {
+	again := i.reattach(ctx, first, cut, where)
+	kept := make([]entities.Edge, 0, len(edges)+len(again)+len(cut.body))
+
+	for _, edge := range edges {
+		if !cut.replaced[edge.Dependent] {
+			kept = append(kept, edge)
+		}
+	}
+
+	kept = append(kept, again...)
+	kept = append(kept, cut.body...)
+
+	slices.SortFunc(kept, compareEdges)
+
+	return i.assemble(ctx, snap, cut.decls, slices.CompactFunc(kept, func(a, b entities.Edge) bool {
+		return compareEdges(a, b) == 0
+	}))
 }
 
 // read parses every owned file into declarations. Files are independent, so

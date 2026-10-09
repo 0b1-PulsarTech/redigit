@@ -47,7 +47,7 @@ func shareLibraries(graph entities.Graph, own ownership, heads map[string]bool) 
 	read := readFromOutside(graph)
 
 	for _, decl := range graph.Decls() {
-		if isTestSide(decl) {
+		if entities.IsTestSide(decl) {
 			continue
 		}
 
@@ -69,7 +69,8 @@ func readFromOutside(graph entities.Graph) map[string]bool {
 		dependent, known := graph.Decl(edge.Dependent)
 		provider, found := graph.Decl(edge.Provider)
 
-		if !known || !found || isTestSide(dependent) || isStructural(edge.Reason) {
+		if !known || !found || entities.IsTestSide(dependent) ||
+			entities.IsStructural(edge.Reason) {
 			continue
 		}
 

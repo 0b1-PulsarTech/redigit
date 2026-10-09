@@ -97,7 +97,7 @@ func needsFresh(
 	fresh, touched map[entities.DeclKey]bool,
 ) bool {
 	for _, edge := range graph.Needs(key) {
-		if isStructural(edge.Reason) || edge.Reason == entities.ReasonImport {
+		if entities.IsStructural(edge.Reason) || edge.Reason == entities.ReasonImport {
 			continue
 		}
 

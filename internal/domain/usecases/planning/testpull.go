@@ -53,5 +53,5 @@ func (index sharedIndex) safeToPull(
 func driftsToTest(graph entities.Graph, edge entities.Edge) bool {
 	provider, found := graph.Decl(edge.Provider)
 
-	return isSoft(edge.Reason) && found && isTestSide(provider)
+	return isSoft(edge.Reason) && found && entities.IsTestSide(provider)
 }

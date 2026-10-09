@@ -13,6 +13,11 @@ const (
 	KindType   DeclKind = "type"
 	KindValue  DeclKind = "value"
 	KindOther  DeclKind = "other"
+	// KindStmt is a piece of a function body: one statement of a function that
+	// assembles the program, named "Function#index". The function itself stays a
+	// KindFunc or KindMethod declaration holding the signature, and a statement
+	// is born when what it registers exists.
+	KindStmt DeclKind = "stmt"
 )
 
 // UnitID identifies the importable unit a declaration belongs to. A language

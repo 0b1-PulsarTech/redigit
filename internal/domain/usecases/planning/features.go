@@ -23,7 +23,7 @@ func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 	var out []entities.Decl
 
 	for _, decl := range graph.Decls() {
-		if isTestSide(decl) {
+		if entities.IsTestSide(decl) {
 			continue
 		}
 
@@ -51,7 +51,7 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 	}
 
 	for _, edge := range graph.Needs(decl.Key) {
-		if !isStructural(edge.Reason) {
+		if !entities.IsStructural(edge.Reason) {
 			return false
 		}
 	}
@@ -59,20 +59,10 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 	return true
 }
 
-func isStructural(reason entities.EdgeReason) bool {
-	switch reason {
-	case entities.ReasonModule, entities.ReasonHosts, entities.ReasonWorkspace,
-		entities.ReasonChecksum:
-		return true
-	default:
-		return false
-	}
-}
-
 func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
-		if found && !isTestSide(consumer) && !roots[edge.Dependent] {
+		if found && !entities.IsTestSide(consumer) && !roots[edge.Dependent] {
 			return true
 		}
 	}

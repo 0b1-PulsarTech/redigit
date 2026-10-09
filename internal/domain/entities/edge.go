@@ -71,6 +71,11 @@ const (
 	// documentation, a pipeline definition, an agent instruction. Written about
 	// a whole that does not exist until the end, it belongs at the end.
 	ReasonProse EdgeReason = "prose"
+	// ReasonBody ties a statement of a function to what the function body itself
+	// supplies: the signature it sits under, and the statement that declares or
+	// last writes a local it reads. The compiler needs both, and no reference
+	// query sees a local.
+	ReasonBody EdgeReason = "body"
 )
 
 // Edge records that Dependent cannot be born before Provider. The field names

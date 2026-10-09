@@ -29,7 +29,7 @@ func rooted() (entities.Graph, entities.Ordering, map[string]entities.Decl) {
 	)
 	at[root.Key] = entities.Position(len(at))
 
-	for index := range wiringFloor {
+	for index := range 20 {
 		ballast := decl("cmd/app/bind.go", fmt.Sprintf("Bind%d", index), "cmd/app")
 		decls = append(decls, ballast)
 		edges = append(edges, needs(root, ballast))
@@ -45,7 +45,7 @@ func TestFindWiring(t *testing.T) {
 	t.Parallel()
 
 	graph, _, named := rooted()
-	roots := findWiring(graph)
+	roots := entities.FindWiring(graph)
 
 	testCases := []struct {
 		name string
@@ -73,7 +73,7 @@ func TestFindWiringIgnoresASmallProgram(t *testing.T) {
 
 	graph, _, _ := twoFeatures()
 
-	if roots := findWiring(graph); len(roots) != 0 {
+	if roots := entities.FindWiring(graph); len(roots) != 0 {
 		t.Fatalf("wiring = %v, want none: the program is smaller than any root", roots)
 	}
 }

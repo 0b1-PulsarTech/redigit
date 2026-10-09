@@ -21,7 +21,7 @@ func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKe
 
 	for _, key := range keys {
 		decl, found := graph.Decl(key)
-		if !found || !isTestSide(decl) {
+		if !found || !entities.IsTestSide(decl) {
 			continue
 		}
 
@@ -85,7 +85,7 @@ func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.D
 		index[key] = at
 
 		decl, found := graph.Decl(key)
-		if !found || decl.Atom == "" || !isTestSide(decl) {
+		if !found || decl.Atom == "" || !entities.IsTestSide(decl) {
 			continue
 		}
 
