@@ -14,7 +14,9 @@ var (
 	fromClause   = regexp.MustCompile(`\bfrom\s*['"]([^'"\n]+)['"]`)
 	bareImport   = regexp.MustCompile(`\bimport\s*['"]([^'"\n]+)['"]`)
 	dynamicCall  = regexp.MustCompile(`\bimport\(\s*['"]([^'"\n]+)['"]\s*\)`)
-	visitedRoute = regexp.MustCompile("['\"`](/[a-z][a-z0-9-]*(?:/[a-z0-9-]+)*)/?['\"`?#]")
+	visitedRoute = regexp.MustCompile(
+		"['\"`}](/[a-z][a-z0-9-]*(?:/(?:[a-z0-9-]+|\\$\\{[^}]*\\}))*)/?['\"`?#]",
+	)
 )
 
 // specGroup is the capture group each import pattern puts the specifier in.
@@ -47,14 +49,25 @@ func specifiers(source string) []string {
 	return out
 }
 
+// interpolated stands for a "${...}" segment, which only a "[param]" route
+// segment matches.
+const interpolated = "[]"
+
 // visits lists the app paths a test reaches for in a string literal, such as
-// "/conversas" or `/funil?periodo=`.
+// "/conversas", `/funil?periodo=` or `${base}/conversas/${id}`.
 func visits(source string) []string {
 	matches := visitedRoute.FindAllStringSubmatch(source, -1)
 	out := make([]string, 0, len(matches))
 
 	for _, match := range matches {
-		out = append(out, strings.TrimSuffix(match[1], "/"))
+		segments := strings.Split(strings.TrimSuffix(match[1], "/"), "/")
+		for index, segment := range segments {
+			if strings.HasPrefix(segment, "${") {
+				segments[index] = interpolated
+			}
+		}
+
+		out = append(out, strings.Join(segments, "/"))
 	}
 
 	return out

@@ -33,6 +33,7 @@ func TestTestAnchorRule(t *testing.T) {
 	want := map[string]string{
 		"web/test/util.test.ts": "web/src/lib/util.ts",
 		"web/test/page.mjs":     "web/src/routes/conversas/[id]/+page.svelte",
+		"web/test/runner.mjs":   "web/src/routes/conversas/[id]/+page.svelte",
 	}
 
 	if len(got) != len(want) {

@@ -64,6 +64,11 @@ func TestVisits(t *testing.T) {
 		},
 		{name: "a query string", source: "fetch(`/funil?periodo=7`)", want: []string{"/funil"}},
 		{name: "a fragment", source: "'/ajustes#ia'", want: []string{"/ajustes"}},
+		{
+			name:   "an interpolated base and segment",
+			source: "goto(`${app.base}/conversas/${id}?aba=detalhes`)",
+			want:   []string{"/conversas/[]"},
+		},
 		{name: "the root path", source: "get('/')", want: nil},
 		{name: "a file path", source: "read('/tmp/x.json')", want: nil},
 		{name: "an upper-case segment", source: "'/Funil'", want: nil},

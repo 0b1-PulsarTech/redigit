@@ -53,8 +53,10 @@ var app = fakeTree{
 	"web/test/harness.mjs":                       "export const h = 1;\n",
 	"web/test/page.mjs": "import { h } from '#test/harness.mjs';\n" +
 		"await fetch(base + '/conversas/abc');\n",
-	"web/test/util.test.ts": "import { more } from '#lib/util';\n",
-	"web/test/bare.mjs":     "import 'node:fs';\n",
+	"web/test/util.test.ts":   "import { more } from '#lib/util';\n",
+	"web/test/runner.mjs":     "import { run } from './cases/abre.mjs';\nawait run();\n",
+	"web/test/cases/abre.mjs": "export const run = () => goto(`${base}/conversas/${id}`);\n",
+	"web/test/bare.mjs":       "import 'node:fs';\n",
 }
 
 const routePage = `<script lang="ts">

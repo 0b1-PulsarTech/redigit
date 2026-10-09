@@ -19,6 +19,8 @@ func TestTreeIndexIsTest(t *testing.T) {
 		{file: "web/test/bare.mjs", isTest: true},
 		{file: "web/test/util.test.ts", isTest: true},
 		{file: "web/test/harness.mjs", isTest: false},
+		{file: "web/test/runner.mjs", isTest: true},
+		{file: "web/test/cases/abre.mjs", isTest: false},
 		{file: "web/src/lib/util.ts", isTest: false},
 		{file: "web/src/routes/+page.svelte", isTest: false},
 	}

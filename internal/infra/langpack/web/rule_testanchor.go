@@ -43,37 +43,69 @@ func (testAnchorRule) Anchors(ctx context.Context, run *index) ([]entities.Ancho
 	return out, nil
 }
 
+// subject searches the test, then the helpers under test/ it imports,
+// breadth first: a suite runner names its cases, and only they name a page.
 func (run *index) subject(ctx context.Context, test string) (string, bool, error) {
-	targets, err := run.targets(ctx, test)
-	if err != nil {
-		return "", false, err
-	}
+	queue, seen := []string{test}, map[string]bool{test: true}
 
-	for _, target := range targets {
-		if !isUnderTest(target) {
-			return target, true, nil
+	for len(queue) > 0 {
+		file := queue[0]
+		queue = queue[1:]
+
+		found, helpers, err := run.ownSubject(ctx, file)
+		if err != nil || found != "" {
+			return found, found != "", err
 		}
-	}
 
-	source, err := run.space.read(ctx, test)
-	if err != nil {
-		return "", false, err
-	}
+		for _, helper := range helpers {
+			if !seen[helper] {
+				seen[helper] = true
 
-	if err = run.space.load(ctx); err != nil {
-		return "", false, err
-	}
-
-	root, _, isPackaged := nearest(run.space.packages, path.Dir(test))
-	if !isPackaged {
-		return "", false, nil
-	}
-
-	for _, visited := range visits(string(source)) {
-		if page, found := run.routeFor(root, visited); found {
-			return page, true, nil
+				queue = append(queue, helper)
+			}
 		}
 	}
 
 	return "", false, nil
+}
+
+// ownSubject is the first file outside test/ that file imports, or else the
+// first page it visits, along with the files under test/ it imports.
+func (run *index) ownSubject(ctx context.Context, file string) (string, []string, error) {
+	targets, err := run.targets(ctx, file)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var helpers []string
+
+	for _, target := range targets {
+		if !isUnderTest(target) {
+			return target, nil, nil
+		}
+
+		helpers = append(helpers, target)
+	}
+
+	source, err := run.space.read(ctx, file)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if err = run.space.load(ctx); err != nil {
+		return "", nil, err
+	}
+
+	root, _, isPackaged := nearest(run.space.packages, path.Dir(file))
+	if !isPackaged {
+		return "", helpers, nil
+	}
+
+	for _, visited := range visits(string(source)) {
+		if page, found := run.routeFor(root, visited); found {
+			return page, nil, nil
+		}
+	}
+
+	return "", helpers, nil
 }

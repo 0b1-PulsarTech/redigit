@@ -62,6 +62,7 @@ func TestRouteFor(t *testing.T) {
 			want:    "web/src/routes/conversas/novo/+page.svelte",
 			isFound: true,
 		},
+		{path: "/conversas/[]", want: "web/src/routes/conversas/[id]/+page.svelte", isFound: true},
 		{path: "/funil", isFound: false},
 		{path: "/conversas/abc/midia", isFound: false},
 	}
