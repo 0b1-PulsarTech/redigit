@@ -291,3 +291,41 @@ func TestImportRuleMakesEveryDeclarationWaitForABlankImport(t *testing.T) {
 		t.Error("a declaration using no selector does not wait for a blank-imported package")
 	}
 }
+
+// A file importing one type of a workspace module made every declaration of the
+// file wait for that module's require, and so for its manifest, long before the
+// module's first package: only the declaration reaching the package waits.
+func TestImportRuleMakesOnlyTheDeclarationUsingAPackageWaitForItsRequire(t *testing.T) {
+	t.Parallel()
+
+	source := "package lead\n\nimport \"github.com/org/lib/store\"\n\n" +
+		"func Uses() { store.Open() }\n\nfunc Idle() {}\n"
+
+	snap := treeWith(t, map[string]string{
+		"apps/lead/x.go":      source,
+		"apps/lead/go.mod":    "module m\n",
+		"libs/lib/store/a.go": "package store\n",
+	})
+
+	uses := withSpan(goDecl("apps/lead/x.go", "Uses"), source, "func Uses", "func Idle")
+	idle := withSpan(goDecl("apps/lead/x.go", "Idle"), source, "func Idle", "")
+	require := piece("apps/lead/go.mod", "require github.com/org/lib", entities.Span{})
+	decls := []entities.Decl{
+		piece("apps/lead/go.mod", "github.com/org/lead", entities.Span{}),
+		piece("libs/lib/go.mod", "github.com/org/lib", entities.Span{}),
+		require, uses, idle, goDecl("libs/lib/store/a.go", "Open"),
+	}
+
+	edges, err := (importRule{}).Edges(t.Context(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if !edgeBetween(edges, uses.Key, require.Key) {
+		t.Error("the declaration using the package does not wait for its require")
+	}
+
+	if edgeBetween(edges, idle.Key, require.Key) {
+		t.Error("a declaration using nothing of the package waits for its require")
+	}
+}

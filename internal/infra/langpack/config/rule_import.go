@@ -18,7 +18,9 @@ import (
 // package its file imports. No reference names the module that ships a package,
 // so the first importer landed hundreds of commits before the require it needs
 // and every tree between failed with "no required module provides package".
-// The edge is per file: a render prunes imports and a require is a leaf.
+// An import outside the repository is an edge per file, since a require is a leaf
+// and the file's imports are written whole; one of the repository's own packages
+// is an edge per declaration that reaches it.
 type importRule struct{}
 
 func (importRule) Name() string { return "import" }
@@ -57,19 +59,7 @@ func (importRule) Edges(
 			continue
 		}
 
-		for _, provider := range providedRequires(importsOf(parsed), required[root]) {
-			for _, dependent := range byFile[file] {
-				edges = append(edges, entities.Edge{
-					Dependent: dependent.Key,
-					Provider:  provider,
-					Reason:    entities.ReasonImport,
-				})
-			}
-		}
-
-		for _, use := range packages.uses(parsed, fset) {
-			edges = append(edges, packages.edges(use, byFile[file])...)
-		}
+		edges = append(edges, fileEdges(parsed, fset, packages, required[root], byFile[file])...)
 	}
 
 	return edges, nil
@@ -81,6 +71,72 @@ func (importRule) Anchors(
 	_ []entities.Decl,
 ) ([]entities.Anchor, error) {
 	return nil, nil
+}
+
+// fileEdges makes the declarations of one parsed file wait for the requires
+// that provide what they import.
+func fileEdges(
+	parsed *ast.File,
+	fset *token.FileSet,
+	packages packageIndex,
+	required map[string]entities.DeclKey,
+	decls []entities.Decl,
+) []entities.Edge {
+	var edges []entities.Edge
+
+	uses := packages.uses(parsed, fset)
+	inRepo := map[string]bool{}
+
+	for _, use := range uses {
+		inRepo[use.path] = true
+	}
+
+	var outside []string
+
+	for _, imported := range importsOf(parsed) {
+		if !inRepo[imported] {
+			outside = append(outside, imported)
+		}
+	}
+
+	for _, provider := range providedRequires(outside, required) {
+		for _, dependent := range decls {
+			edges = append(edges, entities.Edge{
+				Dependent: dependent.Key,
+				Provider:  provider,
+				Reason:    entities.ReasonImport,
+			})
+		}
+	}
+
+	// A render keeps an import only for the declarations that reach the package,
+	// so a require waits for those and not for the whole file: a converter
+	// file importing one type of a workspace module otherwise pulled that
+	// module's manifest hundreds of commits ahead of its first package.
+	for _, use := range uses {
+		module, owned := owningModule(use.path, required)
+		if !owned {
+			continue
+		}
+
+		for _, dependent := range decls {
+			if len(packages.edges(use, []entities.Decl{dependent})) == 0 {
+				continue
+			}
+
+			edges = append(edges, entities.Edge{
+				Dependent: dependent.Key,
+				Provider:  required[module],
+				Reason:    entities.ReasonImport,
+			})
+		}
+	}
+
+	for _, use := range uses {
+		edges = append(edges, packages.edges(use, decls)...)
+	}
+
+	return edges
 }
 
 // requiredModules maps each module directory to its require pieces, keyed by
