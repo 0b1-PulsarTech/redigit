@@ -158,31 +158,34 @@ func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 	}
 }
 
-func TestUnbornProvidersPullsALibraryWithItsManifest(t *testing.T) {
+// A library package is born with its first consumer, not whole: pulling every
+// package of a library when one is read put agentichatter at commit 41 and its
+// first importer at 787.
+func TestUnbornProvidersBringsOnlyTheLibraryDeclarationsAConsumerNeeds(t *testing.T) {
 	t.Parallel()
 
 	member := decl("app/main.go", "Main", "app")
 	manifest := decl("libs/kit/go.mod", "require", "kit")
-	body := decl("libs/kit/kit.go", "Kit", "kit")
+	used := decl("libs/kit/used/used.go", "Used", "kit/used")
+	unused := decl("libs/kit/other/other.go", "Other", "kit/other")
 
 	graph := entities.NewGraph(
-		[]entities.Decl{member, manifest, body},
-		[]entities.Edge{needs(member, manifest)},
+		[]entities.Decl{member, manifest, used, unused},
+		[]entities.Edge{needs(member, manifest), needs(member, used)},
 		nil,
 	)
 
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			member.Key: "app", manifest.Key: SharedFeature, body.Key: SharedFeature,
+			member.Key: "app", manifest.Key: SharedFeature,
+			used.Key: SharedFeature, unused.Key: SharedFeature,
 		},
-		library:   map[entities.DeclKey]string{body.Key: "libs/kit"},
-		libraries: map[string][]entities.DeclKey{"libs/kit": {body.Key}},
 	}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
 
-	if !slices.Contains(got, body.Key) || !slices.Contains(got, manifest.Key) {
-		t.Fatalf("unbornProviders() = %v, want the manifest and the library body together", got)
+	if len(got) != 2 || !slices.Contains(got, manifest.Key) || !slices.Contains(got, used.Key) {
+		t.Fatalf("unbornProviders() = %v, want only the manifest and the package read", got)
 	}
 }
 

@@ -27,10 +27,6 @@ type ownership struct {
 	// cost is how many declarations a feature needs in all, its own and the
 	// shared ones, so the smallest working feature can come first.
 	cost map[FeatureID]int
-	// library maps a declaration of a module with no entry point to that
-	// module, and libraries lists the module's production declarations.
-	library   map[entities.DeclKey]string
-	libraries map[string][]entities.DeclKey
 }
 
 // assign walks back from every entry point and counts, per declaration, how
@@ -44,12 +40,10 @@ func assign(graph entities.Graph) ownership {
 	rootOf := map[string]FeatureID{}
 
 	own := ownership{
-		owner:     map[entities.DeclKey]FeatureID{},
-		reach:     map[entities.DeclKey]int{},
-		group:     map[FeatureID]FeatureID{},
-		cost:      map[FeatureID]int{},
-		library:   map[entities.DeclKey]string{},
-		libraries: map[string][]entities.DeclKey{},
+		owner: map[entities.DeclKey]FeatureID{},
+		reach: map[entities.DeclKey]int{},
+		group: map[FeatureID]FeatureID{},
+		cost:  map[FeatureID]int{},
 	}
 
 	roots := findWiring(graph)

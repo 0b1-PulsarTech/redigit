@@ -40,9 +40,9 @@ func isHead(graph entities.Graph, entry entities.Decl, roots wiring) bool {
 }
 
 // shareLibraries makes every module that is read from outside and holds no
-// head shared whole. A library has no capability of its own: whatever feature
-// needs it first finds it finished, and growing it one declaration per consumer
-// scatters it over every feature that ever read a line of it.
+// head shared. A library has no capability of its own, so no feature owns it;
+// each declaration is born with the first feature that needs it, and the
+// package grows one consumer at a time.
 func shareLibraries(graph entities.Graph, own ownership, heads map[string]bool) {
 	read := readFromOutside(graph)
 
@@ -57,8 +57,6 @@ func shareLibraries(graph entities.Graph, own ownership, heads map[string]bool) 
 		}
 
 		own.owner[decl.Key] = SharedFeature
-		own.library[decl.Key] = module
-		own.libraries[module] = append(own.libraries[module], decl.Key)
 	}
 }
 
