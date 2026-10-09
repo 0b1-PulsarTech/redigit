@@ -111,6 +111,8 @@ func parse(args []string) (bootstrap.Config, int, error) {
 		"chunk map file: JSON spans for a format redigit cannot parse on its own",
 	)
 
+	set.Func("virtual", "ID=PATH: the file a virtual module compiles from", addVirtual(&cfg))
+
 	if err := set.Parse(args); err != nil {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: %s", ErrUsage, err)
 	}

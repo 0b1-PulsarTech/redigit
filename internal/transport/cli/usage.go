@@ -56,6 +56,11 @@ Flags:
                   4  database        # imports nothing, so it can go early
                   6  libs/infra      # persists module entities: after them
 
+  --virtual ID=PATH the file of the tree a bundler plugin compiles the module
+                ID from, such as virtual:app-client=web/tool/client_entry.dart.
+                No import names that file, so without this a component reading
+                the module waits only for the .d.ts declaring it. Repeatable.
+
   --features FILE the vertical slices a layer may reorder inside. One slice
                 per line: the set of positions it covers, then the name. A
                 comma separates, a hyphen marks an inclusive range, so a

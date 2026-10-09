@@ -46,6 +46,10 @@ type Config struct {
 	// opaque pack's whole-file default; a path a specific pack already
 	// understands structurally is refused rather than overridden.
 	ChunkMap entities.ChunkMap
+
+	// Virtual maps a module a bundler plugin makes up ("virtual:x") to the
+	// file of the tree it is compiled from, which no import names.
+	Virtual map[string]string
 }
 
 // AuthorConfig is who a rebuilt history is attributed to, and from when. The
