@@ -378,6 +378,21 @@ depois custo (fecho), depois posicao mais antiga.
 Limite conhecido: o corpo unico de `DoInjections`/`run` registra tudo de uma
 vez, entao a raiz nao cresce por declaracao.
 
+### 3.7 Um produto nasce junto, e a ordem de modulos e uma preferencia
+
+Agrupar features pelo modulo de build espalhava cada produto: rotas,
+repositorio e worker de um mesmo contexto sao construidos em modulos
+diferentes, e o arco de um contexto cobria a historia inteira. O produto e o
+modulo-raiz mais as features ligadas a ele por contrato: uma declaracao lida por
+poucas features (ate `kinReach`) liga todas elas com peso `1/(leitores-1)`, e a
+feature entra na raiz a que esta mais ligada. Um produto sai de ponta a ponta:
+a raiz, depois as camadas, e so entao o proximo produto; quando uma camada nao
+pode sair, a proxima pronta do mesmo produto vai antes.
+
+Uma feature tambem espera as raizes dos modulos que ela le, mas so como
+preferencia: modulos que se leem mutuamente nao tem o que esperar, e o plano
+sai mesmo assim.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

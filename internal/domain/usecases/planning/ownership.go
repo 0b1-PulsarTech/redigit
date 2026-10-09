@@ -19,9 +19,11 @@ type ownership struct {
 	// in build order, by the last one they need.
 	deferred wiring
 	roots    wiring
-	// group is the module a feature's entry point is built in, so the features
-	// of one module are ordered together.
-	group map[FeatureID]string
+	// group is the product a feature belongs to, named by the module-root
+	// feature it serves, so the features of one product are ordered together.
+	group map[FeatureID]FeatureID
+	// waits is the module roots a feature should come after.
+	waits map[FeatureID]map[FeatureID]bool
 	// cost is how many declarations a feature needs in all, its own and the
 	// shared ones, so the smallest working feature can come first.
 	cost map[FeatureID]int
@@ -42,11 +44,13 @@ func assign(graph entities.Graph) ownership {
 	reachedBy := map[entities.DeclKey]map[FeatureID]bool{}
 	seen := map[FeatureID]bool{}
 	entryModules := map[string]bool{}
+	rootHeads := map[FeatureID]bool{}
+	rootOf := map[string]FeatureID{}
 
 	own := ownership{
 		owner:     map[entities.DeclKey]FeatureID{},
 		reach:     map[entities.DeclKey]int{},
-		group:     map[FeatureID]string{},
+		group:     map[FeatureID]FeatureID{},
 		cost:      map[FeatureID]int{},
 		library:   map[entities.DeclKey]string{},
 		libraries: map[string][]entities.DeclKey{},
@@ -62,11 +66,15 @@ func assign(graph entities.Graph) ownership {
 			seen[feature] = true
 
 			own.order = append(own.order, feature)
-			own.group[feature] = moduleDir(graph, entry)
 		}
 
 		if isHead(graph, entry, roots) {
 			entryModules[moduleDir(graph, entry)] = true
+
+			if atModuleRoot(graph, entry) {
+				rootHeads[feature] = true
+				rootOf[moduleDir(graph, entry)] = feature
+			}
 		}
 
 		for key := range reachFrom(graph, entry.Key) {
@@ -79,6 +87,7 @@ func assign(graph entities.Graph) ownership {
 	}
 
 	unionAtoms(graph, reachedBy)
+	own.group = joinProducts(reachedBy, rootHeads)
 
 	for key, features := range reachedBy {
 		for feature := range features {
@@ -89,16 +98,9 @@ func assign(graph entities.Graph) ownership {
 		own.owner[key] = soleOwner(features)
 	}
 
-	// A declaration no entry point reaches is dead weight or a root nobody
-	// consumes yet. It is shared rather than silently dropped: dropping it
-	// would leave a hole in the final tree that the tree invariant catches
-	// far too late to explain.
-	for _, decl := range graph.Decls() {
-		if _, found := own.reach[decl.Key]; !found {
-			own.reach[decl.Key] = 0
-			own.owner[decl.Key] = SharedFeature
-		}
-	}
+	own.waits = readsRoots(graph, reachedBy, rootOf)
+
+	shareUnreached(graph, own)
 
 	shareLibraries(graph, own, entryModules)
 
@@ -113,6 +115,19 @@ func assign(graph entities.Graph) ownership {
 	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
 
 	return own
+}
+
+// shareUnreached shares what no entry point reaches: dead weight or a root
+// nobody consumes yet. It is shared rather than silently dropped: dropping it
+// would leave a hole in the final tree that the tree invariant catches far too
+// late to explain.
+func shareUnreached(graph entities.Graph, own ownership) {
+	for _, decl := range graph.Decls() {
+		if _, found := own.reach[decl.Key]; !found {
+			own.reach[decl.Key] = 0
+			own.owner[decl.Key] = SharedFeature
+		}
+	}
 }
 
 func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[FeatureID]bool) {

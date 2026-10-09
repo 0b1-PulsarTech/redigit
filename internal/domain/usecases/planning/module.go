@@ -83,3 +83,14 @@ func readFromOutside(graph entities.Graph) map[string]bool {
 
 	return out
 }
+
+// atModuleRoot is true for a declaration in the directory of its module's
+// manifest: the module's own entry into the program.
+func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
+	dir := decl.Unit.Dir()
+	if dir == "" {
+		dir = parentDir(decl.Key.File)
+	}
+
+	return dir == moduleDir(graph, decl)
+}

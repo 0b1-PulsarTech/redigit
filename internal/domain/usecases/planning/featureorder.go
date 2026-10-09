@@ -54,42 +54,67 @@ func earliest(own ownership, order entities.Ordering) map[FeatureID]entities.Pos
 // broken: two features that need each other are one feature, or one of the
 // edges between them is wrong, and both are answers a reader must see.
 //
-// Among the features ready to build, the next one is from the same group as the
-// last: a module's features arriving back to back are an arc a reader can
-// follow, and taking every ready feature of every module in rounds scatters
-// each module over the whole history.
+// A product is built as a unit: its root first, then the features serving it,
+// and the products among themselves from the cheapest. When a feature of the
+// product cannot be built yet, the next ready one of the same product goes
+// first, because a product arriving back to back is an arc a reader can follow,
+// and taking every ready feature of every product in rounds scatters each one
+// over the whole history.
+//
+// A feature also waits for the roots of the modules it reads, unless that would
+// leave nothing to build.
 func sortFeatures(
 	features []FeatureID,
 	needs map[FeatureID]map[FeatureID]bool,
+	waits map[FeatureID]map[FeatureID]bool,
 	at map[FeatureID]entities.Position,
-	group map[FeatureID]string,
+	group map[FeatureID]FeatureID,
 	cost map[FeatureID]int,
 ) (sorted []FeatureID, cyclic []FeatureID) {
+	product := func(feature FeatureID) FeatureID { return productOf(group, feature) }
+
 	pending := slices.Clone(features)
 	slices.SortFunc(pending, func(a, b FeatureID) int {
-		if left, right := cost[a], cost[b]; left != right {
-			return cmp.Compare(left, right)
+		left, right := product(a), product(b)
+		if byCost := cmp.Compare(cost[left], cost[right]); byCost != 0 {
+			return byCost
 		}
 
-		if left, right := at[a], at[b]; left != right {
-			return cmp.Compare(left, right)
+		if byRoot := cmp.Compare(left, right); byRoot != 0 {
+			return byRoot
+		}
+
+		if byRank := cmp.Compare(rankIn(a, left), rankIn(b, right)); byRank != 0 {
+			return byRank
+		}
+
+		if byCost := cmp.Compare(cost[a], cost[b]); byCost != 0 {
+			return byCost
+		}
+
+		if byPlace := cmp.Compare(at[a], at[b]); byPlace != 0 {
+			return byPlace
 		}
 
 		return cmp.Compare(a, b)
 	})
 
 	done := map[FeatureID]bool{}
-	last := ""
+	last := FeatureID("")
 
 	for len(pending) > 0 {
-		next := nextFeature(pending, needs, done, group, last)
+		next := nextFeature(pending, readiness{needs, waits, done}, product, last)
+		if next < 0 {
+			next = nextFeature(pending, readiness{needs, nil, done}, product, last)
+		}
+
 		if next < 0 {
 			return sorted, pending
 		}
 
 		feature := pending[next]
 		done[feature] = true
-		last = group[feature]
+		last = product(feature)
 		sorted = append(sorted, feature)
 		pending = slices.Delete(pending, next, next+1)
 	}
@@ -97,23 +122,54 @@ func sortFeatures(
 	return sorted, nil
 }
 
-// nextFeature is the index of the first ready feature in the last group, else
-// of the first ready feature; pending is already in chronological order.
+// rankIn puts the root of a product before the features that serve it.
+func rankIn(feature, root FeatureID) int {
+	if feature == root {
+		return 0
+	}
+
+	return 1
+}
+
+// readiness is what has to be built before a feature may be.
+type readiness struct {
+	needs map[FeatureID]map[FeatureID]bool
+	waits map[FeatureID]map[FeatureID]bool
+	done  map[FeatureID]bool
+}
+
+func (r readiness) ready(feature FeatureID) bool {
+	for other := range r.needs[feature] {
+		if other != feature && !r.done[other] {
+			return false
+		}
+	}
+
+	for other := range r.waits[feature] {
+		if !r.done[other] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// nextFeature is the index of the first ready feature in the last product, else
+// of the first ready feature; pending is already in build order.
 func nextFeature(
 	pending []FeatureID,
-	needs map[FeatureID]map[FeatureID]bool,
-	done map[FeatureID]bool,
-	group map[FeatureID]string,
-	last string,
+	state readiness,
+	product func(FeatureID) FeatureID,
+	last FeatureID,
 ) int {
 	first := -1
 
 	for index, feature := range pending {
-		if !readyToBuild(feature, needs, done) {
+		if !state.ready(feature) {
 			continue
 		}
 
-		if last != "" && group[feature] == last {
+		if last != "" && product(feature) == last {
 			return index
 		}
 
@@ -123,18 +179,4 @@ func nextFeature(
 	}
 
 	return first
-}
-
-func readyToBuild(
-	feature FeatureID,
-	needs map[FeatureID]map[FeatureID]bool,
-	done map[FeatureID]bool,
-) bool {
-	for other := range needs[feature] {
-		if other != feature && !done[other] {
-			return false
-		}
-	}
-
-	return true
 }

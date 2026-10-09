@@ -77,6 +77,7 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 	sorted, cyclic := sortFeatures(
 		own.order,
 		featureNeeds(graph, own),
+		own.waits,
 		earliest(own, order),
 		own.group,
 		own.cost,
