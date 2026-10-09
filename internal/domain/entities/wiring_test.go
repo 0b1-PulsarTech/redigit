@@ -35,3 +35,44 @@ func TestFindWiringTreatsACutFunctionAsWiring(t *testing.T) {
 		})
 	}
 }
+
+// The step type of a bootstrap is read by the bootstrap's own wiring and by
+// nothing else; a type a feature also reads stays with the feature.
+func TestFindWiringTakesInTheTypesOnlyTheWiringReads(t *testing.T) {
+	t.Parallel()
+
+	step := Decl{Key: DeclKey{File: "boot/steps.go", Kind: KindType, Name: "step"}}
+	shared := Decl{Key: DeclKey{File: "boot/steps.go", Kind: KindType, Name: "shared"}}
+	elsewhere := Decl{Key: DeclKey{File: "other/use.go", Kind: KindType, Name: "elsewhere"}}
+	stmt := Decl{Key: DeclKey{File: "boot/steps.go", Kind: KindStmt, Name: "steps#0"}}
+	handler := Decl{Key: DeclKey{File: "boot/handler.go", Kind: KindFunc, Name: "handle"}}
+
+	reads := func(from, to Decl) Edge {
+		return Edge{Dependent: from.Key, Provider: to.Key, Reason: ReasonReference}
+	}
+
+	graph := NewGraph(
+		[]Decl{step, shared, elsewhere, stmt, handler},
+		[]Edge{
+			reads(stmt, step),
+			reads(stmt, shared),
+			reads(handler, shared),
+			reads(stmt, elsewhere),
+		},
+		nil,
+	)
+
+	roots := FindWiring(graph)
+
+	if !roots[step.Key] {
+		t.Errorf("step is read only by the wiring beside it, want it wiring")
+	}
+
+	if roots[shared.Key] {
+		t.Errorf("shared is read by a handler, want it left to its feature")
+	}
+
+	if roots[elsewhere.Key] {
+		t.Errorf("elsewhere sits in another directory, want it left to its feature")
+	}
+}

@@ -1,6 +1,9 @@
 package entities
 
-import "strings"
+import (
+	"path"
+	"strings"
+)
 
 // wiringShare is the fraction of the program, as 1/wiringShare, that a
 // declaration may need before it stops describing a capability and assembles
@@ -57,7 +60,51 @@ func FindWiring(graph Graph) map[DeclKey]bool {
 		}
 	}
 
+	addSupport(graph, out)
+
 	return out
+}
+
+// addSupport takes in the types and values that only the wiring beside them
+// reads: the step type of a bootstrap, a timeout its main uses. They are part
+// of the assembly, and left as the entry point of a feature of their own they
+// hold every function that mentions them until that feature is built.
+func addSupport(graph Graph, roots map[DeclKey]bool) {
+	for changed := true; changed; {
+		changed = false
+
+		for _, decl := range graph.Decls() {
+			if roots[decl.Key] || IsTestSide(decl) || !servesWiring(graph, decl, roots) {
+				continue
+			}
+
+			roots[decl.Key] = true
+			changed = true
+		}
+	}
+}
+
+func servesWiring(graph Graph, decl Decl, roots map[DeclKey]bool) bool {
+	if decl.Key.Kind != KindType && decl.Key.Kind != KindValue {
+		return false
+	}
+
+	read := false
+
+	for _, edge := range graph.Consumers(decl.Key) {
+		consumer, found := graph.Decl(edge.Dependent)
+		if !found || IsTestSide(consumer) || IsStructural(edge.Reason) {
+			continue
+		}
+
+		if !roots[edge.Dependent] || path.Dir(consumer.Key.File) != path.Dir(decl.Key.File) {
+			return false
+		}
+
+		read = true
+	}
+
+	return read
 }
 
 // IsTestSide is a test or anything declared in a test file: the helpers, mocks
