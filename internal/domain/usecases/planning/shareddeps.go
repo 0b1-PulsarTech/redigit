@@ -2,22 +2,11 @@ package planning
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
-// shareDependencies makes the shared bucket closed under what it needs.
-//
-// The shared declarations are born before every feature, so one that needs a
-// declaration a single feature owns would be born before it exists. Reach
-// counting keeps that from happening for what it counted, and three things
-// escape the count: an atom is joined to its members' features after the walk,
-// so a provider read only through one member keeps a single owner while the
-// atom goes shared; a test inherits the ownership of what it exercises, and its
-// helpers do not; and a test helper reached from a shared test belongs to no
-// entry point at all. Each left a forward reference inside a layer commit (214
-// of them, 32 wip commits on the real tree, "undefined: SecondsToDuration" and
-// "undefined: enrichCase" in the trees between).
-//
-// A provider of a shared declaration is shared too, and so is what it needs.
-// An atom goes whole: its members are born in one commit, so one of them
-// staying with a feature would put the commit in two places.
+// shareDependencies makes the shared bucket closed under what it needs: shared
+// code is born before every feature, so a provider owned by one feature would
+// be born after its reader. Atoms, tests and test helpers escape the reach
+// count, so a provider of a shared declaration is shared too, and an atom goes
+// whole.
 func shareDependencies(graph entities.Graph, own ownership) {
 	atoms := atomGroups(graph)
 	queue := make([]entities.DeclKey, 0, graph.Len())

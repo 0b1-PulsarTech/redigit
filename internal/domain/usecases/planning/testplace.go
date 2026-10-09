@@ -6,12 +6,7 @@ import (
 
 // placeTests moves each test-side declaration to just behind the last thing it
 // needs or exercises in the same commit group, so a suite is read with its
-// subject. The fixed point lands tests wherever their position falls, which is
-// often a whole feature after the code under test and past the cut that would
-// have kept the two together.
-//
-// A move never passes a dependency (the test goes after every provider in the
-// group) and never splits an atom (the test goes after the atom's last member).
+// subject. A move never passes a dependency and never splits an atom.
 func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	index := make(map[entities.DeclKey]int, len(keys))
 	for at, key := range keys {
@@ -78,13 +73,9 @@ func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKe
 	return gatherTestAtoms(graph, out)
 }
 
-// gatherTestAtoms brings the members of an atom made only of test-side
-// declarations up to its last member. The fixed point places TestMain and the
-// first test of a package far apart, and an atom stretched over a whole commit
-// group leaves no place to cut it.
-//
-// A member moves only when nothing placed between it and the last member
-// needs it; moving it later never passes something it needs.
+// gatherTestAtoms brings the members of a test-side atom up to its last member,
+// so the atom is not stretched over a commit group. A member moves only when
+// nothing placed between it and the last member needs it.
 func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	index := make(map[entities.DeclKey]int, len(keys))
 	atomOf := make(map[entities.DeclKey]string, len(keys))
@@ -111,7 +102,7 @@ func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.D
 			continue
 		}
 
-		if neededBetween(graph, index, atomOf, key, at, last[atom]) {
+		if neededBetween(graph, index, atomOf, key, span{from: at, to: last[atom]}) {
 			continue
 		}
 
@@ -137,16 +128,18 @@ func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.D
 	return out
 }
 
+type span struct{ from, to int }
+
 func neededBetween(
 	graph entities.Graph,
 	index map[entities.DeclKey]int,
 	atomOf map[entities.DeclKey]string,
 	key entities.DeclKey,
-	from, to int,
+	within span,
 ) bool {
 	for _, edge := range graph.Consumers(key) {
 		at, inside := index[edge.Dependent]
-		if inside && at > from && at <= to && atomOf[edge.Dependent] != atomOf[key] {
+		if inside && at > within.from && at <= within.to && atomOf[edge.Dependent] != atomOf[key] {
 			return true
 		}
 	}

@@ -3,13 +3,8 @@ package planning
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
 // readsRoots is, per feature, the module roots whose code it reads: the roots it
-// should wait for.
-//
-// What a feature reads of another module's code is born with whichever feature
-// reads it first. When that feature is built before the module's own root, the
-// module opens as a stray file inside someone else's arc, long before the rest
-// of it arrives. The wait is a preference, not a need: two modules that read
-// each other leave nothing to wait for, and the plan builds them anyway.
+// should wait for, so a module does not open as a stray file inside another
+// arc. The wait is a preference: modules that read each other are built anyway.
 func readsRoots(
 	graph entities.Graph,
 	reachedBy map[entities.DeclKey]map[FeatureID]bool,

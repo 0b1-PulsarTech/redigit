@@ -14,8 +14,8 @@ func TestPlaceTests(t *testing.T) {
 	two := decl("a/two.go", "Two", "a")
 	other := decl("b/other.go", "Other", "b")
 	testOne := testDecl("a/one_test.go", "TestOne", "a")
-	helper := testDecl("a/helper_test.go", "newHelper", "a")
-	useHelper := testDecl("a/two_test.go", "TestTwo", "a")
+	support := testDecl("a/support_test.go", "newSupport", "a")
+	useSupport := testDecl("a/two_test.go", "TestTwo", "a")
 	orphan := testDecl("c/orphan_test.go", "TestOrphan", "c")
 	sameAtom := decl("a/gen.go", "GenA", "a")
 	sameAtom.Atom = "gen"
@@ -25,13 +25,13 @@ func TestPlaceTests(t *testing.T) {
 
 	graph := entities.NewGraph(
 		[]entities.Decl{
-			one, two, other, testOne, helper, useHelper, orphan, sameAtom, sameAtomB, testGen,
+			one, two, other, testOne, support, useSupport, orphan, sameAtom, sameAtomB, testGen,
 		},
 		[]entities.Edge{
 			needs(testOne, one),
-			needs(useHelper, two),
-			needs(useHelper, helper),
-			needs(helper, two),
+			needs(useSupport, two),
+			needs(useSupport, support),
+			needs(support, two),
 			needs(testGen, sameAtom),
 		},
 		nil,
@@ -48,9 +48,9 @@ func TestPlaceTests(t *testing.T) {
 			[]entities.Decl{one, testOne, two, other},
 		},
 		{
-			"a test waits for the helper it uses, which waits for its own provider",
-			[]entities.Decl{one, two, other, helper, useHelper},
-			[]entities.Decl{one, two, helper, useHelper, other},
+			"a test waits for the support it uses, which waits for its own provider",
+			[]entities.Decl{one, two, other, support, useSupport},
+			[]entities.Decl{one, two, support, useSupport, other},
 		},
 		{
 			"a test with nothing in the group to follow stays where it is",

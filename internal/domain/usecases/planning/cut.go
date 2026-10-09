@@ -48,13 +48,8 @@ func (p Planner) cut(
 
 		current = slices.Clone(current[upTo:])
 		start += upTo
-		files = map[string]bool{}
+		files = filesOf(current)
 		size = p.tallyOf(graph, current)
-
-		for _, key := range current {
-			files[key.File] = true
-		}
-
 		boundary = 0
 	}
 
@@ -155,4 +150,13 @@ func cutKeepsAtoms(extent []int, start, cut int) bool {
 	}
 
 	return true
+}
+
+func filesOf(keys []entities.DeclKey) map[string]bool {
+	out := map[string]bool{}
+	for _, key := range keys {
+		out[key.File] = true
+	}
+
+	return out
 }

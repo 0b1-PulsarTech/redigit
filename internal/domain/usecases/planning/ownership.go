@@ -34,12 +34,8 @@ type ownership struct {
 }
 
 // assign walks back from every entry point and counts, per declaration, how
-// many distinct features can reach it.
-//
-// This is the same shape as the rule that a unit is born when someone OUTSIDE
-// it needs it, counting features instead of units. Getting that count wrong by
-// including insiders is what pinned every package to whatever instant the
-// source history happened to create it.
+// many distinct features can reach it. Counting insiders would pin every
+// package to the instant the source history happened to create it.
 func assign(graph entities.Graph) ownership {
 	reachedBy := map[entities.DeclKey]map[FeatureID]bool{}
 	seen := map[FeatureID]bool{}

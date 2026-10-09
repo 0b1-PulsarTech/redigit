@@ -23,12 +23,8 @@ const (
 )
 
 // moduleRule is the edge no reference query can see: a package compiles only
-// where a go.mod makes its directory a module, and a go.mod names none of the
-// packages it covers. Without it, every tree before the go.mod lands has
-// source and no module to build it, which made `go build` unverifiable.
-//
-// A scaffold file waits for no module: the headers wait for it (scaffoldRule),
-// and the edge back would close the cycle.
+// where a go.mod makes its directory a module. A scaffold file waits for no
+// module: the headers wait for it (scaffoldRule), and the edge back is a cycle.
 type moduleRule struct{}
 
 func (moduleRule) Name() string { return "module" }

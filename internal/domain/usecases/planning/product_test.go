@@ -20,9 +20,9 @@ func readers(features ...FeatureID) map[FeatureID]bool {
 func TestJoinProducts(t *testing.T) {
 	t.Parallel()
 
-	common := map[entities.DeclKey]map[FeatureID]bool{}
+	shared := map[entities.DeclKey]map[FeatureID]bool{}
 	for index := range kinReach + 1 {
-		common[entities.DeclKey{File: "kernel.go", Name: fmt.Sprint(index)}] = readers(
+		shared[entities.DeclKey{File: "kernel.go", Name: fmt.Sprint(index)}] = readers(
 			"crm",
 			"chat",
 			"routes",
@@ -70,7 +70,7 @@ func TestJoinProducts(t *testing.T) {
 		},
 		{
 			"code read by many features ties nothing",
-			common,
+			shared,
 			map[FeatureID]FeatureID{},
 		},
 		{

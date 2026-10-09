@@ -6,16 +6,9 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// describesRule births a document with the first code it describes. A guide to
-// a package, a spec naming the directories it covers, a README beside the code:
-// none has a reader, so all were left for the trailing commit, and docs/ was
-// born in the last decile of a 1208-commit history.
-//
-// The code waits for the document, not the other way: the document is the
-// provider, so it lands no later than the earliest of the code it names, in
-// whichever commit the planner cuts that code. What a document names is read
-// from its text by path (see codeIndex); one naming nothing is scaffold, never
-// the end.
+// describesRule births a document with the first code it describes. The code
+// waits for the document, so it lands no later than the earliest code it names
+// (read from its text by path, see codeIndex); one naming nothing is scaffold.
 type describesRule struct{}
 
 func (describesRule) Name() string { return "describes" }

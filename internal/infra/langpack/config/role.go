@@ -41,12 +41,8 @@ type placement struct {
 type placements map[entities.DeclKey]placement
 
 // classify gives every whole-file declaration the role its path plays in the
-// repository, never a file list of one repository.
-//
-// A file no rule places is an orphan: nothing reads it, so the planner has no
-// feature to birth it in and leaves it for the trailing "reached by no entry
-// point" commit. On a real repository that sent .gitignore, the devcontainer,
-// every Taskfile and the lint configuration to the last 1.5% of the history.
+// repository. A file no rule places is an orphan, left for the trailing
+// "reached by no entry point" commit.
 func classify(snap entities.Snapshot, decls []entities.Decl) placements {
 	headers := moduleHeaders(decls)
 	roots := slices.Sorted(maps.Keys(headers))

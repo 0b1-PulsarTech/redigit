@@ -8,16 +8,9 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// scaffoldRule makes every module wait for the repository scaffold. Dotfiles,
-// editor and lint configuration have no reader, so nothing ever pulled them:
-// on a 1208-commit history they were born in commits 1142 to 1145, long after
-// the code they configure.
-//
-// The go.mod header is the provider, not the source: every package already
-// waits for its module's header, so a scaffold the header waits for is born
-// before the first package of the first module without a single edge per
-// declaration. The scaffold itself skips the module edge (see moduleRule); a
-// file waiting for a go.mod that waits for it would be a cycle.
+// scaffoldRule makes every module wait for the repository scaffold: dotfiles and
+// lint configuration have no reader. The go.mod header is the provider, so the
+// scaffold is born before the first package without an edge per declaration.
 type scaffoldRule struct{}
 
 func (scaffoldRule) Name() string { return "scaffold" }

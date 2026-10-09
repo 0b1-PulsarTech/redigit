@@ -17,12 +17,8 @@ type FeatureID string
 const SharedFeature FeatureID = ""
 
 // entryPoints are the declarations nothing else consumes: a handler, a worker,
-// a command. They are the tips of the dependency graph, and walking back from
-// each one is what recovers a feature that a layer-by-layer order would smear
-// across hundreds of commits.
-//
-// A test consumer does not make a declaration an entry point. Counting tests
-// would make every tested function a feature of its own.
+// a command. A test consumer does not count, or every tested function would be
+// a feature of its own.
 func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 	var out []entities.Decl
 

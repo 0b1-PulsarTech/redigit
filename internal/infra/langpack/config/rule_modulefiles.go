@@ -9,13 +9,8 @@ import (
 )
 
 // moduleFilesRule births a module's own files with its go.mod: the README, the
-// Taskfile, the configuration samples sitting in its root. They have a module
-// edge and no reader, so each was left for the trailing commit; the READMEs of
-// a 1208-commit history were born at 96% of it.
-//
-// They join the header's atom rather than gaining edges of their own: the
-// header is already waiting for the go.work use line in that atom, the files
-// need the header, and one commit holds all of it.
+// Taskfile, the configuration samples in its root. They join the header's atom
+// rather than gaining edges, so one commit holds all of it.
 type moduleFilesRule struct{}
 
 func (moduleFilesRule) Name() string { return "module-files" }

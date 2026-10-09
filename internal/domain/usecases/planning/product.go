@@ -13,19 +13,9 @@ import (
 // features ties nothing, and counting it would chain every module to the next.
 const kinReach = 12
 
-// joinProducts groups each feature with the module root it serves.
-//
-// A product is spread over the tiers: its route group, its repository and
-// its worker are built in three different modules, and no directory or manifest
-// names them as one. What they have in common is the contract they all read, a
-// port or an entity that only they read, and the module root that wires the
-// product into the program reads it too. Grouping features by the module
-// they are built in instead put every route group together, then every
-// repository together, and a product module's arc spanned the whole history.
-//
-// A shared declaration ties its readers with weight 1/(readers-1), so the tie
-// falls as the declaration becomes common. A feature joins the root it is
-// tied to most; one tied to none, or a root itself, stands alone.
+// joinProducts groups each feature with the module root it serves, through the
+// contract they alone read. A shared declaration ties its readers with weight
+// 1/(readers-1); a feature joins the root it is tied to most, else stands alone.
 func joinProducts(
 	reachedBy map[entities.DeclKey]map[FeatureID]bool,
 	roots map[FeatureID]bool,

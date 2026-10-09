@@ -1,9 +1,7 @@
 package planning
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -48,12 +46,8 @@ func New(cfg Config) Planner {
 }
 
 // Plan groups an ordering into commits, cutting along features where a feature
-// owns the work and along layers where none does.
-//
-// The result is never written straight to a history. Automatic grouping is
-// measurably the weak half of this problem: agents reach replay validity above
-// 0.988 while grouping quality sits between 0.03 and 0.46, so the plan exists to
-// be read and corrected before anything is committed.
+// owns the work and along layers where none does. The result is read and
+// corrected before anything is committed: automatic grouping is the weak half.
 func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.Plan, error) {
 	if graph.Len() == 0 {
 		return entities.Plan{}, fmt.Errorf("%w: nothing to plan", apperr.ErrIncomplete)
@@ -76,14 +70,13 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		)
 	}
 
-	sorted, cyclic := sortFeatures(
-		own.order,
-		featureNeeds(graph, own),
-		own.waits,
-		earliest(own, order),
-		own.group,
-		own.cost,
-	)
+	sorted, cyclic := sortFeatures(own.order, featureRules{
+		needs: featureNeeds(graph, own),
+		waits: own.waits,
+		at:    earliest(own, order),
+		group: own.group,
+		cost:  own.cost,
+	})
 
 	// Reachability ownership should make this unreachable: if a declaration
 	// of feature A needs one of feature B, everything that reaches the first
@@ -98,168 +91,4 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 	}
 
 	return p.emit(graph, order, own, sorted), nil
-}
-
-func (p Planner) emit(
-	graph entities.Graph,
-	order entities.Ordering,
-	own ownership,
-	features []FeatureID,
-) entities.Plan {
-	byFeature := groupByFeature(graph, own)
-	born := map[entities.DeclKey]bool{}
-
-	var plan entities.Plan
-
-	for _, feature := range features {
-		members := byFeature[feature]
-
-		// What several features need is born by the first of them to need it,
-		// in the commits just before that feature's own. A kernel emitted ahead
-		// of every feature is a block of hundreds of commits that no feature
-		// explains, and the declarations in it are read for the first time
-		// hundreds of commits later.
-		fresh := map[entities.DeclKey]bool{}
-
-		if shared := unbornProviders(graph, own, members, born); len(shared) > 0 {
-			plan.Commits = append(
-				plan.Commits,
-				p.cut(graph, order, bucket{
-					keys:    shared,
-					shape:   entities.ShapeFeature,
-					feature: feature,
-					reason:  "shared by several features, born with the first that needs it",
-				})...,
-			)
-
-			markBorn(born, shared)
-			markBorn(fresh, shared)
-		}
-
-		markBorn(born, members)
-		markBorn(fresh, members)
-
-		// A test is born with the code it exercises when the feature completes
-		// that code, so the suite and its subject are read together.
-		owned := append(slices.Clone(members), ownTests(graph, own, born, fresh)...)
-
-		plan.Commits = append(
-			plan.Commits,
-			p.cut(graph, order, bucket{
-				keys:    owned,
-				shape:   entities.ShapeFeature,
-				feature: feature,
-				reason:  "one feature, closed over its own dependencies",
-			})...,
-		)
-
-		markBorn(born, owned)
-
-		plan.Commits = append(plan.Commits, p.cutReady(graph, order, own, feature, born, fresh)...)
-	}
-
-	// Anything no feature reached is still part of the final tree. Emitting it
-	// as a trailing layer commit is honest; dropping it would leave a hole the
-	// tree invariant only catches once every explanation is gone.
-	if rest := remaining(graph, born); len(rest) > 0 {
-		plan.Commits = append(
-			plan.Commits,
-			p.cut(graph, order, bucket{
-				keys:    rest,
-				shape:   entities.ShapeLayer,
-				feature: SharedFeature,
-				reason:  "reached by no entry point",
-			})...,
-		)
-
-		markBorn(born, rest)
-	}
-
-	for _, decl := range graph.Decls() {
-		if !born[decl.Key] {
-			plan.Unplaced = append(plan.Unplaced, decl.Key)
-		}
-	}
-
-	slices.SortFunc(plan.Unplaced, func(a, b entities.DeclKey) int {
-		return cmp.Compare(a.String(), b.String())
-	})
-
-	for index := range plan.Commits {
-		plan.Commits[index].Position = entities.Position(index)
-	}
-
-	return plan
-}
-
-func groupByFeature(graph entities.Graph, own ownership) map[FeatureID][]entities.DeclKey {
-	out := map[FeatureID][]entities.DeclKey{}
-
-	for _, decl := range graph.Decls() {
-		feature := own.owner[decl.Key]
-		out[feature] = append(out[feature], decl.Key)
-	}
-
-	return out
-}
-
-// cutReady emits the deferred declarations the feature just built made possible,
-// with whatever shared code they bring along.
-func (p Planner) cutReady(
-	graph entities.Graph,
-	order entities.Ordering,
-	own ownership,
-	feature FeatureID,
-	born, fresh map[entities.DeclKey]bool,
-) []entities.PlannedCommit {
-	ready := readyDeferred(graph, own, born, fresh)
-	if len(ready) == 0 {
-		return nil
-	}
-
-	keys := append(unbornProviders(graph, own, ready, born), ready...)
-	markBorn(born, keys)
-
-	return p.cut(graph, order, bucket{
-		keys:    keys,
-		shape:   entities.ShapeFeature,
-		feature: feature,
-		reason:  "assembles the features built so far",
-	})
-}
-
-// ownTests is the tests, outside the wiring, that the feature just built
-// completes: everything they exercise is born, and the feature supplied part of
-// it. One that needs a ready root waits for that root's turn.
-func ownTests(
-	graph entities.Graph,
-	own ownership,
-	born, fresh map[entities.DeclKey]bool,
-) []entities.DeclKey {
-	subjects := testSubjects(graph)
-	taken := map[entities.DeclKey]bool{}
-
-	for _, key := range readyDeferred(graph, own, born, fresh) {
-		if !own.roots[key] && !born[key] {
-			taken[key] = true
-		}
-	}
-
-	for changed := true; changed; {
-		changed = false
-
-		for key := range taken {
-			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
-				return !born[provider] && !taken[provider] && own.deferred[provider]
-			}) {
-				continue
-			}
-
-			delete(taken, key)
-
-			changed = true
-		}
-	}
-
-	return sortedKeys(taken)
 }

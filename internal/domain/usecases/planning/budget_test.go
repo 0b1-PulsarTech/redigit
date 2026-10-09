@@ -8,10 +8,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-func sized(file, name string, lines int, generated bool) entities.Decl {
+func sized(file, name string, lines int) entities.Decl {
 	out := decl(file, name, entities.UnitID(dirOf(file)))
 	out.Lines = lines
-	out.Generated = generated
+
+	return out
+}
+
+func sizedGenerated(file, name string, lines int) entities.Decl {
+	out := sized(file, name, lines)
+	out.Generated = true
 
 	return out
 }
@@ -184,7 +190,7 @@ func TestPlannerCutsATestPackageOverTheCap(t *testing.T) {
 
 	for _, file := range files {
 		for part := range 3 {
-			d := sized(file.name, fmt.Sprintf("Test%d", part), file.lines/3, false)
+			d := sized(file.name, fmt.Sprintf("Test%d", part), file.lines/3)
 			d.IsTest = true
 			decls = append(decls, d)
 		}
@@ -218,10 +224,11 @@ func TestPlannerKeepsALargeMockApartFromItsInterface(t *testing.T) {
 	t.Parallel()
 
 	decls := make([]entities.Decl, 0, 13)
-	decls = append(decls, sized("store/store.go", "Store", 200, false))
+	decls = append(decls, sized("store/store.go", "Store", 200))
 
 	for part := range 12 {
-		decls = append(decls, sized("store/store_mock.go", fmt.Sprintf("Mock%d", part), 100, true))
+		mock := sizedGenerated("store/store_mock.go", fmt.Sprintf("Mock%d", part), 100)
+		decls = append(decls, mock)
 	}
 
 	for _, run := range cutters() {
@@ -254,8 +261,8 @@ func TestPlannerKeepsASmallMockWithItsInterface(t *testing.T) {
 	t.Parallel()
 
 	decls := []entities.Decl{
-		sized("store/store.go", "Store", 200, false),
-		sized("store/store_mock.go", "Mock", 400, true),
+		sized("store/store.go", "Store", 200),
+		sizedGenerated("store/store_mock.go", "Mock", 400),
 	}
 
 	for _, run := range cutters() {
@@ -272,12 +279,12 @@ func TestPlannerKeepsASmallMockWithItsInterface(t *testing.T) {
 func TestPlannerKeepsAnAtomOverTheCapWholeAndSaysSo(t *testing.T) {
 	t.Parallel()
 
-	first := sized("kinds/a.go", "Kind", 600, false)
+	first := sized("kinds/a.go", "Kind", 600)
 	first.Atom = "kind"
-	second := sized("kinds/b.go", "Kind.Error", 600, false)
+	second := sized("kinds/b.go", "Kind.Error", 600)
 	second.Atom = "kind"
 
-	decls := []entities.Decl{first, second, sized("kinds/c.go", "Other", 10, false)}
+	decls := []entities.Decl{first, second, sized("kinds/c.go", "Other", 10)}
 
 	for _, run := range cutters() {
 		t.Run(run.name, func(t *testing.T) {
@@ -311,12 +318,9 @@ func TestCapNeverSeparatesAnAtomOrOrdersAgainstADependency(t *testing.T) {
 	)
 
 	for index := range 60 {
-		d := sized(
-			fmt.Sprintf("lib/f%d.go", index%7),
-			fmt.Sprintf("D%d", index),
-			70+index%5*40,
-			index%11 == 0,
-		)
+		d := sized(fmt.Sprintf("lib/f%d.go", index%7), fmt.Sprintf("D%d", index), 70+index%5*40)
+		d.Generated = index%11 == 0
+
 		if index%4 < 2 {
 			d.Atom = fmt.Sprintf("atom%d", index/4)
 		}
