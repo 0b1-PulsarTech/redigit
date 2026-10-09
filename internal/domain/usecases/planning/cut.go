@@ -43,13 +43,13 @@ func (p Planner) cut(
 			Shape:   in.shape,
 			Feature: string(in.feature),
 			Decls:   slices.Clone(current[:upTo]),
-			Reason:  annotate(in.reason, tallyOf(graph, current[:upTo]), p.cfg.MaxAddedLines),
+			Reason:  annotate(in.reason, p.tallyOf(graph, current[:upTo]), p.cfg.MaxAddedLines),
 		})
 
 		current = slices.Clone(current[upTo:])
 		start += upTo
 		files = map[string]bool{}
-		size = tallyOf(graph, current)
+		size = p.tallyOf(graph, current)
 
 		for _, key := range current {
 			files[key.File] = true
@@ -63,7 +63,7 @@ func (p Planner) cut(
 			boundary = len(current)
 		}
 
-		weighed := weightOf(graph, key)
+		weighed := p.weightOf(graph, key)
 
 		// Roll back to the last package boundary instead of the raw cap, or a
 		// package with no boundary yet before it: the cap stays an upper bound,

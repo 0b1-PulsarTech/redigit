@@ -39,7 +39,8 @@ func (c Config) withDefaults() Config {
 }
 
 type Planner struct {
-	cfg Config
+	cfg   Config
+	sizes map[string]int
 }
 
 func New(cfg Config) Planner {
@@ -62,6 +63,7 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		return p.emitByCapability(graph, order, ownershipFrom(p.cfg.Capabilities, graph)), nil
 	}
 
+	p.sizes = generatedSizes(graph)
 	own := assign(graph)
 
 	// No entry point means no declaration is unconsumed, which only happens

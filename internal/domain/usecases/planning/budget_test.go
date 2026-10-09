@@ -167,7 +167,7 @@ func cutters() []cutter {
 }
 
 func handLines(graph entities.Graph, commit entities.PlannedCommit) (hand, generated int) {
-	got := tallyOf(graph, commit.Decls)
+	got := New(Config{}).tallyOf(graph, commit.Decls)
 
 	return got.hand, got.generated
 }
@@ -378,4 +378,44 @@ func mustDecl(t *testing.T, graph entities.Graph, key entities.DeclKey) entities
 	}
 
 	return found
+}
+
+func TestTallyChargesAGeneratedFileInFull(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		have tally
+		add  weight
+		want int
+	}{
+		{
+			"first member brings the whole file and its frame",
+			tally{},
+			weight{file: "m.go", lines: 10, frame: 20, whole: 500, generated: true},
+			520,
+		},
+		{
+			"later members add nothing",
+			tally{files: map[string]bool{"m.go": true}},
+			weight{file: "m.go", lines: 10, frame: 20, whole: 500, generated: true},
+			0,
+		},
+		{
+			"a file with no recorded size charges its lines",
+			tally{},
+			weight{file: "h.go", lines: 10, frame: 20},
+			30,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := testCase.have.cost(testCase.add); got != testCase.want {
+				t.Fatalf("cost(%+v) = %d, want %d", testCase.add, got, testCase.want)
+			}
+		})
+	}
 }
