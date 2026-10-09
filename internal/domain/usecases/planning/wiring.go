@@ -133,6 +133,7 @@ func readyDeferred(
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := testSubjects(graph)
+	atoms := atomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
 	for key := range own.deferred {
@@ -165,7 +166,7 @@ func readyDeferred(
 
 			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
 				return waits(provider, strict)
-			}) {
+			}) && !atomWaits(graph, atoms, key, own, born, ready) {
 				continue
 			}
 
@@ -243,4 +244,28 @@ func waitsOn(
 	}
 
 	return slices.ContainsFunc(subjects[key], waits)
+}
+
+// atomWaits is whether a declaration's atom has a deferred member that is not
+// ready: the members are born in one commit, so the first to be ready would
+// otherwise pull the others in with everything they need.
+func atomWaits(
+	graph entities.Graph,
+	atoms map[string][]entities.DeclKey,
+	key entities.DeclKey,
+	own ownership,
+	born, ready map[entities.DeclKey]bool,
+) bool {
+	decl, found := graph.Decl(key)
+	if !found || decl.Atom == "" {
+		return false
+	}
+
+	for _, member := range atoms[decl.Atom] {
+		if own.deferred[member] && !born[member] && !ready[member] {
+			return true
+		}
+	}
+
+	return false
 }

@@ -62,7 +62,7 @@ func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKe
 	}
 
 	if len(moved) == 0 {
-		return keys
+		return gatherTestAtoms(graph, keys)
 	}
 
 	out := make([]entities.DeclKey, 0, len(keys))
@@ -75,5 +75,81 @@ func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKe
 		out = append(out, after[at]...)
 	}
 
+	return gatherTestAtoms(graph, out)
+}
+
+// gatherTestAtoms brings the members of an atom made only of test-side
+// declarations up to its last member. The fixed point places TestMain and the
+// first test of a package far apart, and an atom stretched over a whole commit
+// group leaves no place to cut it.
+//
+// A member moves only when nothing placed between it and the last member
+// needs it; moving it later never passes something it needs.
+func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
+	index := make(map[entities.DeclKey]int, len(keys))
+	atomOf := make(map[entities.DeclKey]string, len(keys))
+	last := map[string]int{}
+
+	for at, key := range keys {
+		index[key] = at
+
+		decl, found := graph.Decl(key)
+		if !found || decl.Atom == "" || !isTestSide(decl) {
+			continue
+		}
+
+		atomOf[key] = decl.Atom
+		last[decl.Atom] = at
+	}
+
+	held := map[int][]entities.DeclKey{}
+	delayed := map[entities.DeclKey]bool{}
+
+	for at, key := range keys {
+		atom, grouped := atomOf[key]
+		if !grouped || at == last[atom] {
+			continue
+		}
+
+		if neededBetween(graph, index, atomOf, key, at, last[atom]) {
+			continue
+		}
+
+		held[last[atom]] = append(held[last[atom]], key)
+		delayed[key] = true
+	}
+
+	if len(delayed) == 0 {
+		return keys
+	}
+
+	out := make([]entities.DeclKey, 0, len(keys))
+
+	for at, key := range keys {
+		if delayed[key] {
+			continue
+		}
+
+		out = append(out, held[at]...)
+		out = append(out, key)
+	}
+
 	return out
+}
+
+func neededBetween(
+	graph entities.Graph,
+	index map[entities.DeclKey]int,
+	atomOf map[entities.DeclKey]string,
+	key entities.DeclKey,
+	from, to int,
+) bool {
+	for _, edge := range graph.Consumers(key) {
+		at, inside := index[edge.Dependent]
+		if inside && at > from && at <= to && atomOf[edge.Dependent] != atomOf[key] {
+			return true
+		}
+	}
+
+	return false
 }

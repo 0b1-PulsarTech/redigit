@@ -84,3 +84,56 @@ func keysOf(decls []entities.Decl) []entities.DeclKey {
 
 	return out
 }
+
+func TestGatherTestAtoms(t *testing.T) {
+	t.Parallel()
+
+	setup := testDecl("a/main_test.go", "TestMain", "a")
+	first := testDecl("a/first_test.go", "TestFirst", "a")
+	middle := testDecl("a/middle_test.go", "TestMiddle", "a")
+	user := testDecl("a/user_test.go", "TestUser", "a")
+	prod := decl("a/code.go", "Code", "a")
+
+	for _, member := range []*entities.Decl{&setup, &first} {
+		member.Atom = "test-main:a"
+	}
+
+	graph := entities.NewGraph(
+		[]entities.Decl{setup, first, middle, user, prod},
+		[]entities.Edge{needs(user, setup)},
+		nil,
+	)
+
+	testCases := []struct {
+		name string
+		keys []entities.Decl
+		want []entities.Decl
+	}{
+		{
+			"the early member moves up to the last one",
+			[]entities.Decl{setup, middle, prod, first},
+			[]entities.Decl{middle, prod, setup, first},
+		},
+		{
+			"a member something between needs stays",
+			[]entities.Decl{setup, user, first},
+			[]entities.Decl{setup, user, first},
+		},
+		{
+			"an adjacent atom is untouched",
+			[]entities.Decl{middle, setup, first},
+			[]entities.Decl{middle, setup, first},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := gatherTestAtoms(graph, keysOf(testCase.keys))
+			if want := keysOf(testCase.want); !slices.Equal(got, want) {
+				t.Fatalf("gatherTestAtoms() = %v, want %v", got, want)
+			}
+		})
+	}
+}
