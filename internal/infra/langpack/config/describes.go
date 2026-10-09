@@ -28,6 +28,7 @@ func isProse(file string) bool {
 type codeIndex struct {
 	snap    entities.Snapshot
 	byDir   map[string][]entities.DeclKey
+	direct  map[string]bool
 	modules map[string]string
 	texts   map[string]string
 }
@@ -43,18 +44,22 @@ func newCodeIndex(
 	index := codeIndex{
 		snap:    snap,
 		byDir:   map[string][]entities.DeclKey{},
+		direct:  map[string]bool{},
 		modules: map[string]string{},
 		texts:   map[string]string{},
 	}
 
 	for root, header := range headers {
 		index.modules[header.Name] = root
+		index.direct[root] = true
 	}
 
 	for _, decl := range decls {
 		if decl.Key.Kind == entities.KindOther || decl.IsTest {
 			continue
 		}
+
+		index.direct[path.Dir(decl.Key.File)] = true
 
 		for dir := path.Dir(decl.Key.File); dir != "."; dir = path.Dir(dir) {
 			index.byDir[dir] = append(index.byDir[dir], decl.Key)
@@ -77,7 +82,7 @@ func (c codeIndex) describedBy(file string) []entities.DeclKey {
 	}
 
 	for dir, keys := range c.byDir {
-		if !strings.Contains(dir, "/") || !names(text, dir, c.byDir) {
+		if !c.direct[dir] || !strings.Contains(dir, "/") || !names(text, dir, c.byDir) {
 			continue
 		}
 
