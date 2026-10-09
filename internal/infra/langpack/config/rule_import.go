@@ -45,7 +45,7 @@ func (importRule) Edges(
 		}
 	}
 
-	edges := indirectEdges(snap, decls)
+	edges := indirectEdges(snap, decls, headers)
 	packages := newPackageIndex(snap, decls, headers)
 
 	for _, file := range slices.Sorted(maps.Keys(byFile)) {
@@ -232,64 +232,4 @@ func owningModule(imported string, required map[string]entities.DeclKey) (string
 	}
 
 	return best, best != ""
-}
-
-// indirectEdges makes every direct require wait for the "// indirect" requires
-// of its own go.mod. A module graph is pruned: the go command wants every
-// module providing a package the build transitively imports listed in the main
-// go.mod, and answers "updates to go.mod needed" until it is. Which direct
-// require needs which indirect one is the dependency's own go.mod, which a
-// tree under construction does not hold, so each direct require pulls them all.
-func indirectEdges(snap entities.Snapshot, decls []entities.Decl) []entities.Edge {
-	direct := map[string][]entities.DeclKey{}
-	indirect := map[string][]entities.DeclKey{}
-	sources := map[string][]byte{}
-
-	for _, decl := range decls {
-		if !strings.HasPrefix(decl.Key.Name, requirePrefix) ||
-			path.Base(decl.Key.File) != goModFile {
-			continue
-		}
-
-		dir := path.Dir(decl.Key.File)
-
-		if isIndirect(snap, decl, sources) {
-			indirect[dir] = append(indirect[dir], decl.Key)
-
-			continue
-		}
-
-		direct[dir] = append(direct[dir], decl.Key)
-	}
-
-	var edges []entities.Edge
-
-	for _, dir := range slices.Sorted(maps.Keys(direct)) {
-		for _, dependent := range direct[dir] {
-			for _, provider := range indirect[dir] {
-				edges = append(edges, entities.Edge{
-					Dependent: dependent,
-					Provider:  provider,
-					Reason:    entities.ReasonImport,
-				})
-			}
-		}
-	}
-
-	return edges
-}
-
-// isIndirect reports whether a require piece carries the "// indirect" comment.
-// An unreadable go.mod makes it direct: that adds no edge, so the cost of the
-// guess is one line ordered by history.
-func isIndirect(snap entities.Snapshot, decl entities.Decl, sources map[string][]byte) bool {
-	source, cached := sources[decl.Key.File]
-	if !cached {
-		source, _ = readSource(snap, decl.Key.File)
-		sources[decl.Key.File] = source
-	}
-
-	_, comment, found := strings.Cut(sliceSpan(source, decl.Span), "//")
-
-	return found && strings.HasPrefix(strings.TrimSpace(comment), "indirect")
 }

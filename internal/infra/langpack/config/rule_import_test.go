@@ -329,3 +329,41 @@ func TestImportRuleMakesOnlyTheDeclarationUsingAPackageWaitForItsRequire(t *test
 		t.Error("a declaration using nothing of the package waits for its require")
 	}
 }
+
+// A workspace module's own go.mod is in the repository, so its indirect require
+// is born once a module this one requires lists it; no direct require waits for
+// it, or the first consumer of any library carried every module's manifest.
+func TestImportRuleBirthsAnIndirectWorkspaceRequireWithTheModuleListingIt(t *testing.T) {
+	t.Parallel()
+
+	const appMod = "apps/lead/go.mod"
+
+	body := "module m\n\nrequire github.com/org/lib v1.0.0\n\n" +
+		"require github.com/org/deep v1.0.0 // indirect\n"
+	boundary := len("module m\n\nrequire github.com/org/lib v1.0.0\n\n")
+	snap := treeWith(t, map[string]string{appMod: body, "libs/lib/go.mod": "module lib\n"})
+
+	app := piece(appMod, "github.com/org/lead", entities.Span{Start: 0, End: 10})
+	lib := piece("libs/lib/go.mod", "github.com/org/lib", entities.Span{})
+	deep := piece("modules/deep/go.mod", "github.com/org/deep", entities.Span{})
+	direct := piece(appMod, "require github.com/org/lib", entities.Span{Start: 10, End: boundary})
+	indirect := piece(
+		appMod, "require github.com/org/deep", entities.Span{Start: boundary, End: len(body)},
+	)
+	listing := piece("libs/lib/go.mod", "require github.com/org/deep", entities.Span{})
+
+	edges, err := (importRule{}).Edges(
+		t.Context(), snap, []entities.Decl{app, lib, deep, direct, indirect, listing},
+	)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if !edgeBetween(edges, indirect.Key, listing.Key) {
+		t.Error("the indirect require does not wait for the module that lists it")
+	}
+
+	if edgeBetween(edges, direct.Key, indirect.Key) {
+		t.Error("a direct require waits for the indirect require of a workspace module")
+	}
+}
