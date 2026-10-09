@@ -20,6 +20,7 @@ func (p Planner) cut(
 	in bucket,
 ) []entities.PlannedCommit {
 	keys := sortForBirth(graph, order, in.keys, nil)
+	keys = placeTests(graph, keys)
 	lastOf := atomExtent(graph, keys)
 
 	var (

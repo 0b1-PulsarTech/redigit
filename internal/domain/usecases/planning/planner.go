@@ -134,18 +134,24 @@ func (p Planner) emit(
 			markBorn(fresh, shared)
 		}
 
+		markBorn(born, members)
+		markBorn(fresh, members)
+
+		// A test is born with the code it exercises when the feature completes
+		// that code, so the suite and its subject are read together.
+		owned := append(slices.Clone(members), ownTests(graph, own, born, fresh)...)
+
 		plan.Commits = append(
 			plan.Commits,
 			p.cut(graph, order, bucket{
-				keys:    members,
+				keys:    owned,
 				shape:   entities.ShapeFeature,
 				feature: feature,
 				reason:  "one feature, closed over its own dependencies",
 			})...,
 		)
 
-		markBorn(born, members)
-		markBorn(fresh, members)
+		markBorn(born, owned)
 
 		plan.Commits = append(plan.Commits, p.cutReady(graph, order, own, feature, born, fresh)...)
 	}
@@ -218,4 +224,40 @@ func (p Planner) cutReady(
 		feature: feature,
 		reason:  "assembles the features built so far",
 	})
+}
+
+// ownTests is the tests, outside the wiring, that the feature just built
+// completes: everything they exercise is born, and the feature supplied part of
+// it. One that needs a ready root waits for that root's turn.
+func ownTests(
+	graph entities.Graph,
+	own ownership,
+	born, fresh map[entities.DeclKey]bool,
+) []entities.DeclKey {
+	subjects := testSubjects(graph)
+	taken := map[entities.DeclKey]bool{}
+
+	for _, key := range readyDeferred(graph, own, born, fresh) {
+		if !own.roots[key] && !born[key] {
+			taken[key] = true
+		}
+	}
+
+	for changed := true; changed; {
+		changed = false
+
+		for key := range taken {
+			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
+				return !born[provider] && !taken[provider] && own.deferred[provider]
+			}) {
+				continue
+			}
+
+			delete(taken, key)
+
+			changed = true
+		}
+	}
+
+	return sortedKeys(taken)
 }

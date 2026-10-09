@@ -397,6 +397,10 @@ O `go.mod` de uma biblioteca nasce com a biblioteca: a linha `require` de quem
 a consome puxa o manifesto cedo, e o corpo so chegava com o primeiro codigo
 lido, centenas de commits depois.
 
+Um teste nasce no commit do que exercita (ou no seguinte): a feature que
+completa o sujeito leva os testes prontos, e dentro do commit cada teste fica
+logo depois do ultimo que ele precisa, sem partir um atomo.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.
