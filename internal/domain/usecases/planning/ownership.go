@@ -19,6 +19,9 @@ type ownership struct {
 	// in build order, by the last one they need.
 	deferred wiring
 	roots    wiring
+	// loose is what nothing reads, deferred and born once what it names exists:
+	// the manifest lines and the entries of a library.
+	loose wiring
 	// group is the product a feature belongs to, named by the module-root
 	// feature it serves, so the features of one product are ordered together.
 	group map[FeatureID]FeatureID
@@ -44,13 +47,15 @@ func assign(graph entities.Graph) ownership {
 		reach: map[entities.DeclKey]int{},
 		group: map[FeatureID]FeatureID{},
 		cost:  map[FeatureID]int{},
+		roots: entities.FindWiring(graph),
+		loose: looseLines(graph),
 	}
 
-	roots := entities.FindWiring(graph)
-	own.roots = roots
-	own.deferred = deferTests(graph, roots)
+	own.deferred = deferTests(graph, own.roots)
 
-	for _, entry := range entryPoints(graph, roots) {
+	entries := entryPoints(graph, own.roots)
+
+	for _, entry := range entries {
 		feature := featureOf(entry)
 		if !seen[feature] {
 			seen[feature] = true
@@ -58,7 +63,7 @@ func assign(graph entities.Graph) ownership {
 			own.order = append(own.order, feature)
 		}
 
-		if isHead(graph, entry, roots) {
+		if isHead(graph, entry, own.roots) {
 			entryModules[moduleDir(graph, entry)] = true
 
 			if atModuleRoot(graph, entry) {
@@ -93,6 +98,7 @@ func assign(graph entities.Graph) ownership {
 	shareUnreached(graph, own)
 
 	shareLibraries(graph, own, entryModules)
+	deferLibraryEntries(own, entries)
 
 	// What is deferred is born when it is ready, not with a feature that
 	// happens to own part of what it needs.

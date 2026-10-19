@@ -93,3 +93,18 @@ func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 
 	return dir == moduleDir(graph, decl)
 }
+
+// deferLibraryEntries defers the entries of a library: a function nothing calls
+// yet, an interface assertion. No feature needs them and no feature owns them,
+// so left to the end they stretched a library's history from its first package
+// to the last commit; deferred, each is born right after what it names.
+func deferLibraryEntries(own ownership, entries []entities.Decl) {
+	for _, entry := range entries {
+		if own.owner[entry.Key] != SharedFeature || own.deferred[entry.Key] {
+			continue
+		}
+
+		own.deferred[entry.Key] = true
+		own.loose[entry.Key] = true
+	}
+}

@@ -22,12 +22,15 @@ const SharedFeature FeatureID = ""
 func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 	var out []entities.Decl
 
+	loose := looseLines(graph)
+
 	for _, decl := range graph.Decls() {
 		if entities.IsTestSide(decl) {
 			continue
 		}
 
-		if roots[decl.Key] || isOrphanProse(graph, decl) || isAfterword(graph, decl.Key) {
+		if roots[decl.Key] || loose[decl.Key] || isOrphanProse(graph, decl) ||
+			isAfterword(graph, decl.Key) {
 			continue
 		}
 
