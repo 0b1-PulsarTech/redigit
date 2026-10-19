@@ -46,6 +46,10 @@ func unbornProviders(
 		for _, key := range index.siblingsOf(graph, own, born, current) {
 			add(key)
 		}
+
+		for _, key := range index.packageOf(graph, current) {
+			add(key)
+		}
 	}
 
 	return sortedKeys(wanted)
@@ -101,6 +105,21 @@ func (index sharedIndex) siblingsOf(
 	}
 
 	return out
+}
+
+// packageOf is the rest of the package of a shared declaration a feature reads:
+// a package is one importable thing, so the first feature to need any of it
+// brings the rest instead of growing it one consumer at a time.
+func (index sharedIndex) packageOf(
+	graph entities.Graph,
+	current entities.DeclKey,
+) []entities.DeclKey {
+	decl, found := graph.Decl(current)
+	if !found || index.own.owner[current] != SharedFeature {
+		return nil
+	}
+
+	return index.own.packages[decl.Unit]
 }
 
 func testAnchors(graph entities.Graph) map[entities.DeclKey][]entities.DeclKey {

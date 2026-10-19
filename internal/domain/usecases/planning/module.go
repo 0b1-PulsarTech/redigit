@@ -108,3 +108,35 @@ func deferLibraryEntries(own ownership, entries []entities.Decl) {
 		own.loose[entry.Key] = true
 	}
 }
+
+// sharedPackages groups the shared production declarations by package. A
+// package is one importable thing: the first feature to need any of it brings
+// the rest, so it is not rebuilt one consumer at a time over the whole history.
+func sharedPackages(graph entities.Graph, own ownership) map[entities.UnitID][]entities.DeclKey {
+	out := map[entities.UnitID][]entities.DeclKey{}
+
+	for _, decl := range graph.Decls() {
+		if own.owner[decl.Key] != SharedFeature || own.deferred[decl.Key] ||
+			entities.IsTestSide(decl) || decl.Generated || decl.Key.Kind == entities.KindOther ||
+			feedsData(graph, decl.Key) {
+			continue
+		}
+
+		out[decl.Unit] = append(out[decl.Unit], decl.Key)
+	}
+
+	return out
+}
+
+// feedsData is whether a declaration is one table's schema or query: each is
+// born with the first repository that reads it, not with the rest of its
+// package, or the whole database arrives in the first commit that touches one.
+func feedsData(graph entities.Graph, key entities.DeclKey) bool {
+	for _, edge := range graph.Consumers(key) {
+		if edge.Reason == entities.ReasonSchema || edge.Reason == entities.ReasonQuery {
+			return true
+		}
+	}
+
+	return false
+}

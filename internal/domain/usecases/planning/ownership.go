@@ -22,6 +22,9 @@ type ownership struct {
 	// loose is what nothing reads, deferred and born once what it names exists:
 	// the manifest lines and the entries of a library.
 	loose wiring
+	// packages is, per unit, the shared declarations of production code that no
+	// test and no deferral holds back.
+	packages map[entities.UnitID][]entities.DeclKey
 	// group is the product a feature belongs to, named by the module-root
 	// feature it serves, so the features of one product are ordered together.
 	group map[FeatureID]FeatureID
@@ -107,6 +110,8 @@ func assign(graph entities.Graph) ownership {
 	}
 
 	shareDependencies(graph, own)
+
+	own.packages = sharedPackages(graph, own)
 
 	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
 
