@@ -48,7 +48,7 @@ func readyDeferred(
 		changed = false
 
 		for key := range ready {
-			strict := !own.roots[key] && !own.loose[key]
+			strict := !own.roots[key]
 
 			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
 				return waits(provider, strict)

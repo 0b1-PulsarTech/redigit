@@ -59,11 +59,13 @@ func unread(graph entities.Graph, key entities.DeclKey, loose wiring) bool {
 	return true
 }
 
-// tiedToFresh is whether a manifest line waits on something not yet born, by any
-// of its ties: a line is nothing but its ties, so none of them is set aside.
+// tiedToFresh is whether a manifest line names something not yet born: the
+// module a workspace entry points at, the package a require provides. The
+// manifest it sits in is no reason to bring it, or one go.work brings them all.
 func tiedToFresh(graph entities.Graph, key entities.DeclKey, fresh, touched wiring) bool {
 	for _, edge := range graph.Needs(key) {
-		if fresh[edge.Provider] || touched[edge.Provider] {
+		named := edge.Reason == entities.ReasonWorkspace || edge.Reason == entities.ReasonImport
+		if named && (fresh[edge.Provider] || touched[edge.Provider]) {
 			return true
 		}
 	}

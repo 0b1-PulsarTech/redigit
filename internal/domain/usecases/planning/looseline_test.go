@@ -81,3 +81,40 @@ func TestDeferLibraryEntries(t *testing.T) {
 		t.Fatalf("the owned entry %s was deferred", owned.Key)
 	}
 }
+
+func TestTiedToFreshCountsOnlyWhatTheLineNames(t *testing.T) {
+	t.Parallel()
+
+	header := manifestLine("go.work", "go 1.27")
+	module := manifestLine("libs/a/go.mod", "module a")
+	use := manifestLine("go.work", "use ./libs/a")
+	graph := entities.NewGraph(
+		[]entities.Decl{header, module, use},
+		[]entities.Edge{
+			edgeOf(use, header, entities.ReasonHosts),
+			edgeOf(use, module, entities.ReasonWorkspace),
+		},
+		nil,
+	)
+
+	testCases := []struct {
+		name  string
+		fresh wiring
+		want  bool
+	}{
+		{"the manifest is fresh, the module is not", wiring{header.Key: true}, false},
+		{"the module it names is fresh", wiring{module.Key: true}, true},
+		{"nothing is fresh", wiring{}, false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tiedToFresh(graph, use.Key, testCase.fresh, wiring{})
+			if got != testCase.want {
+				t.Fatalf("tiedToFresh() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
