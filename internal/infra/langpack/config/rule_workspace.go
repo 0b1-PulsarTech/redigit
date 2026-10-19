@@ -64,7 +64,38 @@ func (workspaceRule) Edges(
 		}
 	}
 
-	return append(edges, requireEdges(decls, headers, replaced)...), nil
+	edges = append(edges, requireEdges(decls, headers, replaced)...)
+
+	return append(edges, directiveEdges(decls, headers)...), nil
+}
+
+// directiveEdges makes a require or replace line wait for the header of its own
+// go.mod. A line born before the module it belongs to leaves a manifest with a
+// directive and no module, and starts the module's history at the line instead
+// of at its first package.
+func directiveEdges(
+	decls []entities.Decl,
+	headers map[string]entities.DeclKey,
+) []entities.Edge {
+	var edges []entities.Edge
+
+	for _, decl := range decls {
+		if path.Base(decl.Key.File) != goModFile ||
+			!strings.HasPrefix(decl.Key.Name, requirePrefix) &&
+				!strings.HasPrefix(decl.Key.Name, replacePrefix) {
+			continue
+		}
+
+		if header, found := headers[path.Dir(decl.Key.File)]; found {
+			edges = append(edges, entities.Edge{
+				Dependent: decl.Key,
+				Provider:  header,
+				Reason:    entities.ReasonModule,
+			})
+		}
+	}
+
+	return edges
 }
 
 // localTarget reports the repository-relative directory a piece names. A

@@ -41,6 +41,20 @@ func treeWith(t *testing.T, files map[string]string) entities.Snapshot {
 	return entities.Snapshot{Root: root, Files: paths}
 }
 
+// beyondHeader drops the edge every directive owes its own go.mod header, so a
+// test can say that a line waits for nothing else.
+func beyondHeader(edges []entities.Edge, header entities.DeclKey) []entities.Edge {
+	var out []entities.Edge
+
+	for _, edge := range edges {
+		if edge.Provider != header {
+			out = append(out, edge)
+		}
+	}
+
+	return out
+}
+
 func edgeBetween(edges []entities.Edge, dependent, provider entities.DeclKey) bool {
 	for _, edge := range edges {
 		if edge.Dependent == dependent && edge.Provider == provider {
@@ -126,7 +140,7 @@ func TestWorkspaceRuleIgnoresAVersionOnlyReplace(t *testing.T) {
 		t.Fatalf("Edges() = %v", err)
 	}
 
-	if len(edges) != 0 {
+	if len(beyondHeader(edges, header.Key)) != 0 {
 		t.Fatalf("a version-only replace produced %d edge(s), want none: %v", len(edges), edges)
 	}
 }
@@ -150,7 +164,7 @@ func TestWorkspaceRuleIgnoresATargetTheTreeDoesNotHold(t *testing.T) {
 		t.Fatalf("Edges() = %v", err)
 	}
 
-	if len(edges) != 0 {
+	if len(beyondHeader(edges, header.Key)) != 0 {
 		t.Fatalf("got %d edge(s) for a target the tree does not hold: %v", len(edges), edges)
 	}
 }
@@ -170,7 +184,7 @@ func TestWorkspaceRuleSurvivesAnUnreadableFile(t *testing.T) {
 		t.Fatalf("Edges() = %v, want the run to continue without this edge", err)
 	}
 
-	if len(edges) != 0 {
+	if len(beyondHeader(edges, header.Key)) != 0 {
 		t.Fatalf("got %d edge(s) from a file that could not be read", len(edges))
 	}
 }
@@ -237,7 +251,7 @@ func TestWorkspaceRuleLeavesAnOrdinaryRequireAlone(t *testing.T) {
 		t.Fatalf("Edges() = %v", err)
 	}
 
-	if len(edges) != 0 {
+	if len(beyondHeader(edges, header.Key)) != 0 {
 		t.Fatalf("got %d edge(s) for a require nothing replaces: %v", len(edges), edges)
 	}
 }
@@ -293,5 +307,28 @@ func TestWorkspaceRuleGrowsTheWorkspaceModuleByModule(t *testing.T) {
 		if anchors[index] != want {
 			t.Errorf("anchor[%d] = %v, want %v", index, anchors[index], want)
 		}
+	}
+}
+
+// A require line born before its own go.mod header leaves a manifest with a
+// directive and no module, which starts the module's history at the line.
+func TestWorkspaceRuleTiesADirectiveToItsOwnHeader(t *testing.T) {
+	t.Parallel()
+
+	const modFile = "libs/a/go.mod"
+
+	body := "module github.com/org/a\n\nrequire github.com/x/y v1.0.0\n"
+	snap := treeWith(t, map[string]string{modFile: body})
+
+	header := piece(modFile, "github.com/org/a", entities.Span{Start: 0, End: 24})
+	require := piece(modFile, "require github.com/x/y", entities.Span{Start: 25, End: len(body)})
+
+	edges, err := (workspaceRule{}).Edges(t.Context(), snap, []entities.Decl{header, require})
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if !edgeBetween(edges, require.Key, header.Key) {
+		t.Fatalf("the require line does not wait for its own header; got %d edge(s)", len(edges))
 	}
 }
