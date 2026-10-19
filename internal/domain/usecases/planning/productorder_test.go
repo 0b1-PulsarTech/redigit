@@ -27,12 +27,12 @@ func TestSortFeaturesBuildsAProductAsAUnit(t *testing.T) {
 			[]FeatureID{"a", "a/repo", "a/routes", "b", "b/routes"},
 		},
 		{
-			"a tier that waits for another root lets the product's next tier go first",
+			"a product another one reads is built before its reader",
 			[]FeatureID{"a", "a/routes", "a/repo", "b"},
 			map[FeatureID]map[FeatureID]bool{"a/routes": {"b": true}},
 			map[FeatureID]FeatureID{"a/routes": "a", "a/repo": "a"},
 			map[FeatureID]int{"a": 1, "b": 5, "a/routes": 2, "a/repo": 3},
-			[]FeatureID{"a", "a/repo", "b", "a/routes"},
+			[]FeatureID{"b", "a", "a/routes", "a/repo"},
 		},
 		{
 			"waits that would leave nothing to build are dropped",

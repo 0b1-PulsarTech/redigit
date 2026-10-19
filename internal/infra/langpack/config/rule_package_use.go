@@ -13,6 +13,7 @@ import (
 // and each selector the file reaches it by.
 type packageUse struct {
 	dir       string
+	path      string
 	sites     []useSite
 	wholeFile bool
 }
@@ -41,7 +42,7 @@ func (index packageIndex) uses(parsed *ast.File, fset *token.FileSet) []*package
 			continue
 		}
 
-		use := &packageUse{dir: dir}
+		use := &packageUse{dir: dir, path: imported}
 		out = append(out, use)
 
 		switch name := localName(spec); name {

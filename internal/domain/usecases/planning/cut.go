@@ -20,7 +20,7 @@ func (p Planner) cut(
 	in bucket,
 ) []entities.PlannedCommit {
 	keys := sortForBirth(graph, order, in.keys, nil)
-	keys = placeTests(graph, keys)
+	keys = gatherDocuments(graph, placeTests(graph, keys))
 	lastOf := atomExtent(graph, keys)
 
 	var (
@@ -31,6 +31,7 @@ func (p Planner) cut(
 		pkg      string
 		boundary int
 		size     tally
+		inDocs   bool
 	)
 
 	flush := func(upTo int) {
@@ -60,6 +61,10 @@ func (p Planner) cut(
 
 		weighed := p.weightOf(graph, key)
 
+		if document := isDocument(key); len(current) > 0 && document != inDocs {
+			flush(safeCut(lastOf, start, len(current)))
+		}
+
 		// Roll back to the last package boundary instead of the raw cap, or a
 		// package with no boundary yet before it: the cap stays an upper bound,
 		// except where holding it would split an atom.
@@ -87,6 +92,7 @@ func (p Planner) cut(
 		current = append(current, key)
 		files[key.File] = true
 		pkg = dirOf(key.File)
+		inDocs = isDocument(key)
 
 		size.add(weighed)
 	}

@@ -92,9 +92,9 @@ func TestDescribesRuleNamesAModuleByItsPath(t *testing.T) {
 func TestDescribesRuleLeavesADocumentNamingNothingToTheScaffold(t *testing.T) {
 	t.Parallel()
 
-	snap := treeWith(t, map[string]string{"docs/CHANGELOG.md": "# Changelog\n"})
+	snap := treeWith(t, map[string]string{"docs/NOTES.md": "# Notes\n"})
 
-	doc := piece("docs/CHANGELOG.md", "<file>", entities.Span{})
+	doc := piece("docs/NOTES.md", "<file>", entities.Span{})
 	header := piece("apps/app/go.mod", "example.com/app", entities.Span{})
 	code := goDecl("apps/app/load.go", "Load")
 	decls := []entities.Decl{doc, header, code}
@@ -111,5 +111,35 @@ func TestDescribesRuleLeavesADocumentNamingNothingToTheScaffold(t *testing.T) {
 
 	if !edgeBetween(scaffold, header.Key, doc.Key) {
 		t.Error("the header does not wait for the document naming nothing")
+	}
+}
+
+// A directory holding no package and no module is a category: a rule forbidding
+// imports of "libs/infra" is born with none of the packages below it.
+func TestDescribesRuleIgnoresADirectoryThatHoldsNoPackage(t *testing.T) {
+	t.Parallel()
+
+	snap := treeWith(t, map[string]string{
+		"docs/rules/imports.md": "Nothing imports libs/infra or libs/infra/store.\n",
+	})
+
+	doc := piece("docs/rules/imports.md", "<file>", entities.Span{})
+	header := piece("libs/go.mod", "example.com/libs", entities.Span{})
+	category := goDecl("libs/infra/queue/queue.go", "Queue")
+	store := goDecl("libs/infra/store/store.go", "Store")
+
+	edges, err := (describesRule{}).Edges(
+		t.Context(), snap, []entities.Decl{doc, header, category, store},
+	)
+	if err != nil {
+		t.Fatalf("Edges() = %v", err)
+	}
+
+	if edgeBetween(edges, category.Key, doc.Key) {
+		t.Error("a package outside the named one waits for the document")
+	}
+
+	if !edgeBetween(edges, store.Key, doc.Key) {
+		t.Error("the named package does not wait for the document")
 	}
 }

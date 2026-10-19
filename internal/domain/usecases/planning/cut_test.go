@@ -127,3 +127,30 @@ func TestCutNeverSplitsAnAtom(t *testing.T) {
 		}
 	}
 }
+
+func TestCutKeepsADocumentApartFromCode(t *testing.T) {
+	t.Parallel()
+
+	spec := entities.DeclKey{File: "docs/specs/a.md", Kind: entities.KindOther, Name: "<file>"}
+	first := decl("pkg/a.go", "A", "pkg").Key
+	second := decl("pkg/b.go", "B", "pkg").Key
+
+	commits := New(Config{}).cut(
+		entities.NewGraph(nil, nil, nil),
+		entities.Ordering{At: map[entities.DeclKey]entities.Position{first: 0, spec: 1, second: 2}},
+		bucket{
+			keys:    []entities.DeclKey{first, spec, second},
+			shape:   entities.ShapeFeature,
+			feature: "pkg",
+			reason:  "test",
+		},
+	)
+
+	if len(commits) != 3 {
+		t.Fatalf("got %d commits, want code, document, code", len(commits))
+	}
+
+	if len(commits[1].Decls) != 1 || commits[1].Decls[0] != spec {
+		t.Fatalf("the middle commit holds %v, want only the document", commits[1].Decls)
+	}
+}

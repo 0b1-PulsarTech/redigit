@@ -27,6 +27,7 @@ func sortForBirth(
 	})
 
 	out := make([]entities.DeclKey, 0, len(sorted))
+	subjects := testSubjects(graph)
 
 	for start := 0; start < len(sorted); {
 		end := start + 1
@@ -34,7 +35,7 @@ func sortForBirth(
 			end++
 		}
 
-		out = append(out, byDependency(graph, sorted[start:end], groupOf)...)
+		out = append(out, byDependency(graph, subjects, sorted[start:end], groupOf)...)
 		start = end
 	}
 
@@ -53,6 +54,7 @@ func sortForBirth(
 // no atom).
 func byDependency(
 	graph entities.Graph,
+	subjects map[entities.DeclKey][]entities.DeclKey,
 	group []entities.DeclKey,
 	groupOf func(entities.DeclKey) FeatureID,
 ) []entities.DeclKey {
@@ -77,6 +79,14 @@ func byDependency(
 				links,
 				link{provider: provider, dependent: dependent, soft: isSoft(edge.Reason)},
 			)
+		}
+
+		// A test shares its subject's position, and nothing but name order would
+		// say which is born first.
+		for _, subject := range subjects[key] {
+			if provider, inside := nodes.leaderOf[subject]; inside && provider != dependent {
+				links = append(links, link{provider: provider, dependent: dependent, soft: true})
+			}
 		}
 	}
 

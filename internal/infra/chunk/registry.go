@@ -15,5 +15,6 @@ var Registry = []indexing.Chunker{
 	SQLMigrations{},
 	GoMod{},
 	GoWork{},
+	Changelog{},
 	WholeFile{MaxLines: entities.DefaultMaxAddedLines},
 }

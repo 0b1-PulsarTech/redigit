@@ -101,7 +101,7 @@ func (c classifier) decide(file string) placement {
 		return placement{role: roleScaffold}
 	}
 
-	if !isProse(file) {
+	if !isProse(file) || path.Base(file) == changelogFile {
 		return placement{role: roleNone}
 	}
 

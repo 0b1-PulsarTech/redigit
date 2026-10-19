@@ -20,7 +20,13 @@ func unbornProviders(
 		inFeature[key] = true
 	}
 
-	index := sharedIndex{atoms: atomGroups(graph), testsOf: testAnchors(graph), own: own}
+	index := sharedIndex{
+		atoms:    atomGroups(graph),
+		testsOf:  testAnchors(graph),
+		subjects: testSubjects(graph),
+		walked:   wanted,
+		own:      own,
+	}
 	queue := slices.Clone(members)
 
 	add := func(key entities.DeclKey) {
@@ -51,7 +57,11 @@ func unbornProviders(
 type sharedIndex struct {
 	atoms   map[string][]entities.DeclKey
 	testsOf map[entities.DeclKey][]entities.DeclKey
-	own     ownership
+	// subjects is, per test, what it exercises: the reverse of testsOf.
+	subjects map[entities.DeclKey][]entities.DeclKey
+	// walked is what the walk has taken into the shared commit so far.
+	walked map[entities.DeclKey]bool
+	own    ownership
 }
 
 // siblingsOf is everything current's place in the shared kernel drags along

@@ -17,6 +17,40 @@ type featureRules struct {
 	cost  map[FeatureID]int
 }
 
+// productReaders counts, per product, the other products whose features read
+// its module. The product many others read is the core, and what a core shares
+// is born inside its own arc only if it comes first: behind a small reader, that
+// reader pulls the shared half forward and splits the core in two. Cost orders
+// the products nobody reads, and breaks a tie.
+func productReaders(
+	waits map[FeatureID]map[FeatureID]bool,
+	product func(FeatureID) FeatureID,
+) map[FeatureID]int {
+	seen := map[FeatureID]map[FeatureID]bool{}
+
+	for feature, roots := range waits {
+		for root := range roots {
+			reader, read := product(feature), product(root)
+			if reader == read {
+				continue
+			}
+
+			if seen[read] == nil {
+				seen[read] = map[FeatureID]bool{}
+			}
+
+			seen[read][reader] = true
+		}
+	}
+
+	out := make(map[FeatureID]int, len(seen))
+	for read, readersOf := range seen {
+		out[read] = len(readersOf)
+	}
+
+	return out
+}
+
 // sortFeatures returns the build order and the features that need each other.
 // A cycle is returned, never silently broken. A product is built as a unit, its
 // root first; a feature also waits for the roots of the modules it reads,
@@ -28,9 +62,14 @@ func sortFeatures(
 	needs, waits, at, group, cost := rules.needs, rules.waits, rules.at, rules.group, rules.cost
 	product := func(feature FeatureID) FeatureID { return productOf(group, feature) }
 
+	readers := productReaders(waits, product)
 	pending := slices.Clone(features)
 	slices.SortFunc(pending, func(a, b FeatureID) int {
 		left, right := product(a), product(b)
+		if byReaders := cmp.Compare(readers[right], readers[left]); byReaders != 0 {
+			return byReaders
+		}
+
 		if byCost := cmp.Compare(cost[left], cost[right]); byCost != 0 {
 			return byCost
 		}
