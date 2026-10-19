@@ -22,8 +22,12 @@ func touched(
 				continue
 			}
 
-			if !needsFresh(graph, subjects, key, fresh, out) &&
-				!(own.loose[key] && tiedToFresh(graph, key, fresh, out)) {
+			needed := needsFresh(graph, subjects, key, fresh, out)
+			if own.loose[key] {
+				needed = needed || tiedToFresh(graph, key, fresh, out)
+			}
+
+			if !needed {
 				continue
 			}
 
