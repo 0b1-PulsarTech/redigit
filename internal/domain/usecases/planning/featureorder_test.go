@@ -153,3 +153,68 @@ func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 		t.Fatalf("features %v need each other, which ownership should make impossible", cyclic)
 	}
 }
+
+// A deferred declaration is shared by being deferred, not by being read by
+// several features, so a feature reaching it comes after the features that own
+// what it needs.
+func TestFeatureNeedsBehindADeferred(t *testing.T) {
+	t.Parallel()
+
+	reader := decl("lead/api/handler.go", "Handle", "lead/api")
+	registry := decl("wire/wire.go", "Register", "wire")
+	bill := decl("bill/api/handler.go", "Handle", "bill/api")
+	plain := decl("kernel/id.go", "NewID", "kernel")
+	hop := decl("wire/hop.go", "Hop", "wire")
+
+	owner := map[entities.DeclKey]FeatureID{
+		reader.Key:   "lead/api",
+		bill.Key:     "bill/api",
+		registry.Key: SharedFeature,
+		hop.Key:      SharedFeature,
+		plain.Key:    SharedFeature,
+	}
+
+	testCases := []struct {
+		name     string
+		edges    []entities.Edge
+		deferred wiring
+		want     bool
+	}{
+		{
+			"a feature reaching a deferred declaration waits for the features behind it",
+			[]entities.Edge{needs(reader, registry), needs(registry, bill)},
+			wiring{registry.Key: true},
+			true,
+		},
+		{
+			"through a chain of deferred declarations",
+			[]entities.Edge{needs(reader, registry), needs(registry, hop), needs(hop, bill)},
+			wiring{registry.Key: true, hop.Key: true},
+			true,
+		},
+		{
+			"a shared declaration that is not deferred hides nothing",
+			[]entities.Edge{needs(reader, plain), needs(plain, bill)},
+			nil,
+			false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(
+				[]entities.Decl{reader, registry, bill, plain, hop},
+				testCase.edges,
+				nil,
+			)
+			got := featureNeeds(graph, ownership{owner: owner, deferred: testCase.deferred})
+
+			if got["lead/api"]["bill/api"] != testCase.want {
+				t.Fatalf("featureNeeds() lead/api -> bill/api = %v, want %v",
+					got["lead/api"]["bill/api"], testCase.want)
+			}
+		})
+	}
+}
