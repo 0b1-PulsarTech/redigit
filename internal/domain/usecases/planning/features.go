@@ -62,7 +62,8 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
-		if found && !entities.IsTestSide(consumer) && !roots[edge.Dependent] {
+		if found && !entities.IsTestSide(consumer) && !roots[edge.Dependent] &&
+			!isAfterword(graph, edge.Dependent) {
 			return true
 		}
 	}
