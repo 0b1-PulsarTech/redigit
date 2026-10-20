@@ -28,6 +28,9 @@ type sqlStmt struct {
 	key  entities.DeclKey
 	kind sqlstmt.Kind
 	refs []string
+	// words are the identifiers the statement mentions, lower-cased: a column of
+	// type citext names the extension that defines it.
+	words []string
 }
 
 // create is the statement that creates the table: every other statement about
@@ -121,7 +124,10 @@ func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
 			}
 
 			table.stmts = append(
-				table.stmts, sqlStmt{key: key, kind: stmt.Kind, refs: stmt.Refs},
+				table.stmts, sqlStmt{
+					key: key, kind: stmt.Kind, refs: stmt.Refs,
+					words: sqlstmt.Idents(source[stmt.Start:stmt.End]),
+				},
 			)
 
 			for _, ref := range stmt.Refs {

@@ -40,6 +40,10 @@ func TestMigrationRuleEdges(t *testing.T) {
 		{"an alter after its table", schemaEdge(foreignKey, templates)},
 		{"a foreign key after the table it points at", schemaEdge(foreignKey, accounts)},
 		{
+			"a table after the extension defining a type it uses",
+			schemaEdge(templates, key(migration, entities.KindOther, "extension:unaccent")),
+		},
+		{
 			"the migrations package after the first table",
 			schemaEdge(key("database/migrations/embed.go", entities.KindValue, "FS"), accounts),
 		},

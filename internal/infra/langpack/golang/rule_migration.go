@@ -10,7 +10,8 @@ import (
 
 // migrationRule orders the statements of a migration against what they build
 // on: a statement after the table it adds to, a foreign key after the table
-// it points at, a table after the ORM type it was generated from. Placed by
+// it points at, a statement after the extension whose type or function it
+// names, a table after the ORM type it was generated from. Placed by
 // file, 9 of 12 migrations landed ahead of their own source, one by 735
 // commits, and the 12 files arrived in a single commit at the end.
 type migrationRule struct{}
@@ -60,6 +61,12 @@ func (model sqlModel) tableEdges(table *sqlTable) []entities.Edge {
 			if target, known := model.tables[ref]; known {
 				targetCreate, _ := target.create()
 				edges = append(edges, schemaEdge(stmt.key, targetCreate))
+			}
+		}
+
+		for _, word := range stmt.words {
+			if extension, isExtension := model.extensions[word]; isExtension {
+				edges = append(edges, schemaEdge(stmt.key, extension))
 			}
 		}
 	}

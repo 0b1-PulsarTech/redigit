@@ -30,7 +30,8 @@ func schemaTree(t *testing.T) (entities.Snapshot, []entities.Decl) {
 		"database/entschema/customixins/uuid.go": "package customixins\n\nfunc UUID() {}\n",
 		"database/migrations/0001_all.sql": "-- Create \"accounts\" table\nCREATE TABLE \"accounts\" (\"id\" uuid);\n" +
 			"-- Create index \"account_id\" to table: \"accounts\"\nCREATE INDEX \"account_id\" ON \"accounts\" (\"id\");\n" +
-			"-- Create \"templates\" table\nCREATE TABLE \"templates\" (\"id\" uuid, \"account_id\" uuid);\n" +
+			"-- Create \"templates\" table\nCREATE TABLE \"templates\" " +
+			"(\"id\" uuid, \"account_id\" uuid, \"slug\" unaccent);\n" +
 			"-- Modify \"templates\" table\nALTER TABLE \"templates\" ADD CONSTRAINT \"fk\" " +
 			"FOREIGN KEY (\"account_id\") REFERENCES \"accounts\" (\"id\");\n" +
 			"CREATE EXTENSION IF NOT EXISTS \"unaccent\";\n",
