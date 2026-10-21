@@ -154,3 +154,23 @@ func TestCutKeepsADocumentApartFromCode(t *testing.T) {
 		t.Fatalf("the middle commit holds %v, want only the document", commits[1].Decls)
 	}
 }
+
+func TestCycleExtentHoldsMutualDeclarationsTogether(t *testing.T) {
+	t.Parallel()
+
+	first := decl("pkg/a.go", "A", "pkg")
+	second := decl("pkg/b.go", "B", "pkg")
+	loose := decl("pkg/c.go", "C", "pkg")
+	keys := []entities.DeclKey{first.Key, second.Key, loose.Key}
+	graph := entities.NewGraph(
+		[]entities.Decl{first, second, loose},
+		[]entities.Edge{needs(first, second), needs(second, first)},
+		nil,
+	)
+
+	got := cycleExtent(graph, keys, []int{0, 1, 2})
+
+	if got[0] != 1 || got[1] != 1 || got[2] != 2 {
+		t.Fatalf("extent = %v, want the cycle to end at its second member", got)
+	}
+}

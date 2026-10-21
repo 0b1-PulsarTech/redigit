@@ -21,7 +21,7 @@ func (p Planner) cut(
 ) []entities.PlannedCommit {
 	keys := sortForBirth(graph, order, in.keys, nil)
 	keys = gatherDocuments(graph, placeTests(graph, keys))
-	lastOf := atomExtent(graph, keys)
+	lastOf := cycleExtent(graph, keys, atomExtent(graph, keys))
 
 	var (
 		start    int
