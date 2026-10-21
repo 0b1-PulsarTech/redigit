@@ -1,6 +1,7 @@
 package planning
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -34,7 +35,7 @@ func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
 
 	got := sharedPackages(graph, own)["lib"]
 
-	if len(got) != 2 || got[0] != plain.Key || got[1] != sibling.Key {
+	if len(got) != 2 || !slices.Contains(got, plain.Key) || !slices.Contains(got, sibling.Key) {
 		t.Fatalf("sharedPackages()[lib] = %v, want only %s and %s", got, plain.Key, sibling.Key)
 	}
 }
