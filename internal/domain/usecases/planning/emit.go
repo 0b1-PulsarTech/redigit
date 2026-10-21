@@ -27,8 +27,9 @@ func (p Planner) emit(
 		// explains, and the declarations in it are read for the first time
 		// hundreds of commits later.
 		fresh := map[entities.DeclKey]bool{}
+		shared, late := splitLate(graph, unbornProviders(graph, own, members, born), members)
 
-		if shared := unbornProviders(graph, own, members, born); len(shared) > 0 {
+		if len(shared) > 0 {
 			plan.Commits = append(
 				plan.Commits,
 				p.cut(graph, order, bucket{
@@ -48,6 +49,8 @@ func (p Planner) emit(
 		members = slices.DeleteFunc(slices.Clone(members), func(key entities.DeclKey) bool {
 			return born[key]
 		})
+
+		members = append(members, late...)
 
 		markBorn(born, members)
 		markBorn(fresh, members)
