@@ -102,34 +102,47 @@ func (walk *componentWalk) visit(node entities.DeclKey) {
 
 // cycleExtent widens the extent of every member of a hard cycle to the cycle's
 // last member: mutual references compile in one commit or in none, so a cut
-// between two of them is not a cut the plan may make.
+// between two of them is not a cut the plan may make. An atom is one node of the
+// cycle, since its members are born together: two tables whose ORM types name
+// each other form one, though no single declaration of either does.
 func cycleExtent(graph entities.Graph, keys []entities.DeclKey, extent []int) []int {
+	nodes := atomNodes(graph, keys)
+	providers := map[entities.DeclKey][]entities.DeclKey{}
+
+	for _, key := range keys {
+		dependent := nodes.leaderOf[key]
+
+		for _, edge := range graph.Needs(key) {
+			provider, inside := nodes.leaderOf[edge.Provider]
+			if inside && provider != dependent && !isSoft(edge.Reason) {
+				providers[dependent] = append(providers[dependent], provider)
+			}
+		}
+	}
+
 	at := make(map[entities.DeclKey]int, len(keys))
 	for index, key := range keys {
 		at[key] = index
 	}
 
-	providers := map[entities.DeclKey][]entities.DeclKey{}
-
-	for _, key := range keys {
-		for _, edge := range graph.Needs(key) {
-			if _, inside := at[edge.Provider]; inside && !isSoft(edge.Reason) {
-				providers[key] = append(providers[key], edge.Provider)
-			}
-		}
-	}
-
-	for _, component := range componentsOf(keys, providers) {
+	for _, component := range componentsOf(nodes.leaders, providers) {
 		if len(component) == 1 {
 			continue
 		}
 
+		var members []entities.DeclKey
+
 		last := 0
-		for _, key := range component {
+
+		for _, leader := range component {
+			members = append(members, nodes.members[leader]...)
+		}
+
+		for _, key := range members {
 			last = max(last, extent[at[key]])
 		}
 
-		for _, key := range component {
+		for _, key := range members {
 			extent[at[key]] = max(extent[at[key]], last)
 		}
 	}

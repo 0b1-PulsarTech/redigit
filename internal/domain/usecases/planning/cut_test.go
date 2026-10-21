@@ -2,6 +2,7 @@ package planning
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -155,22 +156,27 @@ func TestCutKeepsADocumentApartFromCode(t *testing.T) {
 	}
 }
 
-func TestCycleExtentHoldsMutualDeclarationsTogether(t *testing.T) {
+func TestCycleExtentHoldsMutualAtomsTogether(t *testing.T) {
 	t.Parallel()
 
+	// Neither table's declarations need each other, but the two types do.
 	first := decl("pkg/a.go", "A", "pkg")
+	first.Atom = "a"
+	firstTable := decl("pkg/a.sql", "TableA", "pkg")
+	firstTable.Atom = "a"
 	second := decl("pkg/b.go", "B", "pkg")
+	second.Atom = "b"
 	loose := decl("pkg/c.go", "C", "pkg")
-	keys := []entities.DeclKey{first.Key, second.Key, loose.Key}
+	keys := []entities.DeclKey{first.Key, firstTable.Key, second.Key, loose.Key}
 	graph := entities.NewGraph(
-		[]entities.Decl{first, second, loose},
-		[]entities.Edge{needs(first, second), needs(second, first)},
+		[]entities.Decl{first, firstTable, second, loose},
+		[]entities.Edge{needs(first, second), needs(second, firstTable)},
 		nil,
 	)
 
-	got := cycleExtent(graph, keys, []int{0, 1, 2})
+	got := cycleExtent(graph, keys, []int{1, 1, 2, 3})
 
-	if got[0] != 1 || got[1] != 1 || got[2] != 2 {
-		t.Fatalf("extent = %v, want the cycle to end at its second member", got)
+	if want := []int{2, 2, 2, 3}; !slices.Equal(got, want) {
+		t.Fatalf("extent = %v, want %v", got, want)
 	}
 }
