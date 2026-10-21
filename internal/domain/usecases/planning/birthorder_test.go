@@ -123,3 +123,29 @@ func TestSortForBirthKeepsAHardCycleInArrivalOrder(t *testing.T) {
 		t.Fatalf("order = %v, want the cycle kept in arrival order", got)
 	}
 }
+
+func TestSortForBirthPutsWhatWaitsOnAHardCycleAfterIt(t *testing.T) {
+	t.Parallel()
+
+	// The name order puts the dependent first; it needs a member of the cycle.
+	dependent := decl("pkg/0.go", "Dependent", "pkg")
+	first := decl("pkg/a.go", "A", "pkg")
+	second := decl("pkg/b.go", "B", "pkg")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{dependent, first, second},
+		[]entities.Edge{needs(first, second), needs(second, first), needs(dependent, first)},
+		nil,
+	)
+
+	got := sortForBirth(
+		graph,
+		entities.Ordering{},
+		[]entities.DeclKey{dependent.Key, first.Key, second.Key},
+		nil,
+	)
+
+	if len(got) != 3 || got[2] != dependent.Key {
+		t.Fatalf("order = %v, want the dependent after the cycle it needs", got)
+	}
+}

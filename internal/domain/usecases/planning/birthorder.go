@@ -102,8 +102,8 @@ func byDependency(
 		stuck = rest
 	}
 
-	// Whatever a hard cycle left behind, in the order it came in.
-	ordered = append(ordered, stuck...)
+	// Whatever a hard cycle left behind: the cycle, then what waits on it.
+	ordered = append(ordered, inDependencyOrder(stuck, links)...)
 
 	out := make([]entities.DeclKey, 0, len(group))
 	for _, leader := range ordered {
