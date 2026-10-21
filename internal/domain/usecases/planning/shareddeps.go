@@ -44,3 +44,15 @@ func shareDependencies(graph entities.Graph, own ownership) {
 		}
 	}
 }
+
+// takesForeign is whether a declaration walked into the shared commit brings
+// the providers a feature owns. A statement of the assembly is deferred, so
+// assign never shared what it reads; walked in ahead of its feature, it would
+// be born before them, and so would whatever those read in turn.
+func (index sharedIndex) takesForeign(own ownership, current entities.DeclKey) bool {
+	if own.roots[current] {
+		return true
+	}
+
+	return index.walked[current] && own.owner[current] != SharedFeature
+}

@@ -43,6 +43,12 @@ func (p Planner) emit(
 			markBorn(fresh, shared)
 		}
 
+		// A deferred statement walked in ahead of its feature took the
+		// declarations it reads with it; they are no longer the feature's to birth.
+		members = slices.DeleteFunc(slices.Clone(members), func(key entities.DeclKey) bool {
+			return born[key]
+		})
+
 		markBorn(born, members)
 		markBorn(fresh, members)
 

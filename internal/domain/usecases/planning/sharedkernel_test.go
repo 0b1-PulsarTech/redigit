@@ -260,3 +260,37 @@ func TestUnbornProvidersIgnoresAGeneratedByEdgeIntoATest(t *testing.T) {
 		)
 	}
 }
+
+func TestUnbornProvidersBringsWhatAWalkedStatementReadsFromAFeature(t *testing.T) {
+	t.Parallel()
+
+	member := decl("a/handler.go", "Handle", "a")
+	stmt := decl("w/server.go", "NewServer#5", "w")
+	stmt.Key.Kind = entities.KindStmt
+	health := decl("w/server.go", "health", "w")
+	status := decl("w/server.go", "statusKey", "w")
+
+	graph := entities.NewGraph(
+		[]entities.Decl{member, stmt, health, status},
+		[]entities.Edge{needs(member, stmt), needs(stmt, health), needs(health, status)},
+		nil,
+	)
+
+	own := ownership{
+		owner: map[entities.DeclKey]FeatureID{
+			member.Key: "a",
+			stmt.Key:   SharedFeature,
+			health.Key: "w",
+			status.Key: "w",
+		},
+		roots: wiring{stmt.Key: true},
+	}
+
+	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
+
+	for _, want := range []entities.DeclKey{stmt.Key, health.Key, status.Key} {
+		if !slices.Contains(got, want) {
+			t.Fatalf("unbornProviders() = %v, want it to carry %s", got, want)
+		}
+	}
+}

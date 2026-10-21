@@ -82,8 +82,10 @@ func (index sharedIndex) siblingsOf(
 	// Whatever a shared declaration needs is reached by every feature that
 	// reaches the declaration itself (see assign), so it is shared too: the
 	// walk never waits on a feature not yet processed.
+	foreign := index.takesForeign(own, current)
+
 	for _, edge := range graph.Needs(current) {
-		if own.owner[edge.Provider] == SharedFeature && !driftsToTest(graph, edge) {
+		if (foreign || own.owner[edge.Provider] == SharedFeature) && !driftsToTest(graph, edge) {
 			out = append(out, edge.Provider)
 		}
 	}
