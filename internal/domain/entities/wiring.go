@@ -85,7 +85,11 @@ func addSupport(graph Graph, roots map[DeclKey]bool) {
 }
 
 func servesWiring(graph Graph, decl Decl, roots map[DeclKey]bool) bool {
-	if decl.Key.Kind != KindType && decl.Key.Kind != KindValue {
+	if decl.Key.Kind == KindFunc && !callsWiring(graph, decl.Key, roots) {
+		return false
+	}
+
+	if decl.Key.Kind != KindType && decl.Key.Kind != KindValue && decl.Key.Kind != KindFunc {
 		return false
 	}
 
@@ -105,6 +109,20 @@ func servesWiring(graph Graph, decl Decl, roots map[DeclKey]bool) bool {
 	}
 
 	return read
+}
+
+// callsWiring is whether a function reaches for a declaration of the assembly.
+// One that only the wiring reads and that itself calls into the wiring is a
+// registration step: built before the code it registers exists, it would hold
+// the shared commit open on everything the step reaches.
+func callsWiring(graph Graph, key DeclKey, roots map[DeclKey]bool) bool {
+	for _, edge := range graph.Needs(key) {
+		if roots[edge.Provider] && !IsStructural(edge.Reason) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // IsTestSide is a test or anything declared in a test file: the helpers, mocks
