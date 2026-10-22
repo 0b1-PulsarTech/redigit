@@ -8,66 +8,26 @@ import (
 // needs or exercises in the same commit group, so a suite is read with its
 // subject. A move never passes a dependency and never splits an atom.
 func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
-	index := make(map[entities.DeclKey]int, len(keys))
-	for at, key := range keys {
-		index[key] = at
-	}
-
-	subjects := testSubjects(graph)
-	lastOf := atomExtent(graph, keys)
-	after := map[int][]entities.DeclKey{}
-	moved := map[entities.DeclKey]bool{}
-	slot := map[entities.DeclKey]int{}
+	place := newPlacement(graph, keys)
 
 	for _, key := range keys {
-		decl, found := graph.Decl(key)
-		if !found || !entities.IsTestSide(decl) {
-			continue
-		}
-
-		anchor := -1
-
-		raise := func(provider entities.DeclKey) {
-			if at, placed := slot[provider]; placed {
-				anchor = max(anchor, at)
-
-				return
-			}
-
-			if at, inside := index[provider]; inside && provider != key {
-				anchor = max(anchor, lastOf[at])
-			}
-		}
-
-		for _, edge := range graph.Needs(key) {
-			raise(edge.Provider)
-		}
-
-		for _, subject := range subjects[key] {
-			raise(subject)
-		}
-
-		if anchor < 0 || anchor+1 >= index[key] {
-			continue
-		}
-
-		moved[key] = true
-		slot[key] = anchor
-		after[anchor] = append(after[anchor], key)
+		place.consider(key)
 	}
 
-	if len(moved) == 0 {
+	place.settleAtoms()
+
+	if len(place.moved) == 0 {
 		return gatherTestAtoms(graph, keys)
 	}
 
 	out := make([]entities.DeclKey, 0, len(keys))
 
 	for at, key := range keys {
-		if !moved[key] {
+		if !place.moved[key] {
 			out = append(out, key)
 		}
 
-		out = append(out, after[at]...)
+		out = append(out, place.after[at]...)
 	}
 
 	return gatherTestAtoms(graph, out)

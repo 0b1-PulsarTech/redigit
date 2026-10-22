@@ -22,10 +22,15 @@ func TestPlaceTests(t *testing.T) {
 	sameAtomB := decl("a/gen.go", "GenB", "a")
 	sameAtomB.Atom = "gen"
 	testGen := testDecl("a/gen_test.go", "TestGen", "a")
+	mockOne := testDecl("a/store_mock_test.go", "MockOne", "a")
+	mockTwo := testDecl("a/store_mock_test.go", "MockTwo", "a")
+	mockOne.Atom, mockTwo.Atom = "store-mock", "store-mock"
+	useMock := testDecl("a/use_mock_test.go", "TestUseMock", "a")
 
 	graph := entities.NewGraph(
 		[]entities.Decl{
 			one, two, other, testOne, support, useSupport, orphan, sameAtom, sameAtomB, testGen,
+			mockOne, mockTwo, useMock,
 		},
 		[]entities.Edge{
 			needs(testOne, one),
@@ -33,6 +38,9 @@ func TestPlaceTests(t *testing.T) {
 			needs(useSupport, support),
 			needs(support, two),
 			needs(testGen, sameAtom),
+			needs(mockOne, one),
+			needs(mockTwo, two),
+			needs(useMock, mockOne),
 		},
 		nil,
 	)
@@ -61,6 +69,11 @@ func TestPlaceTests(t *testing.T) {
 			"a test never lands inside an atom",
 			[]entities.Decl{sameAtom, one, sameAtomB, other, testGen},
 			[]entities.Decl{sameAtom, one, sameAtomB, testGen, other},
+		},
+		{
+			"a generated test file moves as one, behind the last thing any member needs",
+			[]entities.Decl{one, two, other, mockOne, useMock, mockTwo},
+			[]entities.Decl{one, two, mockOne, mockTwo, other, useMock},
 		},
 	}
 
