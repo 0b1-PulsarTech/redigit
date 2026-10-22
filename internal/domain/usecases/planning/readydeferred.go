@@ -72,7 +72,7 @@ func waitsOn(
 	waits func(entities.DeclKey) bool,
 ) bool {
 	for _, edge := range graph.Needs(key) {
-		if waits(edge.Provider) {
+		if !entities.FillsInterface(graph, edge) && waits(edge.Provider) {
 			return true
 		}
 	}
