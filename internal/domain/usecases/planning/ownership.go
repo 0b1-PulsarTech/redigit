@@ -88,6 +88,8 @@ func assign(graph entities.Graph) ownership {
 		own.owner[key] = SharedFeature
 	}
 
+	shareCompanions(graph, own)
+
 	shareDependencies(graph, own)
 
 	own.packages = sharedPackages(graph, own)
