@@ -16,7 +16,7 @@ func readyDeferred(
 	born map[entities.DeclKey]bool,
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
-	subjects := testSubjects(graph)
+	subjects := sharedSubjects(graph, own)
 	atoms := atomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
