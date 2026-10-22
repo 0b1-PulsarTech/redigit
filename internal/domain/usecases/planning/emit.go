@@ -1,8 +1,6 @@
 package planning
 
 import (
-	"cmp"
-	"maps"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -78,60 +76,11 @@ func (p Planner) emit(
 		)
 	}
 
-	// Once the last feature is built nothing is still to come: what waited for
-	// a feature to freshen what it needs is ready, and is born here instead of
-	// in the tail nobody reached.
-	if len(features) > 0 {
-		plan.Commits = append(
-			plan.Commits,
-			p.cutReady(graph, order, own, features[len(features)-1], births{
-				born:  born,
-				fresh: maps.Clone(born),
-			})...,
-		)
-	}
+	plan.Commits = append(plan.Commits, p.sweepLast(graph, order, own, features, born)...)
 
 	p.closeOut(graph, order, born, &plan)
 
 	return plan
-}
-
-func (p Planner) closeOut(
-	graph entities.Graph,
-	order entities.Ordering,
-	born map[entities.DeclKey]bool,
-	plan *entities.Plan,
-) {
-	// Anything no feature reached is still part of the final tree. Emitting it
-	// as a trailing layer commit is honest; dropping it would leave a hole the
-	// tree invariant only catches once every explanation is gone.
-	if rest := remaining(graph, born); len(rest) > 0 {
-		plan.Commits = append(
-			plan.Commits,
-			p.cut(graph, order, bucket{
-				keys:    rest,
-				shape:   entities.ShapeLayer,
-				feature: SharedFeature,
-				reason:  "reached by no entry point",
-			})...,
-		)
-
-		markBorn(born, rest)
-	}
-
-	for _, decl := range graph.Decls() {
-		if !born[decl.Key] {
-			plan.Unplaced = append(plan.Unplaced, decl.Key)
-		}
-	}
-
-	slices.SortFunc(plan.Unplaced, func(a, b entities.DeclKey) int {
-		return cmp.Compare(a.String(), b.String())
-	})
-
-	for index := range plan.Commits {
-		plan.Commits[index].Position = entities.Position(index)
-	}
 }
 
 func groupByFeature(graph entities.Graph, own ownership) map[FeatureID][]entities.DeclKey {

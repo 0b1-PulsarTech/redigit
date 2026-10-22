@@ -131,3 +131,7 @@ type Decl struct {
 // by the planner that enforces it and the chunker that splits a text file
 // which alone passes it.
 const DefaultMaxAddedLines = 900
+
+// DefaultMinCommitLines is the size below which a commit is a scrap: a reader
+// opens it for a handful of lines that belong to the commit beside it.
+const DefaultMinCommitLines = 15

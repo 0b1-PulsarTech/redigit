@@ -64,6 +64,7 @@ func Defaults() Config {
 		Rev:           "HEAD",
 		ServerCommand: "gopls",
 		ServerArgs:    []string{"-mode=stdio"},
+		Planning:      planning.Config{MinCommitLines: entities.DefaultMinCommitLines},
 		Author: AuthorConfig{
 			Name:  "redigit",
 			Email: "redigit@localhost",

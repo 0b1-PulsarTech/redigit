@@ -17,6 +17,11 @@ type Config struct {
 	// MaxAddedLines caps the hand-written lines one commit adds.
 	MaxAddedLines int
 
+	// MinCommitLines is the size below which a commit is a scrap that merges
+	// into its neighbour, and an interface assertion on its own always does.
+	// Zero keeps every commit the planner cut.
+	MinCommitLines int
+
 	// Capabilities replaces the reachability walk with a slicing the caller
 	// read out of the published history. Empty means derive it.
 	Capabilities Capabilities
