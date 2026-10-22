@@ -85,7 +85,8 @@ func (index sharedIndex) siblingsOf(
 	foreign := index.takesForeign(own, current)
 
 	for _, edge := range graph.Needs(current) {
-		if (foreign || own.owner[edge.Provider] == SharedFeature) && !driftsToTest(graph, edge) {
+		if (foreign || own.owner[edge.Provider] == SharedFeature) &&
+			!driftsToTest(graph, edge) && !entities.IsSatisfaction(edge.Reason) {
 			out = append(out, edge.Provider)
 		}
 	}
