@@ -2,6 +2,7 @@ package planning
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -74,6 +75,19 @@ func (p Planner) emit(
 		plan.Commits = append(
 			plan.Commits,
 			p.cutReady(graph, order, own, feature, births{born: born, fresh: fresh})...,
+		)
+	}
+
+	// Once the last feature is built nothing is still to come: what waited for
+	// a feature to freshen what it needs is ready, and is born here instead of
+	// in the tail nobody reached.
+	if len(features) > 0 {
+		plan.Commits = append(
+			plan.Commits,
+			p.cutReady(graph, order, own, features[len(features)-1], births{
+				born:  born,
+				fresh: maps.Clone(born),
+			})...,
 		)
 	}
 

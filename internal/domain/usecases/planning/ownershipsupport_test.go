@@ -29,6 +29,10 @@ func TestAssignBuildsNoFeatureForCodeOnlyTestsRead(t *testing.T) {
 		t.Errorf("owner of the checker = %q, want it shared", got)
 	}
 
+	if got := own.reach[checker.Key]; got != 0 {
+		t.Errorf("reach of the checker = %d, want no built feature to reach it", got)
+	}
+
 	if !own.deferred[checker.Key] {
 		t.Error("the checker is not deferred, so it is born before any test reads it")
 	}

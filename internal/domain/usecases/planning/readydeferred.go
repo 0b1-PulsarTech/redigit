@@ -30,7 +30,10 @@ func readyDeferred(
 	// would put the code under it in the feature that happened to come first.
 	// The wiring has no feature of its own, so it may bring what only it uses;
 	// what a feature also uses is born with that feature, and bringing it early
-	// would pull its whole closure into the first registration.
+	// would pull its whole closure into the first registration. A manifest line
+	// is brought by what imports it: nothing else would ever birth the require
+	// of a module that only tests import, and so is what no built feature
+	// reaches.
 	waits := func(provider entities.DeclKey, strict bool) bool {
 		switch {
 		case born[provider]:
@@ -39,8 +42,11 @@ func readyDeferred(
 			return !ready[provider]
 		case own.owner[provider] != SharedFeature:
 			return true
+		case own.reach[provider] == 0:
+			return false
 		default:
-			return strict || usedBeyondWiring(graph, own, provider)
+			return strict && !isManifestKey(graph, provider) ||
+				usedBeyondWiring(graph, own, provider)
 		}
 	}
 
@@ -126,4 +132,10 @@ func usedBeyondWiring(graph entities.Graph, own ownership, key entities.DeclKey)
 	}
 
 	return false
+}
+
+func isManifestKey(graph entities.Graph, key entities.DeclKey) bool {
+	decl, found := graph.Decl(key)
+
+	return found && isManifestLine(graph, decl)
 }

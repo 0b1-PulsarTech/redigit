@@ -64,9 +64,12 @@ func assign(graph entities.Graph) ownership {
 	for key, features := range walk.reachedBy {
 		for feature := range features {
 			own.cost[feature]++
+
+			if walk.built[feature] {
+				own.reach[key]++
+			}
 		}
 
-		own.reach[key] = len(features)
 		own.owner[key] = soleOwner(features)
 
 		// The code only test support reaches has no feature to be built in.

@@ -83,6 +83,9 @@ func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 			registration.Key: SharedFeature, feature.Key: "a",
 			both.Key: SharedFeature, onlyWiring.Key: SharedFeature,
 		},
+		reach: map[entities.DeclKey]int{
+			both.Key: 2, onlyWiring.Key: 1,
+		},
 		deferred: wiring{registration.Key: true},
 		roots:    wiring{registration.Key: true},
 	}
