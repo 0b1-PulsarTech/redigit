@@ -27,6 +27,10 @@ func touched(
 				needed = needed || tiedToFresh(graph, key, fresh, out)
 			}
 
+			if !needed && isAfterwordBase(graph, key) {
+				needed = consumedBy(graph, key, out)
+			}
+
 			if !needed {
 				continue
 			}
@@ -57,6 +61,20 @@ func needsFresh(
 
 	for _, subject := range subjects[key] {
 		if fresh[subject] || touched[subject] {
+			return true
+		}
+	}
+
+	return false
+}
+
+func consumedBy(
+	graph entities.Graph,
+	key entities.DeclKey,
+	touched map[entities.DeclKey]bool,
+) bool {
+	for _, edge := range graph.Consumers(key) {
+		if touched[edge.Dependent] {
 			return true
 		}
 	}

@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"path"
+	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/routes"
@@ -14,9 +15,8 @@ const changelogFile = "CHANGELOG.md"
 
 // changelogRule makes each changelog entry wait for the route groups it names.
 // An entry records a change a client can observe, so it is true only once the
-// route exists: the file cut by lines and born whole came before any of the code
-// its entries are about. An entry that names no route has nothing to wait for and
-// is left for the end of the history.
+// route exists. An entry that names no route is left for the end of the history.
+// Each entry that waits also waits for the title, born with the first of them.
 type changelogRule struct{}
 
 func (changelogRule) Name() string { return "changelog" }
@@ -32,8 +32,18 @@ func (changelogRule) Edges(
 
 	var edges []entities.Edge
 
+	headers := map[string]entities.DeclKey{}
+
 	for _, decl := range decls {
-		if !isChangelogEntry(decl.Key) {
+		if isChangelogEntry(decl.Key) && decl.Span.Start == 0 &&
+			!strings.HasPrefix(routes.Text(read, sources, decl), "## ") &&
+			decl.Key.Name == "<file>" {
+			headers[decl.Key.File] = decl.Key
+		}
+	}
+
+	for _, decl := range decls {
+		if !isChangelogEntry(decl.Key) || headers[decl.Key.File] == decl.Key {
 			continue
 		}
 
@@ -53,6 +63,14 @@ func (changelogRule) Edges(
 					Reason:    entities.ReasonProse,
 				})
 			}
+		}
+
+		if header, found := headers[decl.Key.File]; found && len(named) > 0 {
+			edges = append(edges, entities.Edge{
+				Dependent: decl.Key,
+				Provider:  header,
+				Reason:    entities.ReasonProse,
+			})
 		}
 	}
 

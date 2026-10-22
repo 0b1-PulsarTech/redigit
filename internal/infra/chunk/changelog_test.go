@@ -15,14 +15,19 @@ func TestChangelogChunks(t *testing.T) {
 		names  []string
 	}{
 		{
-			name:   "the preamble rides with the first entry",
+			name:   "the preamble is a piece of its own",
 			source: "# Changelog\n\nintro\n\n## one\n\nbody\n\n## two\n\nbody\n",
+			names:  []string{"<file>", "<file>#2", "<file>#3"},
+		},
+		{
+			name:   "a file that opens on an entry has no header",
+			source: "## one\n\n## two\n",
 			names:  []string{"<file>", "<file>#2"},
 		},
 		{
 			name:   "a heading of level three opens no entry",
 			source: "# C\n\n## one\n\n### Changed\n\n## two\n",
-			names:  []string{"<file>", "<file>#2"},
+			names:  []string{"<file>", "<file>#2", "<file>#3"},
 		},
 		{
 			name:   "one entry stays whole",

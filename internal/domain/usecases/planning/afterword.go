@@ -16,3 +16,21 @@ func isAfterword(graph entities.Graph, key entities.DeclKey) bool {
 
 	return false
 }
+
+// isAfterwordBase is what only afterwords build on and that needs nothing
+// itself, such as a changelog's title: it is deferred with them and born with the
+// first of them, since no feature leads to it and it must not trail them.
+func isAfterwordBase(graph entities.Graph, key entities.DeclKey) bool {
+	consumers := graph.Consumers(key)
+	if key.Kind != entities.KindOther || len(consumers) == 0 || len(graph.Needs(key)) > 0 {
+		return false
+	}
+
+	for _, edge := range consumers {
+		if edge.Reason != entities.ReasonProse || !isAfterword(graph, edge.Dependent) {
+			return false
+		}
+	}
+
+	return true
+}

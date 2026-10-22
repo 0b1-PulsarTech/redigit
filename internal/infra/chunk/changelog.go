@@ -13,7 +13,8 @@ import (
 // Changelog cuts a CHANGELOG.md into its entries, one per level-two heading, so
 // each can be born after the feature it names. Cut by lines, a changelog of
 // dated fixes lands at the start of the history, describing code that does not
-// exist yet. The text above the first entry travels with that entry.
+// exist yet. The text above the first entry is a piece of its own, the header,
+// born with the first entry that lands.
 type Changelog struct{}
 
 var _ indexing.Chunker = Changelog{}
@@ -35,7 +36,9 @@ func (Changelog) Chunks(_ context.Context, path string, source []byte) ([]entiti
 		return []entities.Decl{wholeFileDecl(path, source)}, nil
 	}
 
-	starts[0] = 0
+	if starts[0] > 0 {
+		starts = append([]int{0}, starts...)
+	}
 
 	pieces := make([]entities.Decl, 0, len(starts))
 

@@ -30,7 +30,7 @@ func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 		}
 
 		if roots[decl.Key] || loose[decl.Key] || isOrphanProse(graph, decl) ||
-			isAfterword(graph, decl.Key) {
+			isAfterword(graph, decl.Key) || isAfterwordBase(graph, decl.Key) {
 			continue
 		}
 

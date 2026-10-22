@@ -20,7 +20,8 @@ func deferTests(graph entities.Graph, roots wiring) wiring {
 	loose := looseLines(graph)
 
 	for _, decl := range graph.Decls() {
-		if entities.IsTestSide(decl) || isAfterword(graph, decl.Key) || loose[decl.Key] {
+		if entities.IsTestSide(decl) || isAfterword(graph, decl.Key) ||
+			isAfterwordBase(graph, decl.Key) || loose[decl.Key] {
 			out[decl.Key] = true
 		}
 	}
