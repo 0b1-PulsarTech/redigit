@@ -6,9 +6,9 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// describesRule births a document with the first code it describes. The code
-// waits for the document, so it lands no later than the earliest code it names
-// (read from its text by path, see codeIndex); one naming nothing is scaffold.
+// describesRule births a document with the first code it sits beside: a
+// package's README. The code waits for the document, so the two land together.
+// A document that only names code is namedRule's.
 type describesRule struct{}
 
 func (describesRule) Name() string { return "describes" }
@@ -59,6 +59,10 @@ func forEachDescribed(
 	placed := classify(snap, decls)
 
 	for _, decl := range decls {
+		if placed[decl.Key].role != roleProse {
+			continue
+		}
+
 		for _, code := range placed[decl.Key].homes {
 			visit(decl.Key, code)
 		}

@@ -16,7 +16,10 @@ func TestClassifyPlacesScaffoldByPathRole(t *testing.T) {
 	}{
 		{"a root dotfile", ".gitignore", roleScaffold},
 		{"a root build file", "Taskfile.yml", roleScaffold},
-		{"a root agent instruction", "AGENTS.md", roleScaffold},
+		{"a root agent instruction stays last", "AGENTS.md", roleNone},
+		{"a second agent instruction stays last", "CLAUDE.md", roleNone},
+		{"an agent rules dotfile stays last", ".pulsarules-languages.json", roleNone},
+		{"a rules document naming nothing is left for the end", "docs/SERVICE_FLOW.md", roleNone},
 		{"an editor directory", ".idea/vcs.xml", roleScaffold},
 		{"a nested editor file", ".devcontainer/features/go.json", roleScaffold},
 		{"a lint config inside a module", "tools/.golangci.yml", roleScaffold},
@@ -61,8 +64,8 @@ func TestClassifyPlacesEveryPieceOfALongFile(t *testing.T) {
 
 	got := classify(entities.Snapshot{}, []entities.Decl{first, second})
 
-	if got[first.Key].role != roleScaffold || got[second.Key].role != roleScaffold {
-		t.Errorf("classify = %v, want both pieces placed as scaffold", got)
+	if got[first.Key].role != got[second.Key].role || got[first.Key].role != roleNone {
+		t.Errorf("classify = %v, want both pieces placed alike", got)
 	}
 }
 
@@ -94,6 +97,42 @@ func TestClassifyPlacesAModulesRootFiles(t *testing.T) {
 			file := piece(testCase.file, wholeFilePrefix, entities.Span{})
 
 			got := classify(entities.Snapshot{}, append([]entities.Decl{file}, decls...))[file.Key].role
+			if got != testCase.want {
+				t.Errorf("classify(%s) = %v, want %v", testCase.file, got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestClassifyPlacesAnyDocumentNamingCodeAfterIt(t *testing.T) {
+	t.Parallel()
+
+	snap := treeWith(t, map[string]string{
+		"README.md":       "Run apps/lead/svc first.\n",
+		"docs/guide.md":   "See apps/lead/svc.\n",
+		"docs/nothing.md": "Hello.\n",
+	})
+
+	code := goDecl("apps/lead/svc/svc.go", "Serve")
+	header := piece("apps/lead/go.mod", "example.com/app", entities.Span{})
+
+	testCases := []struct {
+		name string
+		file string
+		want role
+	}{
+		{"a root README naming a package", "README.md", roleNamed},
+		{"a guide naming a package", "docs/guide.md", roleNamed},
+		{"a guide naming nothing", "docs/nothing.md", roleNone},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := piece(testCase.file, wholeFilePrefix, entities.Span{})
+
+			got := classify(snap, []entities.Decl{doc, code, header})[doc.Key].role
 			if got != testCase.want {
 				t.Errorf("classify(%s) = %v, want %v", testCase.file, got, testCase.want)
 			}

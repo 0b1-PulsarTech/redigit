@@ -233,13 +233,12 @@ func TestModuleFilesAreBornWithTheirGoMod(t *testing.T) {
 	}
 }
 
-func TestDocumentIsBornWithTheFirstCodeItNames(t *testing.T) {
+func TestDocumentIsBornAfterTheCodeItNames(t *testing.T) {
 	t.Parallel()
 
 	files := map[string]string{
 		"apps/app/go.mod":           "module example.com/app\n\ngo 1.26\n",
 		"docs/worker.md":            "The queue consumer lives in `apps/app/worker`.\n",
-		"docs/CHANGELOG.md":         "# Changelog\n",
 		"apps/app/worker/README.md": "# worker\n",
 	}
 	code := []fixtureCode{
@@ -251,30 +250,25 @@ func TestDocumentIsBornWithTheFirstCodeItNames(t *testing.T) {
 
 	born := commitOf(t, files, code)
 
-	first := min(born["apps/app/worker/queue.go"], born["apps/app/worker/worker.go"])
+	last := max(born["apps/app/worker/queue.go"], born["apps/app/worker/worker.go"])
 
-	// A spec is a commit of documents, the one right before the code it names.
-	if born["docs/worker.md"] != first-1 {
+	// A spec is true of the code it names, so it is a commit of documents right
+	// after that code and never a preamble to it.
+	if born["docs/worker.md"] <= last {
 		t.Errorf(
-			"docs/worker.md born in commit %d, want %d, just before the code",
+			"docs/worker.md born in commit %d, the code it names in %d: a document opened the history",
 			born["docs/worker.md"],
-			first-1,
+			last,
 		)
 	}
 
-	if born["apps/app/worker/README.md"] != first {
+	if born["apps/app/worker/README.md"] != min(
+		born["apps/app/worker/queue.go"], born["apps/app/worker/worker.go"],
+	) {
 		t.Errorf(
 			"the package README born in commit %d, the package's first code in %d",
 			born["apps/app/worker/README.md"],
-			first,
-		)
-	}
-
-	// A changelog naming no route has no feature to follow: it closes the history.
-	if born["docs/CHANGELOG.md"] <= born["apps/app/main.go"] {
-		t.Errorf(
-			"a changelog naming nothing born in commit %d, want the end",
-			born["docs/CHANGELOG.md"],
+			born["apps/app/worker/queue.go"],
 		)
 	}
 }

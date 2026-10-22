@@ -26,12 +26,15 @@ const (
 	// roleModuleOwn is born with the go.mod of the module whose root holds it:
 	// its README, Taskfile, configuration samples.
 	roleModuleOwn
-	// roleProse is born with the first code it describes: a document naming
-	// a package, a README beside one.
+	// roleProse is born with the first code it sits beside: a README in a
+	// package's own directory.
 	roleProse
+	// roleNamed is born once the code its text names exists: a specification
+	// or a guide is true of what is written, and a reader meets it after it.
+	roleNamed
 )
 
-// placement is the role of one file and, for prose, the code it describes.
+// placement is the role of one file and, for prose, the code it is about.
 type placement struct {
 	role  role
 	homes []entities.DeclKey
@@ -88,7 +91,7 @@ func (c classifier) place(file string) placement {
 }
 
 func (c classifier) decide(file string) placement {
-	if isScaffoldPath(file) {
+	if isScaffoldPath(file) && !isProse(file) {
 		return placement{role: roleScaffold}
 	}
 
@@ -105,11 +108,15 @@ func (c classifier) decide(file string) placement {
 		return placement{role: roleNone}
 	}
 
-	if homes := c.code.describedBy(file); len(homes) > 0 {
-		return placement{role: roleProse, homes: homes}
+	if beside := c.code.besideCode(file); len(beside) > 0 {
+		return placement{role: roleProse, homes: beside}
 	}
 
-	return placement{role: roleScaffold}
+	if named := c.code.namedCode(file); len(named) > 0 {
+		return placement{role: roleNamed, homes: named}
+	}
+
+	return placement{role: roleNone}
 }
 
 // codedModules marks the modules holding a declaration of a format the tool
@@ -132,29 +139,6 @@ func codedModules(roots []string, decls []entities.Decl) map[string]bool {
 
 func isWholeFile(key entities.DeclKey) bool {
 	return key.Kind == entities.KindOther && strings.HasPrefix(key.Name, wholeFilePrefix)
-}
-
-// inertDirs hold what a repository writes last or by hand with an owner of
-// its own: pipelines and agent instructions are the final commits' business.
-var inertDirs = []string{".github", ".gitlab", ".gitea", ".circleci", ".claude"}
-
-// isInert reports a file no scaffold or documentation rule may move: the
-// formats other rules own (Go, SQL, go.mod, go.sum, go.work), fixtures a test
-// reads, and the pipeline directories.
-func isInert(file string) bool {
-	switch path.Ext(file) {
-	case ".go", ".sql":
-		return true
-	}
-
-	switch path.Base(file) {
-	case goModFile, goSumFile, goWorkFile:
-		return true
-	}
-
-	segments := strings.Split(file, "/")
-
-	return slices.Contains(segments, "testdata") || slices.Contains(inertDirs, segments[0])
 }
 
 // isScaffoldPath recognises the files that describe the repository rather than

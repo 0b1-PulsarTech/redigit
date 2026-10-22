@@ -69,17 +69,25 @@ func newCodeIndex(
 	return index
 }
 
-// describedBy is the code a document is about: what lives in its own
-// directory, in a directory its text names with a path, and in a module whose
-// path its text names. A bare word names nothing: "database" or "tools" are
-// words before they are directories, so a directory counts only as a path.
-func (c codeIndex) describedBy(file string) []entities.DeclKey {
-	text := c.read(file)
+// besideCode is the code a document sits beside: what lives in its own
+// directory, which is what a package README is about.
+func (c codeIndex) besideCode(file string) []entities.DeclKey {
 	found := map[entities.DeclKey]bool{}
 
 	for _, key := range c.byDir[path.Dir(file)] {
 		found[key] = true
 	}
+
+	return sortedDecls(found)
+}
+
+// namedCode is the code a document says it is about: what lives in a directory
+// its text names with a path, and in a module whose path its text names. A bare
+// word names nothing: "database" or "tools" are words before they are
+// directories, so a directory counts only as a path.
+func (c codeIndex) namedCode(file string) []entities.DeclKey {
+	text := c.read(file)
+	found := map[entities.DeclKey]bool{}
 
 	for dir, keys := range c.byDir {
 		if !c.direct[dir] || !strings.Contains(dir, "/") || !names(text, dir, c.byDir) {

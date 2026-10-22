@@ -35,6 +35,7 @@ var rules = []rule{
 	scaffoldRule{},
 	moduleFilesRule{},
 	describesRule{},
+	namedRule{},
 	changelogRule{},
 }
 
