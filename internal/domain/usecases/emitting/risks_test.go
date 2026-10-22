@@ -113,23 +113,30 @@ func TestRisksForAggregation(t *testing.T) {
 	}
 }
 
-func TestRisksForIgnoresAnInterfaceASomethingOnlySatisfies(t *testing.T) {
+func TestRisksForIgnoresAnInterfaceATypeOnlyFills(t *testing.T) {
 	t.Parallel()
 
 	impl := key("a.go", "Impl")
-	iface := key("b.go", "Iface")
+	target := key("b.go", "Target")
 
 	testCases := []struct {
-		name   string
-		reason entities.EdgeReason
-		want   []Risk
+		name        string
+		reason      entities.EdgeReason
+		isInterface bool
+		want        []Risk
 	}{
-		{"implementing an interface born later compiles", entities.ReasonImplements, nil},
-		{"so does a method set reached through a field", entities.ReasonMethodSet, nil},
+		{"filling an interface born later compiles", entities.ReasonImplements, true, nil},
 		{
-			"a reference to it does not",
+			"passing a value on needs the method that fills it",
+			entities.ReasonImplements,
+			false,
+			[]Risk{{Chunk: impl, Target: target, BornAt: 1}},
+		},
+		{
+			"a reference to the interface does not compile",
 			entities.ReasonReference,
-			[]Risk{{Chunk: impl, Target: iface, BornAt: 1}},
+			true,
+			[]Risk{{Chunk: impl, Target: target, BornAt: 1}},
 		},
 	}
 
@@ -138,12 +145,12 @@ func TestRisksForIgnoresAnInterfaceASomethingOnlySatisfies(t *testing.T) {
 			t.Parallel()
 
 			graph := entities.NewGraph(
-				nil,
-				[]entities.Edge{{Dependent: impl, Provider: iface, Reason: testCase.reason}},
+				[]entities.Decl{{Key: target, IsInterface: testCase.isInterface}},
+				[]entities.Edge{{Dependent: impl, Provider: target, Reason: testCase.reason}},
 				nil,
 			)
 			planned := entities.PlannedCommit{Position: 0, Decls: []entities.DeclKey{impl}}
-			positions := map[entities.DeclKey]entities.Position{impl: 0, iface: 1}
+			positions := map[entities.DeclKey]entities.Position{impl: 0, target: 1}
 
 			if got := risksFor(planned, graph, positions); !slices.Equal(got, testCase.want) {
 				t.Fatalf("risksFor() = %+v, want %+v", got, testCase.want)

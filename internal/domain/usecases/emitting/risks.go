@@ -30,7 +30,7 @@ func risksFor(
 
 		for _, edge := range graph.Needs(key) {
 			target := edge.Provider
-			if seen[target] || entities.IsSatisfaction(edge.Reason) {
+			if seen[target] || entities.FillsInterface(graph, edge) {
 				continue
 			}
 

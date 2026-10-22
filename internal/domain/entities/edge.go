@@ -97,9 +97,16 @@ type Anchor struct {
 	Reason EdgeReason
 }
 
-// IsSatisfaction is a reason that only matches a type to the interface it
-// satisfies. The implementation compiles with the interface born later, so
-// neither the planner nor the risk report counts it as a need.
-func IsSatisfaction(reason EdgeReason) bool {
-	return reason == ReasonImplements || reason == ReasonMethodSet
+// FillsInterface is an edge from a type to an interface it satisfies. The type
+// compiles with the interface born later, so neither the planner nor the risk
+// report counts it as a need. An edge to a method that satisfies one is another
+// thing: the code that passes the value on cannot compile without it.
+func FillsInterface(graph Graph, edge Edge) bool {
+	if edge.Reason != ReasonImplements {
+		return false
+	}
+
+	provider, found := graph.Decl(edge.Provider)
+
+	return found && provider.IsInterface
 }

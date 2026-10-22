@@ -295,29 +295,41 @@ func TestUnbornProvidersBringsWhatAWalkedStatementReadsFromAFeature(t *testing.T
 	}
 }
 
-func TestUnbornProvidersDoesNotFollowAnInterfaceASomethingOnlySatisfies(t *testing.T) {
+func TestUnbornProvidersDoesNotFollowAnInterfaceATypeOnlyFills(t *testing.T) {
 	t.Parallel()
 
 	member := decl("a/handler.go", "Handle", "a")
 	impl := decl("kernel/impl.go", "Impl", "kernel")
+	method := decl("kernel/impl.go", "Impl.Do", "kernel")
 	iface := decl("other/iface.go", "Iface", "other")
+	iface.IsInterface = true
 
 	graph := entities.NewGraph(
-		[]entities.Decl{member, impl, iface},
+		[]entities.Decl{member, impl, method, iface},
 		[]entities.Edge{
 			needs(member, impl),
+			{Dependent: member.Key, Provider: method.Key, Reason: entities.ReasonImplements},
 			{Dependent: impl.Key, Provider: iface.Key, Reason: entities.ReasonImplements},
 		},
 		nil,
 	)
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
-		member.Key: "a", impl.Key: SharedFeature, iface.Key: SharedFeature,
+		member.Key: "a",
+		impl.Key:   SharedFeature,
+		method.Key: SharedFeature,
+		iface.Key:  SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
 
-	if want := []entities.DeclKey{impl.Key}; !slices.Equal(got, want) {
+	want := []entities.DeclKey{impl.Key, method.Key}
+	slices.SortFunc(
+		want,
+		func(a, b entities.DeclKey) int { return cmp.Compare(a.String(), b.String()) },
+	)
+
+	if !slices.Equal(got, want) {
 		t.Fatalf("unbornProviders() = %v, want %v", got, want)
 	}
 }
