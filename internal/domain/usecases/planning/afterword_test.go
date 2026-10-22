@@ -38,3 +38,21 @@ func TestIsAfterword(t *testing.T) {
 		})
 	}
 }
+
+func TestCodeWiringDropsADocumentThatNamesTheProgram(t *testing.T) {
+	t.Parallel()
+
+	route := decl("a/handler.go", "GroupName", "a")
+	boot := decl("cmd/main.go", "main", "cmd")
+	entry := decl("docs/CHANGELOG.md", "<file>#2", "docs")
+	graph := entities.NewGraph(
+		[]entities.Decl{route, boot, entry},
+		[]entities.Edge{{Dependent: entry.Key, Provider: route.Key, Reason: entities.ReasonProse}},
+		nil,
+	)
+
+	got := codeWiring(graph, wiring{entry.Key: true, boot.Key: true})
+	if got[entry.Key] || !got[boot.Key] {
+		t.Fatalf("codeWiring() = %v, want only the code root", got)
+	}
+}

@@ -34,3 +34,18 @@ func isAfterwordBase(graph entities.Graph, key entities.DeclKey) bool {
 
 	return true
 }
+
+// codeWiring is the wiring that is code. A document naming many directories
+// reaches a twentieth of the program and looked like a root, which made every
+// entry it names a head plugged into it and tied unrelated modules to a product.
+func codeWiring(graph entities.Graph, roots wiring) wiring {
+	out := wiring{}
+
+	for key := range roots {
+		if !isAfterword(graph, key) && !isAfterwordBase(graph, key) {
+			out[key] = true
+		}
+	}
+
+	return out
+}

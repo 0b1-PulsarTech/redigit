@@ -50,7 +50,7 @@ func assign(graph entities.Graph) ownership {
 		reach: map[entities.DeclKey]int{},
 		group: map[FeatureID]FeatureID{},
 		cost:  map[FeatureID]int{},
-		roots: entities.FindWiring(graph),
+		roots: codeWiring(graph, entities.FindWiring(graph)),
 		loose: looseLines(graph),
 	}
 
