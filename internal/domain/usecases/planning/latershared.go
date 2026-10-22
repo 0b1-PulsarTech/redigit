@@ -20,11 +20,17 @@ func splitLate(
 		waiting[key] = true
 	}
 
+	atoms := atomGroups(graph)
+
 	for changed := true; changed; {
 		changed = false
 
 		for _, key := range shared {
-			if waiting[key] || !readsAny(graph, key, waiting) {
+			if waiting[key] {
+				continue
+			}
+
+			if !readsAny(graph, key, waiting) && !atomWaiting(graph, atoms, key, waiting) {
 				continue
 			}
 
@@ -54,4 +60,17 @@ func readsAny(graph entities.Graph, key entities.DeclKey, set map[entities.DeclK
 	}
 
 	return false
+}
+
+// atomWaiting is whether another member of the declaration's atom waits: an
+// atom is born in one commit, so it goes late as one.
+func atomWaiting(
+	graph entities.Graph,
+	atoms map[string][]entities.DeclKey,
+	key entities.DeclKey,
+	waiting map[entities.DeclKey]bool,
+) bool {
+	return slices.ContainsFunc(atomMembers(graph, atoms, key), func(member entities.DeclKey) bool {
+		return waiting[member]
+	})
 }
