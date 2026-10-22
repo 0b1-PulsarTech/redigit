@@ -1,0 +1,50 @@
+package planning
+
+import "github.com/wrapped-owls/redigit/internal/domain/entities"
+
+// testSupport is the code only the tests of other packages read: a fixture, a
+// builder, an assertion no production declaration uses. A function only its
+// own package's tests read is the code under test, not support. Owned as an
+// entry point, support formed a feature of its own and held back every test
+// that needs it; deferred like a test, it is born with the first one.
+func testSupport(graph entities.Graph) wiring {
+	out := wiring{}
+
+	for changed := true; changed; {
+		changed = false
+
+		for _, decl := range graph.Decls() {
+			if out[decl.Key] || decl.Key.Kind == entities.KindOther || entities.IsTestSide(decl) {
+				continue
+			}
+
+			if !onlyOtherTestsRead(graph, decl, out) {
+				continue
+			}
+
+			out[decl.Key] = true
+			changed = true
+		}
+	}
+
+	return out
+}
+
+func onlyOtherTestsRead(graph entities.Graph, decl entities.Decl, support wiring) bool {
+	read := false
+
+	for _, edge := range graph.Consumers(decl.Key) {
+		consumer, found := graph.Decl(edge.Dependent)
+		if !found || entities.IsStructural(edge.Reason) || isAfterword(graph, edge.Dependent) {
+			continue
+		}
+
+		if !entities.IsTestSide(consumer) && !support[edge.Dependent] {
+			return false
+		}
+
+		read = read || support[edge.Dependent] || consumer.Unit != decl.Unit
+	}
+
+	return read
+}

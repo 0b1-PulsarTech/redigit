@@ -19,6 +19,9 @@ type ownership struct {
 	// in build order, by the last one they need.
 	deferred wiring
 	roots    wiring
+	// support is the code only other packages' tests read; it is deferred and
+	// born with the first test that needs it.
+	support wiring
 	// loose is what nothing reads, deferred and born once what it names exists:
 	// the manifest lines and the entries of a library.
 	loose wiring
@@ -39,12 +42,6 @@ type ownership struct {
 // many distinct features can reach it. Counting insiders would pin every
 // package to the instant the source history happened to create it.
 func assign(graph entities.Graph) ownership {
-	reachedBy := map[entities.DeclKey]map[FeatureID]bool{}
-	seen := map[FeatureID]bool{}
-	entryModules := map[string]bool{}
-	rootHeads := map[FeatureID]bool{}
-	rootOf := map[string]FeatureID{}
-
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{},
 		reach: map[entities.DeclKey]int{},
@@ -54,53 +51,35 @@ func assign(graph entities.Graph) ownership {
 		loose: looseLines(graph),
 	}
 
-	own.deferred = deferTests(graph, own.roots)
+	own.support = testSupport(graph)
+	own.deferred = deferTests(graph, own.roots, own.support)
 
 	entries := entryPoints(graph, own.roots)
+	walk := walkEntries(graph, own, entries)
 
-	for _, entry := range entries {
-		feature := featureOf(entry)
-		if !seen[feature] {
-			seen[feature] = true
+	unionAtoms(graph, walk.reachedBy)
+	own.group = joinProducts(walk.reachedBy, walk.rootHeads)
+	own.order = walk.order
 
-			own.order = append(own.order, feature)
-		}
-
-		if isHead(graph, entry, own.roots) {
-			entryModules[moduleDir(graph, entry)] = true
-
-			if atModuleRoot(graph, entry) {
-				rootHeads[feature] = true
-				rootOf[moduleDir(graph, entry)] = feature
-			}
-		}
-
-		for key := range reachFrom(graph, entry.Key) {
-			if reachedBy[key] == nil {
-				reachedBy[key] = map[FeatureID]bool{}
-			}
-
-			reachedBy[key][feature] = true
-		}
-	}
-
-	unionAtoms(graph, reachedBy)
-	own.group = joinProducts(reachedBy, rootHeads)
-
-	for key, features := range reachedBy {
+	for key, features := range walk.reachedBy {
 		for feature := range features {
 			own.cost[feature]++
 		}
 
 		own.reach[key] = len(features)
 		own.owner[key] = soleOwner(features)
+
+		// The code only test support reaches has no feature to be built in.
+		if !walk.built[own.owner[key]] {
+			own.owner[key] = SharedFeature
+		}
 	}
 
-	own.waits = readsRoots(graph, own.owner, rootOf)
+	own.waits = readsRoots(graph, own.owner, walk.rootOf)
 
 	shareUnreached(graph, own)
 
-	shareLibraries(graph, own, entryModules)
+	shareLibraries(graph, own, walk.entryModules)
 	deferLibraryEntries(own, entries)
 
 	// What is deferred is born when it is ready, not with a feature that

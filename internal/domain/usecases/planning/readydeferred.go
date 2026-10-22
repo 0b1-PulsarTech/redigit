@@ -62,7 +62,7 @@ func readyDeferred(
 		}
 	}
 
-	return sortedKeys(touched(graph, subjects, own, ready, fresh))
+	return sortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
 }
 
 func waitsOn(

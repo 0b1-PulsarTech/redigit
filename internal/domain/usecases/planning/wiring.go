@@ -11,7 +11,7 @@ type wiring map[entities.DeclKey]bool
 // the code it exercises and a test of the injector needs the whole program, so
 // none of them is owned by a capability up front; each arrives once what it
 // needs exists.
-func deferTests(graph entities.Graph, roots wiring) wiring {
+func deferTests(graph entities.Graph, roots, support wiring) wiring {
 	out := wiring{}
 	for key := range roots {
 		out[key] = true
@@ -20,7 +20,7 @@ func deferTests(graph entities.Graph, roots wiring) wiring {
 	loose := looseLines(graph)
 
 	for _, decl := range graph.Decls() {
-		if entities.IsTestSide(decl) || isAfterword(graph, decl.Key) ||
+		if entities.IsTestSide(decl) || support[decl.Key] || isAfterword(graph, decl.Key) ||
 			isAfterwordBase(graph, decl.Key) || loose[decl.Key] {
 			out[decl.Key] = true
 		}
