@@ -2,38 +2,40 @@ package planning
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
-// readsRoots is, per feature, the module roots whose code it reads: the roots it
-// should wait for, so a module does not open as a stray file inside another
-// arc. The wait is a preference: modules that read each other are built anyway.
+// readsRoots is, per feature, the module roots whose code it reads directly: the
+// roots it should wait for, so a module does not open as a stray file inside
+// another arc. What it reaches only through shared code is not read by it, and
+// waiting for that would make every feature wait for the whole program. The
+// wait is a preference: modules that read each other are built anyway.
 func readsRoots(
 	graph entities.Graph,
-	reachedBy map[entities.DeclKey]map[FeatureID]bool,
+	owner map[entities.DeclKey]FeatureID,
 	rootOf map[string]FeatureID,
 ) map[FeatureID]map[FeatureID]bool {
 	reads := map[FeatureID]map[FeatureID]bool{}
 
-	for key, features := range reachedBy {
-		decl, found := graph.Decl(key)
+	for _, edge := range graph.Edges() {
+		feature := owner[edge.Dependent]
+		if feature == SharedFeature || entities.IsStructural(edge.Reason) ||
+			entities.FillsInterface(graph, edge) {
+			continue
+		}
+
+		decl, found := graph.Decl(edge.Provider)
 		if !found || decl.Key.Kind == entities.KindOther {
 			continue
 		}
 
 		root, rooted := rootOf[moduleDir(graph, decl)]
-		if !rooted {
+		if !rooted || feature == root {
 			continue
 		}
 
-		for feature := range features {
-			if feature == root {
-				continue
-			}
-
-			if reads[feature] == nil {
-				reads[feature] = map[FeatureID]bool{}
-			}
-
-			reads[feature][root] = true
+		if reads[feature] == nil {
+			reads[feature] = map[FeatureID]bool{}
 		}
+
+		reads[feature][root] = true
 	}
 
 	return reads

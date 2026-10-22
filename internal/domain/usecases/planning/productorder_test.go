@@ -59,26 +59,35 @@ func TestSortFeaturesBuildsAProductAsAUnit(t *testing.T) {
 	}
 }
 
-func TestReadsRoots(t *testing.T) {
+func TestReadsRootsCountsOnlyWhatAFeatureReadsDirectly(t *testing.T) {
 	t.Parallel()
 
-	manifest := decl("crm/go.mod", "module", "crm")
 	port := decl("crm/port.go", "Port", "crm")
-
+	shared := decl("kernel/guard.go", "Guard", "kernel")
+	handler := decl("routes/handler.go", "Handle", "routes")
+	crm := decl("crm/go.mod", "module", "crm")
+	kernel := decl("kernel/go.mod", "module", "kernel")
 	graph := entities.NewGraph(
-		[]entities.Decl{manifest, port},
+		[]entities.Decl{port, shared, handler, crm, kernel},
 		[]entities.Edge{
-			{Dependent: port.Key, Provider: manifest.Key, Reason: entities.ReasonModule},
+			needs(handler, port), needs(handler, shared), needs(shared, port),
+			{Dependent: port.Key, Provider: crm.Key, Reason: entities.ReasonModule},
+			{Dependent: shared.Key, Provider: kernel.Key, Reason: entities.ReasonModule},
 		},
 		nil,
 	)
-	reached := map[entities.DeclKey]map[FeatureID]bool{
-		port.Key: readers("crm", "routes"),
+	owner := map[entities.DeclKey]FeatureID{
+		port.Key: "crm", handler.Key: "routes", shared.Key: SharedFeature,
+	}
+	roots := map[string]FeatureID{"crm": "crm", "kernel": "kernel"}
+
+	got := readsRoots(graph, owner, roots)
+
+	if !got["routes"]["crm"] || !got["routes"]["kernel"] || len(got["crm"]) != 0 {
+		t.Fatalf("readsRoots() = %v, want routes to wait for crm and kernel", got)
 	}
 
-	got := readsRoots(graph, reached, map[string]FeatureID{"crm": "crm"})
-
-	if !got["routes"]["crm"] || len(got["crm"]) != 0 {
-		t.Fatalf("readsRoots() = %v, want routes to wait for crm and crm for none", got)
+	if len(got[SharedFeature]) != 0 {
+		t.Fatalf("readsRoots() = %v, want the shared kernel to wait for nothing", got)
 	}
 }

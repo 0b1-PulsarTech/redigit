@@ -96,7 +96,7 @@ func assign(graph entities.Graph) ownership {
 		own.owner[key] = soleOwner(features)
 	}
 
-	own.waits = readsRoots(graph, reachedBy, rootOf)
+	own.waits = readsRoots(graph, own.owner, rootOf)
 
 	shareUnreached(graph, own)
 
