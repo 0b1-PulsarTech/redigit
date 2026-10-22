@@ -96,3 +96,10 @@ type Anchor struct {
 	To     DeclKey
 	Reason EdgeReason
 }
+
+// IsSatisfaction is a reason that only matches a type to the interface it
+// satisfies. The implementation compiles with the interface born later, so
+// neither the planner nor the risk report counts it as a need.
+func IsSatisfaction(reason EdgeReason) bool {
+	return reason == ReasonImplements || reason == ReasonMethodSet
+}

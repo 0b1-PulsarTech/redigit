@@ -112,3 +112,42 @@ func TestRisksForAggregation(t *testing.T) {
 		})
 	}
 }
+
+func TestRisksForIgnoresAnInterfaceASomethingOnlySatisfies(t *testing.T) {
+	t.Parallel()
+
+	impl := key("a.go", "Impl")
+	iface := key("b.go", "Iface")
+
+	testCases := []struct {
+		name   string
+		reason entities.EdgeReason
+		want   []Risk
+	}{
+		{"implementing an interface born later compiles", entities.ReasonImplements, nil},
+		{"so does a method set reached through a field", entities.ReasonMethodSet, nil},
+		{
+			"a reference to it does not",
+			entities.ReasonReference,
+			[]Risk{{Chunk: impl, Target: iface, BornAt: 1}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(
+				nil,
+				[]entities.Edge{{Dependent: impl, Provider: iface, Reason: testCase.reason}},
+				nil,
+			)
+			planned := entities.PlannedCommit{Position: 0, Decls: []entities.DeclKey{impl}}
+			positions := map[entities.DeclKey]entities.Position{impl: 0, iface: 1}
+
+			if got := risksFor(planned, graph, positions); !slices.Equal(got, testCase.want) {
+				t.Fatalf("risksFor() = %+v, want %+v", got, testCase.want)
+			}
+		})
+	}
+}
