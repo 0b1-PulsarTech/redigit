@@ -56,7 +56,7 @@ func TestShareDependenciesLeavesAFeatureItsOwn(t *testing.T) {
 	))
 
 	if got := own.Owner[scaffold.Key]; got != "a" {
-		t.Fatalf("helper owner = %q, want %q", got, "a")
+		t.Fatalf("scaffold owner = %q, want %q", got, "a")
 	}
 }
 

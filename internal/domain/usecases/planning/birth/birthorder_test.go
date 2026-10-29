@@ -62,7 +62,7 @@ func TestSortForBirthWaitsForWhatAnAtomMemberNeeds(t *testing.T) {
 	)
 
 	if len(got) != 3 || got[0] != scaffold.Key {
-		t.Fatalf("order = %v, want the helper before the atom", got)
+		t.Fatalf("order = %v, want the scaffold before the atom", got)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestSortForBirthIgnoresAGeneratedByEdgeThatClosesACycle(t *testing.T) {
 	)
 
 	if len(got) != 2 || got[0] != mock.Key {
-		t.Fatalf("order = %v, want the mock before the helper that reads it", got)
+		t.Fatalf("order = %v, want the mock before the scaffold that reads it", got)
 	}
 }
 

@@ -142,7 +142,7 @@ func TestAnchorTestsWaitsForTheEarliestOfATwin(t *testing.T) {
 	}
 
 	if raised.Of(scaffold.Key) != 3 {
-		t.Errorf("helper positioned at %d, want 3", raised.Of(scaffold.Key))
+		t.Errorf("scaffold positioned at %d, want 3", raised.Of(scaffold.Key))
 	}
 }
 
@@ -168,7 +168,7 @@ func TestAnchorTestsLiftsAReaderOfALiftedHelper(t *testing.T) {
 
 	if raised.Of(scaffold.Key) != 40 || raised.Of(reader.Key) != 40 {
 		t.Fatalf(
-			"helper at %d and reader at %d, want both at 40",
+			"scaffold at %d and reader at %d, want both at 40",
 			raised.Of(scaffold.Key), raised.Of(reader.Key),
 		)
 	}
