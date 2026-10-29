@@ -2,6 +2,7 @@ package planning
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -135,4 +136,145 @@ func TestPlannerBuildsEachHandlerAsItsOwnArc(t *testing.T) {
 	if first != "bill/api" {
 		t.Fatalf("the shared declaration is born by %q, want the first feature built", first)
 	}
+}
+
+func statement(function, file string, index int) entities.Decl {
+	return entities.Decl{
+		Key: entities.DeclKey{
+			File: file,
+			Kind: entities.KindStmt,
+			Name: function + "#" + strconv.Itoa(index),
+		},
+		Unit: "cmd/app",
+	}
+}
+
+// A function cut into statements grows with the program: the program starts
+// with its entry, and each feature adds the registration that wires it. Held
+// whole it waits for the last feature and `main` lands at the end.
+func TestPlannerBirthsEachRegistrationWithItsFeature(t *testing.T) {
+	t.Parallel()
+
+	run := decl("cmd/app/run.go", "Run", "cmd/app")
+	main := decl("cmd/app/main.go", "Main", "cmd/app")
+	first := statement("Run", "cmd/app/run.go", 0)
+	lead := statement("Run", "cmd/app/run.go", 1)
+	bill := statement("Run", "cmd/app/run.go", 2)
+
+	first.Atom = "run"
+	run.Atom = "run"
+
+	base, _, named := twoFeatures()
+
+	decls := append(base.Decls(), run, main, first, lead, bill)
+	edges := append(
+		base.Edges(),
+		needs(main, run),
+		needs(first, run),
+		needs(lead, run),
+		needs(bill, run),
+		needs(lead, named["leadAPI"]),
+		needs(bill, named["billAPI"]),
+	)
+
+	at := map[entities.DeclKey]entities.Position{}
+	for index, d := range decls {
+		at[d.Key] = entities.Position(index)
+	}
+
+	plan, err := New(Config{}).Plan(
+		entities.NewGraph(decls, edges, nil),
+		entities.Ordering{At: at},
+	)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+
+	for index, commit := range plan.Commits {
+		for _, key := range commit.Decls {
+			bornAt[key] = index
+		}
+	}
+
+	if len(plan.Unplaced) != 0 {
+		t.Fatalf("Unplaced = %v, want none", plan.Unplaced)
+	}
+
+	testCases := []struct {
+		name         string
+		born, before entities.Decl
+	}{
+		{"main is born before the first feature", main, named["leadAPI"]},
+		{"the first registration comes with the signature", first, named["leadAPI"]},
+		{"a registration comes after the feature it wires", named["leadAPI"], lead},
+		{"the other registration comes after its own", named["billAPI"], bill},
+		{"a registration is not held for the last feature", bill, named["leadAPI"]},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if bornAt[testCase.born.Key] >= bornAt[testCase.before.Key] {
+				t.Fatalf("%v is born at %d, want before %v at %d",
+					testCase.born.Key, bornAt[testCase.born.Key],
+					testCase.before.Key, bornAt[testCase.before.Key])
+			}
+		})
+	}
+}
+
+func TestPlannerBearsTheTitleWithTheFirstEntry(t *testing.T) {
+	t.Parallel()
+
+	graph, order, parts := twoFeatures()
+	title := prose("<file>")
+	lead := prose("<file>#2")
+	bill := prose("<file>#3")
+
+	decls := append(graph.Decls(), title, lead, bill)
+	edges := append(
+		graph.Edges(),
+		edgeOf(lead, parts["leadAPI"], entities.ReasonProse),
+		edgeOf(lead, title, entities.ReasonProse),
+		edgeOf(bill, parts["billAPI"], entities.ReasonProse),
+		edgeOf(bill, title, entities.ReasonProse),
+	)
+
+	order.At[title.Key], order.At[lead.Key], order.At[bill.Key] = 9, 7, 8
+
+	plan, err := New(Config{}).Plan(entities.NewGraph(decls, edges, nil), order)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+
+	for index, commit := range plan.Commits {
+		for _, key := range commit.Decls {
+			bornAt[key] = index
+		}
+	}
+
+	first := min(bornAt[lead.Key], bornAt[bill.Key])
+	if bornAt[title.Key] != first {
+		t.Fatalf("the title is at %d, the first entry at %d", bornAt[title.Key], first)
+	}
+
+	for _, entry := range []struct{ entry, route entities.Decl }{
+		{lead, parts["leadAPI"]}, {bill, parts["billAPI"]},
+	} {
+		if bornAt[entry.entry.Key] < bornAt[entry.route.Key] {
+			t.Fatalf("%s is born before the route it records", entry.entry.Key)
+		}
+	}
+}
+
+func prose(name string) entities.Decl {
+	found := decl("CHANGELOG.md", name, "")
+	found.Key.Kind = entities.KindOther
+
+	return found
 }
