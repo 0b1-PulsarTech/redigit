@@ -44,8 +44,8 @@ func TestIsGenerated(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := isGenerated([]byte(testCase.source)); got != testCase.want {
-				t.Fatalf("isGenerated() = %v, want %v", got, testCase.want)
+			if got := IsGenerated([]byte(testCase.source)); got != testCase.want {
+				t.Fatalf("IsGenerated() = %v, want %v", got, testCase.want)
 			}
 		})
 	}

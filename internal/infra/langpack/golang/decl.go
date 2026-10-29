@@ -67,7 +67,7 @@ func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]ent
 	// of the graph took every reference edge to them along, and a test landed
 	// 491 positions before the mock it uses. The files of one sqlc run are
 	// grouped by the sql atom rule instead, one atom per table and per query.
-	if isGenerated(source) && !isSqlcOutput(source) {
+	if IsGenerated(source) && !IsSqlcOutput(source) {
 		for index := range decls {
 			decls[index].Atom = path
 		}

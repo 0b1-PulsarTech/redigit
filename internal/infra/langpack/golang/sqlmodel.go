@@ -220,7 +220,7 @@ func isDBGenOutput(snap entities.Snapshot, file string) bool {
 
 	source, err := readSource(snap, file)
 
-	return err == nil && isSqlcOutput(source)
+	return err == nil && IsSqlcOutput(source)
 }
 
 func sortedFiles(byFile map[string][]entities.Decl) []string {

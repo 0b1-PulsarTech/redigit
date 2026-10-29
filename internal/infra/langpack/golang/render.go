@@ -48,7 +48,7 @@ func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) 
 	// A generated file is reproduced verbatim: its declarations are one atom
 	// and arrive together, and filtering through the printer would drop the
 	// marker comment that says a tool wrote it.
-	if len(keep) > 0 && isGenerated(source) && !isSqlcOutput(source) {
+	if len(keep) > 0 && IsGenerated(source) && !IsSqlcOutput(source) {
 		return source, nil
 	}
 
