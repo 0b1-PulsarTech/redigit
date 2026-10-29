@@ -133,10 +133,10 @@ func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[reach.F
 }
 
 func soleOwner(features map[reach.FeatureID]bool) reach.FeatureID {
-	// A declaration reached by two features belongs to neither: picking one of
-	// them would be a guess, and a guess here is what puts a declaration
-	// hundreds of commits from its use.
 	if len(features) != 1 {
+		// A declaration reached by two features belongs to neither: picking one of
+		// them would be a guess, and a guess here is what puts a declaration
+		// hundreds of commits from its use.
 		return reach.SharedFeature
 	}
 

@@ -86,9 +86,6 @@ func featuresBehind(
 
 func Earliest(own owners.Ownership, order entities.Ordering) map[reach.FeatureID]entities.Position {
 	out := map[reach.FeatureID]entities.Position{}
-	// The earliest position is the tie-break between features neither of which
-	// needs the other, so a rebuilt history still follows the original
-	// chronology wherever the dependency graph leaves the choice open.
 
 	for key, feature := range own.Owner {
 		at := order.Of(key)
@@ -96,6 +93,9 @@ func Earliest(own owners.Ownership, order entities.Ordering) map[reach.FeatureID
 			continue
 		}
 
+		// The earliest position is the tie-break between features neither of which
+		// needs the other, so a rebuilt history still follows the original
+		// chronology wherever the dependency graph leaves the choice open.
 		if current, found := out[feature]; !found || at < current {
 			out[feature] = at
 		}

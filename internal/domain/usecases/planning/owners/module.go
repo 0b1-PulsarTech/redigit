@@ -8,14 +8,14 @@ import (
 )
 
 func moduleDir(graph entities.Graph, decl entities.Decl) string {
-	// A module is the unit of build the owner reads as one piece of the product,
-	// so it groups features better than a path prefix, which depends on how a
-	// repository happens to be laid out.
 	for _, edge := range graph.Needs(decl.Key) {
 		if edge.Reason != entities.ReasonModule {
 			continue
 		}
 
+		// A module is the unit of build the owner reads as one piece of the product,
+		// so it groups features better than a path prefix, which depends on how a
+		// repository happens to be laid out.
 		if cut := strings.LastIndex(edge.Provider.File, "/"); cut > 0 {
 			return edge.Provider.File[:cut]
 		}

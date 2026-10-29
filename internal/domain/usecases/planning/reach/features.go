@@ -71,9 +71,9 @@ func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wir
 }
 
 func FeatureOf(decl entities.Decl) FeatureID {
+	dir := decl.Unit.Dir()
 	// Two entry points of the same directory open the same feature: a package's
 	// handlers are one feature, not one feature each.
-	dir := decl.Unit.Dir()
 	if dir == "" {
 		dir = ParentDir(decl.Key.File)
 	}
