@@ -11,6 +11,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/gencode"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/tests"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/typecheck"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/wiring"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
@@ -77,10 +78,10 @@ func NewRulePack(tags []string) RulePack {
 	source := typed.NewSource(tags)
 
 	return RulePack{rules: append(slices.Clone(rules),
-		MethodSet{Source: source},
-		TypedConversion{Source: source},
-		Escaped{Source: source},
-		Reference{Source: source},
+		typecheck.MethodSet{Source: source},
+		typecheck.Conversion{Source: source},
+		typecheck.Escaped{Source: source},
+		typecheck.Reference{Source: source},
 	)}
 }
 

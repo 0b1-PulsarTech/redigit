@@ -1,4 +1,4 @@
-package golang
+package typecheck
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
-// TypedConversion makes a declaration that hands a concrete value to an
+// Conversion makes a declaration that hands a concrete value to an
 // interface wait for the methods of that value the interface lists. A reference
 // query sees the value's TYPE at most, and the line compiles only once every
 // method the interface demands exists: "cannot use budgettemplaterepo.New(db)
@@ -16,11 +16,11 @@ import (
 // the type checker's, so it covers every place Go converts silently (argument,
 // assignment, return, literal element, send, type assertion) instead of the few
 // a text rule could name.
-type TypedConversion struct{ Source *typed.Source }
+type Conversion struct{ Source *typed.Source }
 
-func (TypedConversion) Name() string { return "typed-conversion" }
+func (Conversion) Name() string { return "typed-conversion" }
 
-func (r TypedConversion) Edges(
+func (r Conversion) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -39,7 +39,7 @@ func (r TypedConversion) Edges(
 	return edges, nil
 }
 
-func (TypedConversion) Anchors(
+func (Conversion) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
