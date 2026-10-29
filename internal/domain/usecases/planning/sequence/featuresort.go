@@ -1,4 +1,4 @@
-package planning
+package sequence
 
 import (
 	"cmp"
@@ -6,16 +6,17 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // FeatureRules decides the order of the features: what must precede what, where
 // each first appeared, its product and its cost.
 type FeatureRules struct {
-	Needs map[FeatureID]map[FeatureID]bool
-	Waits map[FeatureID]map[FeatureID]bool
-	At    map[FeatureID]entities.Position
-	Group map[FeatureID]FeatureID
-	Cost  map[FeatureID]int
+	Needs map[reach.FeatureID]map[reach.FeatureID]bool
+	Waits map[reach.FeatureID]map[reach.FeatureID]bool
+	At    map[reach.FeatureID]entities.Position
+	Group map[reach.FeatureID]reach.FeatureID
+	Cost  map[reach.FeatureID]int
 }
 
 // productReaders counts, per product, the other products whose features read
@@ -24,10 +25,10 @@ type FeatureRules struct {
 // reader pulls the shared half forward and splits the core in two. Cost orders
 // the products nobody reads, and breaks a tie.
 func productReaders(
-	waits map[FeatureID]map[FeatureID]bool,
-	product func(FeatureID) FeatureID,
-) map[FeatureID]int {
-	seen := map[FeatureID]map[FeatureID]bool{}
+	waits map[reach.FeatureID]map[reach.FeatureID]bool,
+	product func(reach.FeatureID) reach.FeatureID,
+) map[reach.FeatureID]int {
+	seen := map[reach.FeatureID]map[reach.FeatureID]bool{}
 
 	for feature, roots := range waits {
 		for root := range roots {
@@ -37,14 +38,14 @@ func productReaders(
 			}
 
 			if seen[read] == nil {
-				seen[read] = map[FeatureID]bool{}
+				seen[read] = map[reach.FeatureID]bool{}
 			}
 
 			seen[read][reader] = true
 		}
 	}
 
-	out := make(map[FeatureID]int, len(seen))
+	out := make(map[reach.FeatureID]int, len(seen))
 	for read, readersOf := range seen {
 		out[read] = len(readersOf)
 	}
@@ -57,15 +58,15 @@ func productReaders(
 // root first; a feature also waits for the roots of the modules it reads,
 // unless that would leave nothing to build.
 func SortFeatures(
-	features []FeatureID,
+	features []reach.FeatureID,
 	rules FeatureRules,
-) (sorted []FeatureID, cyclic []FeatureID) {
+) (sorted []reach.FeatureID, cyclic []reach.FeatureID) {
 	needs, waits, at, group, cost := rules.Needs, rules.Waits, rules.At, rules.Group, rules.Cost
-	product := func(feature FeatureID) FeatureID { return owners.ProductOf(group, feature) }
+	product := func(feature reach.FeatureID) reach.FeatureID { return owners.ProductOf(group, feature) }
 
 	readers := productReaders(waits, product)
 	pending := slices.Clone(features)
-	slices.SortFunc(pending, func(a, b FeatureID) int {
+	slices.SortFunc(pending, func(a, b reach.FeatureID) int {
 		left, right := product(a), product(b)
 		if byReaders := cmp.Compare(readers[right], readers[left]); byReaders != 0 {
 			return byReaders
@@ -94,8 +95,8 @@ func SortFeatures(
 		return cmp.Compare(a, b)
 	})
 
-	done := map[FeatureID]bool{}
-	last := FeatureID("")
+	done := map[reach.FeatureID]bool{}
+	last := reach.FeatureID("")
 
 	for len(pending) > 0 {
 		next := nextFeature(pending, readiness{needs, waits, done}, product, last)
@@ -118,7 +119,7 @@ func SortFeatures(
 }
 
 // rankIn puts the root of a product before the features that serve it.
-func rankIn(feature, root FeatureID) int {
+func rankIn(feature, root reach.FeatureID) int {
 	if feature == root {
 		return 0
 	}

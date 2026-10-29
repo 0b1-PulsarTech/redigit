@@ -1,4 +1,4 @@
-package planning
+package sequence
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -8,17 +8,17 @@ import (
 
 // FeatureNeeds is which features have to be built before which. A feature needs
 // another when any declaration it owns waits on a declaration the other owns.
-func FeatureNeeds(graph entities.Graph, own owners.Ownership) map[FeatureID]map[FeatureID]bool {
-	needs := map[FeatureID]map[FeatureID]bool{}
-	behind := map[entities.DeclKey]map[FeatureID]bool{}
+func FeatureNeeds(graph entities.Graph, own owners.Ownership) map[reach.FeatureID]map[reach.FeatureID]bool {
+	needs := map[reach.FeatureID]map[reach.FeatureID]bool{}
+	behind := map[entities.DeclKey]map[reach.FeatureID]bool{}
 
-	add := func(from, to FeatureID) {
+	add := func(from, to reach.FeatureID) {
 		if from == reach.SharedFeature || to == reach.SharedFeature || from == to {
 			return
 		}
 
 		if needs[from] == nil {
-			needs[from] = map[FeatureID]bool{}
+			needs[from] = map[reach.FeatureID]bool{}
 		}
 
 		needs[from][to] = true
@@ -47,13 +47,13 @@ func featuresBehind(
 	graph entities.Graph,
 	own owners.Ownership,
 	start entities.DeclKey,
-	memo map[entities.DeclKey]map[FeatureID]bool,
-) map[FeatureID]bool {
+	memo map[entities.DeclKey]map[reach.FeatureID]bool,
+) map[reach.FeatureID]bool {
 	if found, ok := memo[start]; ok {
 		return found
 	}
 
-	out := map[FeatureID]bool{}
+	out := map[reach.FeatureID]bool{}
 	seen := map[entities.DeclKey]bool{start: true}
 	queue := []entities.DeclKey{start}
 
@@ -89,8 +89,8 @@ func featuresBehind(
 // is the tie-break between features neither of which needs the other, so a
 // rebuilt history still follows the original chronology wherever the dependency
 // graph leaves the choice open.
-func Earliest(own owners.Ownership, order entities.Ordering) map[FeatureID]entities.Position {
-	out := map[FeatureID]entities.Position{}
+func Earliest(own owners.Ownership, order entities.Ordering) map[reach.FeatureID]entities.Position {
+	out := map[reach.FeatureID]entities.Position{}
 
 	for key, feature := range own.Owner {
 		at := order.Of(key)

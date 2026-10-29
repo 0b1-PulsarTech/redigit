@@ -6,6 +6,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/sequence"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/testplace"
 )
 
@@ -78,10 +79,10 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		)
 	}
 
-	sorted, cyclic := SortFeatures(own.Order, FeatureRules{
-		Needs: FeatureNeeds(graph, own),
+	sorted, cyclic := sequence.SortFeatures(own.Order, sequence.FeatureRules{
+		Needs: sequence.FeatureNeeds(graph, own),
 		Waits: own.Waits,
-		At:    Earliest(own, order),
+		At:    sequence.Earliest(own, order),
 		Group: own.Group,
 		Cost:  own.Cost,
 	})

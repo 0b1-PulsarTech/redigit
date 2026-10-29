@@ -1,4 +1,4 @@
-package planning
+package sequence
 
 import (
 	"slices"
@@ -14,48 +14,48 @@ func TestSortFeatures(t *testing.T) {
 
 	testCases := []struct {
 		name       string
-		features   []FeatureID
-		needs      map[FeatureID]map[FeatureID]bool
-		at         map[FeatureID]entities.Position
-		want       []FeatureID
+		features   []reach.FeatureID
+		needs      map[reach.FeatureID]map[reach.FeatureID]bool
+		at         map[reach.FeatureID]entities.Position
+		want       []reach.FeatureID
 		wantCyclic int
 	}{
 		{
 			"a dependency wins over chronology",
-			[]FeatureID{"api", "core"},
-			map[FeatureID]map[FeatureID]bool{"api": {"core": true}},
-			map[FeatureID]entities.Position{"api": 0, "core": 9},
-			[]FeatureID{"core", "api"},
+			[]reach.FeatureID{"api", "core"},
+			map[reach.FeatureID]map[reach.FeatureID]bool{"api": {"core": true}},
+			map[reach.FeatureID]entities.Position{"api": 0, "core": 9},
+			[]reach.FeatureID{"core", "api"},
 			0,
 		},
 		{
 			"independent features keep the original chronology",
-			[]FeatureID{"late", "early"},
+			[]reach.FeatureID{"late", "early"},
 			nil,
-			map[FeatureID]entities.Position{"late": 7, "early": 1},
-			[]FeatureID{"early", "late"},
+			map[reach.FeatureID]entities.Position{"late": 7, "early": 1},
+			[]reach.FeatureID{"early", "late"},
 			0,
 		},
 		{
 			"equal positions fall back to the name so the result is deterministic",
-			[]FeatureID{"b", "a"},
+			[]reach.FeatureID{"b", "a"},
 			nil,
-			map[FeatureID]entities.Position{"a": 3, "b": 3},
-			[]FeatureID{"a", "b"},
+			map[reach.FeatureID]entities.Position{"a": 3, "b": 3},
+			[]reach.FeatureID{"a", "b"},
 			0,
 		},
 		{
 			"a feature that needs only itself is not blocked",
-			[]FeatureID{"solo"},
-			map[FeatureID]map[FeatureID]bool{"solo": {"solo": true}},
+			[]reach.FeatureID{"solo"},
+			map[reach.FeatureID]map[reach.FeatureID]bool{"solo": {"solo": true}},
 			nil,
-			[]FeatureID{"solo"},
+			[]reach.FeatureID{"solo"},
 			0,
 		},
 		{
 			"mutual need is reported rather than silently ordered",
-			[]FeatureID{"a", "b"},
-			map[FeatureID]map[FeatureID]bool{"a": {"b": true}, "b": {"a": true}},
+			[]reach.FeatureID{"a", "b"},
+			map[reach.FeatureID]map[reach.FeatureID]bool{"a": {"b": true}, "b": {"a": true}},
 			nil,
 			nil,
 			2,
@@ -168,7 +168,7 @@ func TestFeatureNeedsBehindADeferred(t *testing.T) {
 	plain := decl("kernel/id.go", "NewID", "kernel")
 	hop := decl("wire/hop.go", "Hop", "wire")
 
-	owner := map[entities.DeclKey]FeatureID{
+	owner := map[entities.DeclKey]reach.FeatureID{
 		reader.Key:   "lead/api",
 		bill.Key:     "bill/api",
 		registry.Key: reach.SharedFeature,
