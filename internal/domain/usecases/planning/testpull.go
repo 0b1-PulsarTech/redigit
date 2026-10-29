@@ -2,6 +2,7 @@ package planning
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/birth"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -33,7 +34,7 @@ func (index sharedIndex) safeToPull(
 			provider := edge.Provider
 
 			switch {
-			case IsSoft(edge.Reason) || seen[provider] || born[provider]:
+			case birth.IsSoft(edge.Reason) || seen[provider] || born[provider]:
 				continue
 			case index.own.owner[provider] != reach.SharedFeature:
 				return false
@@ -64,5 +65,5 @@ func (index sharedIndex) safeToPull(
 func driftsToTest(graph entities.Graph, edge entities.Edge) bool {
 	provider, found := graph.Decl(edge.Provider)
 
-	return IsSoft(edge.Reason) && found && entities.IsTestSide(provider)
+	return birth.IsSoft(edge.Reason) && found && entities.IsTestSide(provider)
 }

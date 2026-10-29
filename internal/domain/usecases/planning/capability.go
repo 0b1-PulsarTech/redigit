@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/birth"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -74,7 +75,7 @@ func (p Planner) emitByCapability(
 
 	// The affinity a tie is resolved by: the atom first, because its members
 	// must end up in ONE commit, then the slice.
-	keys = SortForBirth(graph, order, keys, func(key entities.DeclKey) FeatureID {
+	keys = birth.SortForBirth(graph, order, keys, func(key entities.DeclKey) FeatureID {
 		if atom, grouped := atoms[key]; grouped {
 			return FeatureID(atom)
 		}

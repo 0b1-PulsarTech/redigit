@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/birth"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -20,9 +21,9 @@ func (p Planner) cut(
 	order entities.Ordering,
 	in bucket,
 ) []entities.PlannedCommit {
-	keys := SortForBirth(graph, order, in.keys, nil)
+	keys := birth.SortForBirth(graph, order, in.keys, nil)
 	keys = gatherDocuments(graph, placeTests(graph, keys))
-	lastOf := CycleExtent(graph, keys, reach.AtomExtent(graph, keys))
+	lastOf := birth.CycleExtent(graph, keys, reach.AtomExtent(graph, keys))
 
 	var (
 		start    int

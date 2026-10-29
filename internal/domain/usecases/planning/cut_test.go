@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/birth"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -175,7 +176,7 @@ func TestCycleExtentHoldsMutualAtomsTogether(t *testing.T) {
 		nil,
 	)
 
-	got := CycleExtent(graph, keys, []int{1, 1, 2, 3})
+	got := birth.CycleExtent(graph, keys, []int{1, 1, 2, 3})
 
 	if want := []int{2, 2, 2, 3}; !slices.Equal(got, want) {
 		t.Fatalf("extent = %v, want %v", got, want)

@@ -1,4 +1,4 @@
-package planning
+package birth
 
 import (
 	"cmp"
@@ -16,7 +16,7 @@ func SortForBirth(
 	graph entities.Graph,
 	order entities.Ordering,
 	keys []entities.DeclKey,
-	groupOf func(entities.DeclKey) FeatureID,
+	groupOf func(entities.DeclKey) reach.FeatureID,
 ) []entities.DeclKey {
 	sorted := slices.Clone(keys)
 	slices.SortFunc(sorted, func(a, b entities.DeclKey) int {
@@ -57,7 +57,7 @@ func byDependency(
 	graph entities.Graph,
 	subjects map[entities.DeclKey][]entities.DeclKey,
 	group []entities.DeclKey,
-	groupOf func(entities.DeclKey) FeatureID,
+	groupOf func(entities.DeclKey) reach.FeatureID,
 ) []entities.DeclKey {
 	if len(group) <= 1 {
 		return group
@@ -134,7 +134,7 @@ func IsSoft(reason entities.EdgeReason) bool {
 func drainLinks(
 	nodes []entities.DeclKey,
 	links []link,
-	groupOf func(entities.DeclKey) FeatureID,
+	groupOf func(entities.DeclKey) reach.FeatureID,
 	hardOnly bool,
 ) (emitted, stuck []entities.DeclKey) {
 	inside := make(map[entities.DeclKey]bool, len(nodes))
@@ -212,7 +212,7 @@ func drain(
 	group []entities.DeclKey,
 	needs map[entities.DeclKey][]entities.DeclKey,
 	pending map[entities.DeclKey]int,
-	groupOf func(entities.DeclKey) FeatureID,
+	groupOf func(entities.DeclKey) reach.FeatureID,
 ) []entities.DeclKey {
 	out := make([]entities.DeclKey, 0, len(group))
 	ready := make([]entities.DeclKey, 0, len(group))
@@ -223,7 +223,7 @@ func drain(
 		}
 	}
 
-	current := FeatureID("")
+	current := reach.FeatureID("")
 	started := false
 
 	for len(ready) > 0 {
@@ -258,8 +258,8 @@ func drain(
 // slice over 40% of the history.
 func nextReady(
 	ready []entities.DeclKey,
-	groupOf func(entities.DeclKey) FeatureID,
-	current FeatureID,
+	groupOf func(entities.DeclKey) reach.FeatureID,
+	current reach.FeatureID,
 ) int {
 	if groupOf == nil {
 		return 0
