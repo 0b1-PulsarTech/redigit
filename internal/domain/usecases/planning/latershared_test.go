@@ -21,7 +21,7 @@ func TestSplitLateKeepsWhatReadsAMemberWithTheFeature(t *testing.T) {
 		nil,
 	)
 
-	early, late := splitLate(
+	early, late := SplitLate(
 		graph,
 		[]entities.DeclKey{kernel.Key, statement.Key, chained.Key},
 		[]entities.DeclKey{own.Key},
@@ -50,7 +50,7 @@ func TestSplitLateSendsAnAtomLateAsOne(t *testing.T) {
 		nil,
 	)
 
-	early, late := splitLate(
+	early, late := SplitLate(
 		graph,
 		[]entities.DeclKey{head.Key, last.Key},
 		[]entities.DeclKey{own.Key},

@@ -32,7 +32,7 @@ func TestReadyDeferredIgnoresAnInterfaceATypeOnlyFills(t *testing.T) {
 	born := map[entities.DeclKey]bool{subject.Key: true}
 	fresh := map[entities.DeclKey]bool{subject.Key: true}
 
-	got := readyDeferred(graph, own, born, fresh)
+	got := ReadyDeferred(graph, own, born, fresh)
 
 	if !slices.Contains(got, double.Key) {
 		t.Fatalf("readyDeferred() = %v, want the double born before the interface it fills", got)

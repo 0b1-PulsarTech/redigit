@@ -8,11 +8,11 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// readyDeferred is the deferred declarations that can be born now: none of what
+// ReadyDeferred is the deferred declarations that can be born now: none of what
 // they need belongs to a feature still to come, and something they need was
 // born with the feature just built. Without the second condition, whatever
 // needs only shared code is ready at the first feature and drags that code in.
-func readyDeferred(
+func ReadyDeferred(
 	graph entities.Graph,
 	own owners.Ownership,
 	born map[entities.DeclKey]bool,

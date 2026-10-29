@@ -65,7 +65,7 @@ func TestReadyDeferredDoesNotWaitForASubjectOnlyAFeatureReads(t *testing.T) {
 	born := map[entities.DeclKey]bool{entries.Key: true}
 	fresh := map[entities.DeclKey]bool{entries.Key: true}
 
-	if got, want := readyDeferred(
+	if got, want := ReadyDeferred(
 		graph,
 		own,
 		born,

@@ -6,10 +6,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// ownTests is the tests, outside the wiring, that the feature just built
+// OwnTests is the tests, outside the wiring, that the feature just built
 // completes: everything they exercise is born, and the feature supplied part of
 // it. One that needs a ready root waits for that root's turn.
-func ownTests(
+func OwnTests(
 	graph entities.Graph,
 	own owners.Ownership,
 	born, fresh map[entities.DeclKey]bool,
@@ -17,7 +17,7 @@ func ownTests(
 	subjects := reach.TestSubjects(graph)
 	taken := map[entities.DeclKey]bool{}
 
-	for _, key := range readyDeferred(graph, own, born, fresh) {
+	for _, key := range ReadyDeferred(graph, own, born, fresh) {
 		if !own.Roots[key] && !born[key] {
 			taken[key] = true
 		}

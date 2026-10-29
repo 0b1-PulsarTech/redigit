@@ -77,7 +77,7 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 			born := map[entities.DeclKey]bool{counted.Key: true}
 			fresh := map[entities.DeclKey]bool{counted.Key: true}
 
-			got := slices.Contains(readyDeferred(graph, own, born, fresh), suite.Key)
+			got := slices.Contains(ReadyDeferred(graph, own, born, fresh), suite.Key)
 			if got != testCase.want {
 				t.Fatalf("suite ready = %v, want %v", got, testCase.want)
 			}

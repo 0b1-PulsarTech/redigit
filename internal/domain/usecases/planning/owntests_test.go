@@ -48,7 +48,7 @@ func TestOwnTests(t *testing.T) {
 	born := map[entities.DeclKey]bool{code.Key: true}
 	fresh := map[entities.DeclKey]bool{code.Key: true}
 
-	got := ownTests(graph, own, born, fresh)
+	got := OwnTests(graph, own, born, fresh)
 
 	if want := []entities.DeclKey{testCode.Key}; !slices.Equal(got, want) {
 		t.Fatalf(

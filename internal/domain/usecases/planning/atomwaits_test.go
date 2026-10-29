@@ -40,7 +40,7 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 	born := map[entities.DeclKey]bool{code.Key: true}
 	fresh := map[entities.DeclKey]bool{code.Key: true}
 
-	if got, want := readyDeferred(
+	if got, want := ReadyDeferred(
 		graph,
 		own,
 		born,
@@ -57,7 +57,7 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 	born[later.Key] = true
 	fresh[later.Key] = true
 
-	if got := readyDeferred(graph, own, born, fresh); len(got) != 3 {
+	if got := ReadyDeferred(graph, own, born, fresh); len(got) != 3 {
 		t.Fatalf("readyDeferred() = %v, want the whole atom once its test can be born", got)
 	}
 }
@@ -94,13 +94,13 @@ func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 
 	fresh := map[entities.DeclKey]bool{onlyWiring.Key: true}
 
-	if got := readyDeferred(graph, own, map[entities.DeclKey]bool{}, fresh); len(got) != 0 {
+	if got := ReadyDeferred(graph, own, map[entities.DeclKey]bool{}, fresh); len(got) != 0 {
 		t.Fatalf("readyDeferred() = %v, want none: Both is born with the feature that uses it", got)
 	}
 
 	born := map[entities.DeclKey]bool{both.Key: true}
 
-	if got := readyDeferred(graph, own, born, fresh); len(got) != 1 {
+	if got := ReadyDeferred(graph, own, born, fresh); len(got) != 1 {
 		t.Fatalf("readyDeferred() = %v, want the registration once Both is born", got)
 	}
 }
