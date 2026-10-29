@@ -20,9 +20,9 @@ func Cut(ctx context.Context, cfg Config) (pieces []chunking.Piece, err error) {
 	reader := gitstore.NewReader(cfg.Repo, cfg.Rev)
 	defer func() { err = errors.Join(err, reader.Close()) }()
 
-	snap, err := reader.Snapshot(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read snapshot: %w", err)
+	snap, snapErr := reader.Snapshot(ctx)
+	if snapErr != nil {
+		return nil, fmt.Errorf("read snapshot: %w", snapErr)
 	}
 
 	cutter := chunking.NewCutter(reader, reader, chunkers(cfg.ChunkMap))

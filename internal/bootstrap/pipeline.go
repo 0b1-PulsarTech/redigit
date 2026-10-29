@@ -85,8 +85,6 @@ type auditor interface {
 type readerCloser struct{ reader gitstore.Reader }
 
 func (adapter readerCloser) Close(context.Context) error {
-	// The reader closes without a context; fitting it to the closer port lets
-	// its cat-file process be released with the rest.
 	if err := adapter.reader.Close(); err != nil {
 		return fmt.Errorf("stop cat-file: %w", err)
 	}

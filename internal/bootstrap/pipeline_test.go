@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -288,46 +289,40 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 	errCheckout := errors.New("checkout is still locked")
 
 	testCases := []struct {
-		name         string
-		session      fakeCloser
-		reader       fakeCloser
-		checkout     fakeCloser
-		wantSession  bool
-		wantReader   bool
-		wantCheckout bool
-		wantNil      bool
+		name     string
+		session  fakeCloser
+		reader   fakeCloser
+		checkout fakeCloser
+		want     []error
 	}{
-		{name: "all close cleanly", wantNil: true},
+		{name: "all close cleanly"},
 		{
-			name:        "only the session fails",
-			session:     fakeCloser{err: errSession},
-			wantSession: true,
+			name:    "only the session fails",
+			session: fakeCloser{err: errSession},
+			want:    []error{errSession},
 		},
 		{
-			name:         "only the checkout fails",
-			checkout:     fakeCloser{err: errCheckout},
-			wantCheckout: true,
+			name:     "only the checkout fails",
+			checkout: fakeCloser{err: errCheckout},
+			want:     []error{errCheckout},
 		},
 		{
-			name:         "both fail, and neither hides the other",
-			session:      fakeCloser{err: errSession},
-			checkout:     fakeCloser{err: errCheckout},
-			wantSession:  true,
-			wantCheckout: true,
+			name:     "both fail, and neither hides the other",
+			session:  fakeCloser{err: errSession},
+			checkout: fakeCloser{err: errCheckout},
+			want:     []error{errSession, errCheckout},
 		},
 		{
-			name:       "only the git reader fails",
-			reader:     fakeCloser{err: errReader},
-			wantReader: true,
+			name:   "only the git reader fails",
+			reader: fakeCloser{err: errReader},
+			want:   []error{errReader},
 		},
 		{
-			name:         "all three fail, and none hides another",
-			session:      fakeCloser{err: errSession},
-			reader:       fakeCloser{err: errReader},
-			checkout:     fakeCloser{err: errCheckout},
-			wantSession:  true,
-			wantReader:   true,
-			wantCheckout: true,
+			name:     "all three fail, and none hides another",
+			session:  fakeCloser{err: errSession},
+			reader:   fakeCloser{err: errReader},
+			checkout: fakeCloser{err: errCheckout},
+			want:     []error{errSession, errReader, errCheckout},
 		},
 	}
 
@@ -342,27 +337,16 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 			}
 
 			err := pipeline.Close(t.Context())
-
-			if testCase.wantNil {
-				if err != nil {
-					t.Fatalf("Close() = %v, want nil", err)
-				}
-
-				return
+			if len(testCase.want) == 0 && err != nil {
+				t.Fatalf("Close() = %v, want nil", err)
 			}
 
-			assertWraps(t, err, errSession, testCase.wantSession)
-			assertWraps(t, err, errReader, testCase.wantReader)
-			assertWraps(t, err, errCheckout, testCase.wantCheckout)
+			for _, target := range []error{errSession, errReader, errCheckout} {
+				if errors.Is(err, target) != slices.Contains(testCase.want, target) {
+					t.Fatalf("Close() = %v, want exactly %v wrapped", err, testCase.want)
+				}
+			}
 		})
-	}
-}
-
-func assertWraps(t *testing.T, err, target error, want bool) {
-	t.Helper()
-
-	if errors.Is(err, target) != want {
-		t.Fatalf("Close() = %v, wraps %v: %t, want %t", err, target, !want, want)
 	}
 }
 
