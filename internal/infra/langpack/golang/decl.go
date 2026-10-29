@@ -14,6 +14,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 )
 
 // Syntax implements indexing.Syntax for Go source: declaration boundaries via
@@ -67,7 +68,7 @@ func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]ent
 	// of the graph took every reference edge to them along, and a test landed
 	// 491 positions before the mock it uses. The files of one sqlc run are
 	// grouped by the sql atom rule instead, one atom per table and per query.
-	if IsGenerated(source) && !IsSqlcOutput(source) {
+	if genmark.IsGenerated(source) && !genmark.IsSqlcOutput(source) {
 		for index := range decls {
 			decls[index].Atom = path
 		}

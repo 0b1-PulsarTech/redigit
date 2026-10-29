@@ -9,6 +9,7 @@ import (
 	"go/token"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 )
 
 // declIdent identifies a surviving declaration by kind and name only: Render
@@ -48,7 +49,7 @@ func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) 
 	// A generated file is reproduced verbatim: its declarations are one atom
 	// and arrive together, and filtering through the printer would drop the
 	// marker comment that says a tool wrote it.
-	if len(keep) > 0 && IsGenerated(source) && !IsSqlcOutput(source) {
+	if len(keep) > 0 && genmark.IsGenerated(source) && !genmark.IsSqlcOutput(source) {
 		return source, nil
 	}
 

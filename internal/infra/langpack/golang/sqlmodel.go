@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 	"github.com/wrapped-owls/redigit/internal/infra/sqlstmt"
 )
 
@@ -220,7 +221,7 @@ func isDBGenOutput(snap entities.Snapshot, file string) bool {
 
 	source, err := readSource(snap, file)
 
-	return err == nil && IsSqlcOutput(source)
+	return err == nil && genmark.IsSqlcOutput(source)
 }
 
 func sortedFiles(byFile map[string][]entities.Decl) []string {
