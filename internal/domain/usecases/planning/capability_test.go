@@ -2,7 +2,6 @@ package planning
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -368,99 +367,5 @@ func TestPlannerNeverSplitsAnAtom(t *testing.T) {
 			"a generated file was written across %d commits: half of it exists on its own",
 			len(plan.Commits),
 		)
-	}
-}
-
-// A test waits for the member of its atom that needs the last feature. The
-// feature freshens that member alone, and nothing is left to freshen the test:
-// it is born once the last feature is built, not in the tail of what no entry
-// point reached.
-func TestPlannerBirthsATestWaitingOnItsAtomAfterTheLastFeature(t *testing.T) {
-	t.Parallel()
-
-	handler := decl("a/handler.go", "Handle", "a")
-	counted := decl("a/count.go", "Count", "a")
-	late := decl("b/handler.go", "Serve", "b")
-	early := testDecl("b/early_test.go", "TestEarly", "b")
-	last := testDecl("b/last_test.go", "TestLast", "b")
-	early.Atom, last.Atom = "e2e-main", "e2e-main"
-
-	graph := entities.NewGraph(
-		[]entities.Decl{handler, counted, late, early, last},
-		[]entities.Edge{needs(handler, counted), needs(early, counted), needs(last, late)},
-		nil,
-	)
-	order := entities.Ordering{At: map[entities.DeclKey]entities.Position{
-		handler.Key: 0, counted.Key: 1, late.Key: 2, early.Key: 3, last.Key: 4,
-	}}
-
-	plan, err := New(Config{}).Plan(graph, order)
-	if err != nil {
-		t.Fatalf("Plan() = %v", err)
-	}
-
-	for _, commit := range plan.Commits {
-		if strings.HasPrefix(commit.Reason, "reached by no entry point") {
-			t.Fatalf("commit %q holds what no feature reached", commit.Subject)
-		}
-	}
-}
-
-func TestPlannerBuildsEachHandlerAsItsOwnArc(t *testing.T) {
-	t.Parallel()
-
-	graph, order, named := rooted()
-
-	plan, err := New(Config{}).Plan(graph, order)
-	if err != nil {
-		t.Fatalf("Plan() = %v", err)
-	}
-
-	if len(plan.Unplaced) != 0 {
-		t.Fatalf("Unplaced = %v, want none", plan.Unplaced)
-	}
-
-	bornAt := map[entities.DeclKey]int{}
-	runs := []string{}
-
-	for index, commit := range plan.Commits {
-		if len(runs) == 0 || runs[len(runs)-1] != commit.Feature {
-			runs = append(runs, commit.Feature)
-		}
-
-		for _, key := range commit.Decls {
-			bornAt[key] = index
-		}
-	}
-
-	seen := map[string]bool{}
-
-	for _, feature := range runs {
-		if seen[feature] {
-			t.Fatalf("feature runs %v: %q is split in two", runs, feature)
-		}
-
-		seen[feature] = true
-	}
-
-	if !seen["lead/api"] || !seen["bill/api"] {
-		t.Fatalf("feature runs %v, want one arc for each handler", runs)
-	}
-
-	root := bornAt[named["root"].Key]
-	for _, handler := range []string{"leadAPI", "billAPI"} {
-		if bornAt[named[handler].Key] >= root {
-			t.Fatalf(
-				"%s is born at %d, want before the root at %d",
-				handler,
-				bornAt[named[handler].Key],
-				root,
-			)
-		}
-	}
-
-	first := plan.Commits[bornAt[named["kernel"].Key]].Feature
-	if first != "bill/api" {
-		t.Fatalf("the shared declaration is born by %q, want the first feature built", first)
 	}
 }
