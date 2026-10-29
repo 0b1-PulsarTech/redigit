@@ -15,8 +15,6 @@ func ReadyDeferred(
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := sharedSubjects(graph, own)
-	// Without the second condition, whatever needs only shared code is ready at
-	// the first feature and drags that code in.
 	atoms := reach.AtomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
@@ -62,6 +60,8 @@ func ReadyDeferred(
 		}
 	}
 
+	// Only what needs something fresh is ready: otherwise whatever needs only
+	// shared code is ready at the first feature and drags that code in.
 	return owners.SortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
 }
 

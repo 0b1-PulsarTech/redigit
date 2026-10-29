@@ -8,9 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// A declaration read by more features than this says nothing about which belong
-// together: a helper read by a hundred ties nothing, and counting it would chain
-// every module to the next.
 const kinReach = 12
 
 func joinProducts(
@@ -22,6 +19,9 @@ func joinProducts(
 	// A shared declaration ties its readers with weight 1/(readers-1); a feature
 	// joins the root it is tied to most, else stands alone.
 	for _, features := range reachedBy {
+		// Past kinReach readers a declaration says nothing about which belong
+		// together: a helper read by a hundred ties nothing and would chain every
+		// module to the next.
 		if len(features) < 2 || len(features) > kinReach {
 			continue
 		}

@@ -54,13 +54,11 @@ func SortFeatures(
 	rules FeatureRules,
 ) (sorted []reach.FeatureID, cyclic []reach.FeatureID) {
 	needs, waits, at, group, cost := rules.Needs, rules.Waits, rules.At, rules.Group, rules.Cost
-	// A cycle is returned, never silently broken. A product is built as a unit,
-	// its root first; a feature also waits for the roots of the modules it
-	// reads, unless that would leave nothing to build.
 	product := func(feature reach.FeatureID) reach.FeatureID { return owners.ProductOf(group, feature) }
 
 	readers := productReaders(waits, product)
 	pending := slices.Clone(features)
+	// A product is built as a unit, its root first.
 	slices.SortFunc(pending, func(first, second reach.FeatureID) int {
 		left, right := product(first), product(second)
 		if byReaders := cmp.Compare(readers[right], readers[left]); byReaders != 0 {
@@ -95,11 +93,14 @@ func SortFeatures(
 
 	for len(pending) > 0 {
 		next := nextFeature(pending, readiness{needs, waits, done}, product, last)
+		// A feature also waits for the roots of the modules it reads, unless that
+		// would leave nothing to build.
 		if next < 0 {
 			next = nextFeature(pending, readiness{needs, nil, done}, product, last)
 		}
 
 		if next < 0 {
+			// A cycle is returned, never silently broken.
 			return sorted, pending
 		}
 

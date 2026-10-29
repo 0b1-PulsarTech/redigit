@@ -42,7 +42,7 @@ func anchorHelpers(
 
 func isHelper(graph entities.Graph, own owners.Ownership, key entities.DeclKey) bool {
 	decl, found := graph.Decl(key)
-	// One nothing reads is not a helper, only a loose declaration.
+	// A non-test declaration nothing else reads is not a helper, only a loose one.
 	if !found || decl.IsTest || !entities.IsTestSide(decl) && !own.Support[key] {
 		return false
 	}

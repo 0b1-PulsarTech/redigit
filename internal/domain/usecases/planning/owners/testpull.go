@@ -12,8 +12,6 @@ func (index sharedIndex) safeToPull(
 	born map[entities.DeclKey]bool,
 ) bool {
 	seen := map[entities.DeclKey]bool{key: true}
-	// A shared test is pulled along with its reader, so it is checked as the
-	// reader is: its own needs can belong to a feature that is not built yet.
 	queue := []entities.DeclKey{key}
 
 	for len(queue) > 0 {
@@ -31,6 +29,8 @@ func (index sharedIndex) safeToPull(
 		for _, edge := range graph.Needs(current) {
 			provider := edge.Provider
 
+			// A shared test is pulled along with its reader, so it is checked as the
+			// reader is: its needs can belong to a feature that is not built yet.
 			switch {
 			case birth.IsSoft(edge.Reason) || seen[provider] || born[provider]:
 				continue

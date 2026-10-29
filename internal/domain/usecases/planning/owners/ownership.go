@@ -46,12 +46,13 @@ func Assign(graph entities.Graph) Ownership {
 		Loose: reach.LooseLines(graph),
 	}
 
-	// Counting insiders would pin every package to the instant the source
-	// history happened to create it.
 	own.Support = testplace.TestSupport(graph)
 	own.Deferred = reach.DeferTests(graph, own.Roots, own.Support)
 
 	entries := reach.EntryPoints(graph, own.Roots)
+	// Each declaration is counted once per distinct feature that reaches it;
+	// counting insiders would pin every package to the instant the source
+	// history happened to create it.
 	walk := walkEntries(graph, own, entries)
 
 	unionAtoms(graph, walk.reachedBy)
@@ -129,13 +130,13 @@ func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[reach.F
 }
 
 func soleOwner(features map[reach.FeatureID]bool) reach.FeatureID {
+	// A declaration reached by two features belongs to neither: picking one of
+	// them would be a guess, and a guess here is what puts a declaration
+	// hundreds of commits from its use.
 	if len(features) != 1 {
 		return reach.SharedFeature
 	}
 
-	// A declaration reached by two features belongs to neither: picking one of
-	// them would be a guess, and a guess here is what puts a declaration
-	// hundreds of commits from its use.
 	for feature := range features {
 		return feature
 	}

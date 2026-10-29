@@ -14,9 +14,6 @@ type opening struct {
 
 func openingTests(decls []entities.Decl, order entities.Ordering) opening {
 	mains := map[entities.UnitID]entities.Decl{}
-	// A package whose setup lands hundreds of commits after its first test runs
-	// that test without the setup it was written against; one whose setup lands
-	// first runs it over nothing.
 	tests := map[entities.UnitID][]entities.Decl{}
 
 	for _, decl := range decls {
@@ -40,6 +37,9 @@ func openingTests(decls []entities.Decl, order entities.Ordering) opening {
 			continue
 		}
 
+		// TestMain is tied to the test its package is likely to be born with: a
+		// setup landing hundreds of commits after that test runs it without the
+		// setup it was written against; one landing first runs it over nothing.
 		opener := members[0]
 
 		for _, candidate := range members[1:] {

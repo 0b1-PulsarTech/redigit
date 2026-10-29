@@ -49,6 +49,7 @@ func (place *placement) consider(key entities.DeclKey) {
 		return
 	}
 
+	// A move never passes a dependency and never splits an atom.
 	anchor := place.anchorOf(decl)
 
 	if decl.Atom != "" {

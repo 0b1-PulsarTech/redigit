@@ -14,9 +14,6 @@ func touched(
 ) map[entities.DeclKey]bool {
 	out := map[entities.DeclKey]bool{}
 
-	// A manifest line does not count: every test of a module needs its go.mod,
-	// and that is no reason for the test to arrive with the first declaration
-	// that pulled the manifest in.
 	for changed := true; changed; {
 		changed = false
 
@@ -53,6 +50,9 @@ func needsFresh(
 	fresh, touched map[entities.DeclKey]bool,
 ) bool {
 	for _, edge := range graph.Needs(key) {
+		// A manifest line does not count: every test of a module needs its go.mod,
+		// and that is no reason for the test to arrive with the first declaration
+		// that pulled the manifest in.
 		if entities.IsStructural(edge.Reason) || edge.Reason == entities.ReasonImport {
 			continue
 		}

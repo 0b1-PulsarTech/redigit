@@ -16,8 +16,6 @@ const SharedFeature FeatureID = ""
 func EntryPoints(graph entities.Graph, roots Wiring) []entities.Decl {
 	var out []entities.Decl
 
-	// A test consumer does not count, or every tested function would be a
-	// feature of its own.
 	loose := LooseLines(graph)
 
 	for _, decl := range graph.Decls() {
@@ -61,6 +59,8 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
+		// A test consumer does not count, or every tested function would be a
+		// feature of its own.
 		if found && !entities.IsTestSide(consumer) && !roots[edge.Dependent] &&
 			!IsAfterword(graph, edge.Dependent) {
 			return true
@@ -71,9 +71,9 @@ func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wir
 }
 
 func FeatureOf(decl entities.Decl) FeatureID {
-	dir := decl.Unit.Dir()
 	// Two entry points of the same directory open the same feature: a package's
 	// handlers are one feature, not one feature each.
+	dir := decl.Unit.Dir()
 	if dir == "" {
 		dir = ParentDir(decl.Key.File)
 	}
@@ -91,11 +91,11 @@ func ParentDir(path string) string {
 
 func ReachFrom(graph entities.Graph, start entities.DeclKey) map[entities.DeclKey]bool {
 	seen := map[entities.DeclKey]bool{start: true}
+	queue := []entities.DeclKey{start}
+
 	// The walk follows Needs, so it collects everything that has to exist before
 	// the entry point does - which is exactly the slice the entry point is the
 	// tip of.
-	queue := []entities.DeclKey{start}
-
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]

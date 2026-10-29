@@ -7,8 +7,6 @@ import (
 
 func shareDependencies(graph entities.Graph, own Ownership) {
 	atoms := reach.AtomGroups(graph)
-	// Atoms, tests and test helpers escape the reach count, so a provider of a
-	// shared declaration is shared too, and an atom goes whole.
 	queue := make([]entities.DeclKey, 0, graph.Len())
 
 	for _, decl := range graph.Decls() {
@@ -17,6 +15,8 @@ func shareDependencies(graph entities.Graph, own Ownership) {
 		}
 	}
 
+	// Atoms, tests and test helpers escape the reach count, so a provider of a
+	// shared declaration is shared too, and an atom goes whole.
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]

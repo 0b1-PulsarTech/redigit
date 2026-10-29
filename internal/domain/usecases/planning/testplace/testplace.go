@@ -7,7 +7,6 @@ import (
 func PlaceTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	place := newPlacement(graph, keys)
 
-	// A move never passes a dependency and never splits an atom.
 	for _, key := range keys {
 		place.consider(key)
 	}
@@ -33,8 +32,6 @@ func PlaceTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKe
 
 func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	index := make(map[entities.DeclKey]int, len(keys))
-	// A member moves only when nothing placed between it and the last member
-	// needs it.
 	atomOf := make(map[entities.DeclKey]string, len(keys))
 	last := map[string]int{}
 
@@ -59,6 +56,8 @@ func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.D
 			continue
 		}
 
+		// A member moves only when nothing placed between it and the last member
+		// needs it.
 		if neededBetween(graph, index, atomOf, key, span{from: at, to: last[atom]}) {
 			continue
 		}

@@ -12,10 +12,10 @@ func readsRoots(
 ) map[reach.FeatureID]map[reach.FeatureID]bool {
 	reads := map[reach.FeatureID]map[reach.FeatureID]bool{}
 
-	// What it reaches only through shared code is not read by it, and waiting
-	// for that would make every feature wait for the whole program.
 	for _, edge := range graph.Edges() {
 		feature := owner[edge.Dependent]
+		// What a feature reaches only through shared code is not read by it, and
+		// waiting for that would make every feature wait for the whole program.
 		if feature == reach.SharedFeature || entities.IsStructural(edge.Reason) ||
 			entities.FillsInterface(graph, edge) {
 			continue

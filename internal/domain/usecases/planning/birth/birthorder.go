@@ -15,7 +15,7 @@ func SortForBirth(
 	groupOf func(entities.DeclKey) reach.FeatureID,
 ) []entities.DeclKey {
 	sorted := slices.Clone(keys)
-	// The fixed point only guarantees a provider is not LATER, so provider and
+	// The ordering only guarantees a provider is not LATER, so provider and
 	// dependent routinely share a position, and a name tie-break inverts them.
 	slices.SortFunc(sorted, func(first, second entities.DeclKey) int {
 		if left, right := order.Of(first), order.Of(second); left != right {
@@ -235,8 +235,8 @@ func nextReady(
 		return 0
 	}
 
-	// Taking the first ready one instead - name order - doubled the commit count
-	// and spread a slice over 40% of the history.
+	// Staying in the current group matters: taking the first ready one by name
+	// order doubled the commit count and spread a slice over 40% of the history.
 	for index, candidate := range ready {
 		if groupOf(candidate) == current {
 			return index

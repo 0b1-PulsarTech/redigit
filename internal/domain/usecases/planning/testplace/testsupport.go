@@ -8,8 +8,6 @@ import (
 func TestSupport(graph entities.Graph) reach.Wiring {
 	out := reach.Wiring{}
 
-	// A function only its own package's tests read is the code under test, not
-	// support.
 	for changed := true; changed; {
 		changed = false
 
@@ -43,6 +41,8 @@ func onlyOtherTestsRead(graph entities.Graph, decl entities.Decl, support reach.
 			return false
 		}
 
+		// A function only its own package's tests read is the code under test,
+		// not support.
 		read = read || support[edge.Dependent] || consumer.Unit != decl.Unit
 	}
 
