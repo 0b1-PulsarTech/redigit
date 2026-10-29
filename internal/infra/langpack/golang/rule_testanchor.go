@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // testAnchorRule pulls a test toward the declaration it exercises. It is an
@@ -40,7 +41,7 @@ func (testAnchorRule) Anchors(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 	byUnit := groupByUnit(decls)
 	sources := map[string][]byte{}
 

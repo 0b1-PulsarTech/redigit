@@ -4,6 +4,7 @@ import (
 	"go/ast"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // builtTypes reports the local types a declaration HANDS somewhere: a keyed
@@ -25,7 +26,7 @@ func builtTypes(
 	var out []string
 
 	collect := func(expr ast.Expr) {
-		if name, built := ConcreteTypeIn(expr); built && !seen[name] {
+		if name, built := declsource.ConcreteTypeIn(expr); built && !seen[name] {
 			seen[name] = true
 
 			out = append(out, name)
@@ -56,7 +57,7 @@ func declarationOf(
 ) ast.Decl {
 	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := ReadSource(snap, decl.Key.File)
+		read, err := declsource.ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -65,10 +66,10 @@ func declarationOf(
 		sources[decl.Key.File] = source
 	}
 
-	text := SliceSpan(source, decl.Span)
+	text := declsource.SliceSpan(source, decl.Span)
 	if text == "" {
 		return nil
 	}
 
-	return ParseDeclaration(text)
+	return declsource.ParseDeclaration(text)
 }

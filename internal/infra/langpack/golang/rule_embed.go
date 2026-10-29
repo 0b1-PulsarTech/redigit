@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // embedRule makes a //go:embed declaration wait for a file its pattern matches.
@@ -35,7 +36,7 @@ func (embedRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 
 	var edges []entities.Edge
 
@@ -44,7 +45,7 @@ func (embedRule) Edges(
 			continue
 		}
 
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil || !bytes.Contains(source, []byte(embedDirective)) {
 			continue
 		}

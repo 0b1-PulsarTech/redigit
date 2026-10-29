@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // mockgenRule links a generated mock to the interface it structurally
@@ -29,12 +30,12 @@ func (r mockgenRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 
 	var edges []entities.Edge
 
 	for file, mockDecls := range byFile {
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +58,7 @@ func (r mockgenRule) Edges(
 
 		for _, dependent := range mockDependents(mockDecls, source) {
 			for _, name := range dependent.subjects {
-				if provider, found := FindTypeNamed(candidates, name); found {
+				if provider, found := declsource.FindTypeNamed(candidates, name); found {
 					edges = append(edges, entities.Edge{
 						Dependent: dependent.key,
 						Provider:  provider,

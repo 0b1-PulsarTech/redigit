@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // sqlGenesis is the first table with everything the schema tools need to read
@@ -193,7 +194,7 @@ func identsOf(snap entities.Snapshot, file string) map[string]bool {
 		return nil
 	}
 
-	source, err := ReadSource(snap, file)
+	source, err := declsource.ReadSource(snap, file)
 	if err != nil {
 		return nil
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/routes"
 )
 
@@ -30,7 +31,7 @@ func (routePathRule) Anchors(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
-	read := func(file string) ([]byte, error) { return ReadSource(snap, file) }
+	read := func(file string) ([]byte, error) { return declsource.ReadSource(snap, file) }
 
 	groups := routes.Find(read, decls)
 	if len(groups) == 0 {

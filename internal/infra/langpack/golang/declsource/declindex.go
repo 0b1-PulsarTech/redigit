@@ -1,4 +1,4 @@
-package golang
+package declsource
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 

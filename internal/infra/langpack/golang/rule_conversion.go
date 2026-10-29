@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // conversionRule ties a function that RETURNS an interface to the methods of
@@ -88,7 +89,7 @@ func convertedTypes(
 
 	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := ReadSource(snap, decl.Key.File)
+		read, err := declsource.ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -97,10 +98,10 @@ func convertedTypes(
 		sources[decl.Key.File] = source
 	}
 
-	text := SliceSpan(source, decl.Span)
+	text := declsource.SliceSpan(source, decl.Span)
 	if text == "" || !strings.Contains(text, "return") {
 		return nil
 	}
 
-	return ReturnedConcreteTypes(text, interfaces)
+	return declsource.ReturnedConcreteTypes(text, interfaces)
 }

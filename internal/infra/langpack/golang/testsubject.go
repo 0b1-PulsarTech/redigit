@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // testSubject prefers a call the test body actually makes - a fact - over a
@@ -39,7 +40,7 @@ func calledSubject(
 ) (entities.DeclKey, bool) {
 	source, cached := sources[d.Key.File]
 	if !cached {
-		read, err := ReadSource(snap, d.Key.File)
+		read, err := declsource.ReadSource(snap, d.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -48,7 +49,7 @@ func calledSubject(
 		sources[d.Key.File] = source
 	}
 
-	fn := ParseFunc(SliceSpan(source, d.Span))
+	fn := declsource.ParseFunc(declsource.SliceSpan(source, d.Span))
 	if fn == nil || fn.Body == nil {
 		return entities.DeclKey{}, false
 	}
@@ -108,7 +109,7 @@ func bestSubject(scope []entities.Decl, tokens []string) (entities.DeclKey, bool
 		left := strings.Join(tokens[:cut], "")
 		right := strings.Join(tokens[cut:], "")
 
-		if key, ok := FindTypeNamed(scope, left); ok {
+		if key, ok := declsource.FindTypeNamed(scope, left); ok {
 			best, found = key, true
 		}
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 func TestReturnedConcreteTypes(t *testing.T) {
@@ -72,7 +73,7 @@ func TestReturnedConcreteTypes(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ReturnedConcreteTypes(testCase.text, interfaces)
+			got := declsource.ReturnedConcreteTypes(testCase.text, interfaces)
 
 			if len(got) != len(testCase.want) {
 				t.Fatalf("returnedConcreteTypes() = %v, want %v", got, testCase.want)

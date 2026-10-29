@@ -1,4 +1,4 @@
-package golang
+package declsource
 
 import (
 	"testing"

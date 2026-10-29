@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // goverterRule links a generated converter_gen.go to the sibling *conv.go
@@ -22,7 +23,7 @@ func (goverterRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 
 	var edges []entities.Edge
 
@@ -64,14 +65,14 @@ func directiveDecls(
 			continue
 		}
 
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, d := range candidates {
 			if d.Key.Kind == entities.KindType &&
-				strings.Contains(SliceSpan(source, d.Span), "goverter:") {
+				strings.Contains(declsource.SliceSpan(source, d.Span), "goverter:") {
 				providers = append(providers, d.Key)
 			}
 		}

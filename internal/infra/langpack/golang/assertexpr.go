@@ -5,6 +5,8 @@ import (
 	"go/parser"
 	"go/token"
 	"strings"
+
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // receiverOfAssertion parses "_ I = (*T)(nil)" and returns T.
@@ -46,7 +48,7 @@ func parseAssertion(body string) (string, bool) {
 				continue
 			}
 
-			if name, found := ConcreteTypeIn(value.Values[0]); found {
+			if name, found := declsource.ConcreteTypeIn(value.Values[0]); found {
 				return name, true
 			}
 		}

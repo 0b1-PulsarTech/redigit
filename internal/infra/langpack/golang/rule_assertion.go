@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // assertionRule ties a compile-time interface assertion to the methods that
@@ -102,7 +103,7 @@ func assertedType(
 
 	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := ReadSource(snap, decl.Key.File)
+		read, err := declsource.ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -111,7 +112,7 @@ func assertedType(
 		sources[decl.Key.File] = source
 	}
 
-	text := SliceSpan(source, decl.Span)
+	text := declsource.SliceSpan(source, decl.Span)
 	if text == "" {
 		return "", false
 	}

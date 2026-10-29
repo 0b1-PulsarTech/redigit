@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // boundRule ties every declaration that MENTIONS an interface-bound concrete
@@ -116,7 +117,7 @@ func mentionedTypes(
 ) []string {
 	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := ReadSource(snap, decl.Key.File)
+		read, err := declsource.ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -125,12 +126,12 @@ func mentionedTypes(
 		sources[decl.Key.File] = source
 	}
 
-	text := SliceSpan(source, decl.Span)
+	text := declsource.SliceSpan(source, decl.Span)
 	if text == "" {
 		return nil
 	}
 
-	node := ParseDeclaration(text)
+	node := declsource.ParseDeclaration(text)
 	if node == nil {
 		return nil
 	}

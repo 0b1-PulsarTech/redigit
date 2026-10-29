@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // declLocator answers which declaration encloses an offset of a file, the way
@@ -16,7 +17,7 @@ type declLocator struct {
 }
 
 func newDeclLocator(decls []entities.Decl) declLocator {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 
 	for _, group := range byFile {
 		slices.SortFunc(group, func(a, b entities.Decl) int { return a.Span.Start - b.Span.Start })

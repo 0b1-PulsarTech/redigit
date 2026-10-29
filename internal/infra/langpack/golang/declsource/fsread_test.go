@@ -1,16 +1,17 @@
-package golang
+package declsource
 
 import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestReadSource(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	writeFile(t, root, "a.go", "package a\n")
+	testkit.WriteFile(t, root, "a.go", "package a\n")
 
 	testCases := []struct {
 		name    string

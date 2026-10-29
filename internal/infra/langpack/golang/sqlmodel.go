@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 	"github.com/wrapped-owls/redigit/internal/infra/sqlstmt"
 )
@@ -83,7 +84,7 @@ func loadSQLModel(snap entities.Snapshot, decls []entities.Decl) (sqlModel, erro
 	model := sqlModel{
 		tables:     map[string]*sqlTable{},
 		extensions: map[string]entities.DeclKey{},
-		decls:      GroupByFile(decls),
+		decls:      declsource.GroupByFile(decls),
 	}
 
 	if err := model.readMigrations(snap); err != nil {
@@ -102,7 +103,7 @@ func loadSQLModel(snap entities.Snapshot, decls []entities.Decl) (sqlModel, erro
 
 func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
 	for _, file := range migrationFiles(snap.Files) {
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			return err
 		}
@@ -219,7 +220,7 @@ func isDBGenOutput(snap entities.Snapshot, file string) bool {
 		return false
 	}
 
-	source, err := ReadSource(snap, file)
+	source, err := declsource.ReadSource(snap, file)
 
 	return err == nil && genmark.IsSqlcOutput(source)
 }
@@ -239,7 +240,7 @@ func (model *sqlModel) readQueries(snap entities.Snapshot) error {
 	generated := model.generatedByName(snap)
 
 	for _, file := range queryFiles(snap.Files) {
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			return err
 		}

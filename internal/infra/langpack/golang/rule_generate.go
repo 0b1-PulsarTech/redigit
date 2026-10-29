@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // generateRule ties a generated file to the declaration carrying the
@@ -23,12 +24,12 @@ func (generateRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 
 	var edges []entities.Edge
 
 	for file, fileDecls := range byFile {
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			continue
 		}

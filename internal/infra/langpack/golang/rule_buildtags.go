@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // buildTagsRule registers build-constraint visibility as one of the seven Go
@@ -56,7 +57,7 @@ func BuildConstraints(snap entities.Snapshot) ([]BuildTag, error) {
 	var out []BuildTag
 
 	for _, file := range snap.Files {
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}

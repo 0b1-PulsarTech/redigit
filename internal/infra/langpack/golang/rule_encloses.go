@@ -8,6 +8,7 @@ import (
 	"go/token"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // enclosesRule keeps a value or constructor with the type it belongs to: a
@@ -28,7 +29,7 @@ func (enclosesRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := GroupByFile(decls)
+	byFile := declsource.GroupByFile(decls)
 
 	var edges []entities.Edge
 
@@ -67,7 +68,7 @@ func enclosesInFile(
 	file string,
 	types map[string]entities.DeclKey,
 ) ([]entities.Edge, error) {
-	source, err := ReadSource(snap, file)
+	source, err := declsource.ReadSource(snap, file)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +111,7 @@ func funcEncloses(
 		return nil
 	}
 
-	funcKey, ok := FindDecl(fileDecls, file, entities.KindFunc, d.Name.Name)
+	funcKey, ok := declsource.FindDecl(fileDecls, file, entities.KindFunc, d.Name.Name)
 	if !ok {
 		return nil
 	}
@@ -182,7 +183,7 @@ func valueEncloses(
 				continue
 			}
 
-			if valueKey, found := FindDecl(fileDecls, file, entities.KindValue, name.Name); found {
+			if valueKey, found := declsource.FindDecl(fileDecls, file, entities.KindValue, name.Name); found {
 				edges = append(edges, entities.Edge{
 					Dependent: valueKey,
 					Provider:  typeKey,

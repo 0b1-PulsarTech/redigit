@@ -14,6 +14,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
 // typedSource type-checks the tree a snapshot describes, once, for every rule
@@ -194,7 +195,7 @@ func modulesOf(snap entities.Snapshot) ([]module, error) {
 			continue
 		}
 
-		source, err := ReadSource(snap, file)
+		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}
