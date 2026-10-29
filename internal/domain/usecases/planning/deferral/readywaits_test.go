@@ -1,4 +1,4 @@
-package planning
+package deferral
 
 import (
 	"slices"
@@ -36,25 +36,25 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 	testCases := []struct {
 		name  string
 		reach map[entities.DeclKey]int
-		owner map[entities.DeclKey]FeatureID
+		owner map[entities.DeclKey]reach.FeatureID
 		want  bool
 	}{
 		{
 			"a require nothing but the suite imports",
 			map[entities.DeclKey]int{require.Key: 1, indirect.Key: 1, query.Key: 0, counted.Key: 1},
-			map[entities.DeclKey]FeatureID{counted.Key: reach.SharedFeature},
+			map[entities.DeclKey]reach.FeatureID{counted.Key: reach.SharedFeature},
 			true,
 		},
 		{
 			"a query no built feature reaches",
 			map[entities.DeclKey]int{require.Key: 0, query.Key: 0, counted.Key: 1},
-			map[entities.DeclKey]FeatureID{counted.Key: reach.SharedFeature},
+			map[entities.DeclKey]reach.FeatureID{counted.Key: reach.SharedFeature},
 			true,
 		},
 		{
 			"shared code a feature also reads still waits for its feature",
 			map[entities.DeclKey]int{require.Key: 0, query.Key: 2, counted.Key: 1},
-			map[entities.DeclKey]FeatureID{counted.Key: reach.SharedFeature},
+			map[entities.DeclKey]reach.FeatureID{counted.Key: reach.SharedFeature},
 			false,
 		},
 	}
@@ -63,7 +63,7 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			owner := map[entities.DeclKey]FeatureID{
+			owner := map[entities.DeclKey]reach.FeatureID{
 				suite.Key: reach.SharedFeature, require.Key: reach.SharedFeature, indirect.Key: reach.SharedFeature,
 				query.Key:   reach.SharedFeature,
 				counted.Key: reach.SharedFeature, feature.Key: "a",

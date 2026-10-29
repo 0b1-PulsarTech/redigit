@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/deferral"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 )
 
@@ -27,7 +28,7 @@ func (p Planner) emit(
 		// explains, and the declarations in it are read for the first time
 		// hundreds of commits later.
 		fresh := map[entities.DeclKey]bool{}
-		shared, late := SplitLate(graph, owners.UnbornProviders(graph, own, members, born), members)
+		shared, late := deferral.SplitLate(graph, owners.UnbornProviders(graph, own, members, born), members)
 
 		if len(shared) > 0 {
 			plan.Commits = append(
@@ -57,7 +58,7 @@ func (p Planner) emit(
 
 		// A test is born with the code it exercises when the feature completes
 		// that code, so the suite and its subject are read together.
-		owned := append(slices.Clone(members), OwnTests(graph, own, born, fresh)...)
+		owned := append(slices.Clone(members), deferral.OwnTests(graph, own, born, fresh)...)
 
 		plan.Commits = append(
 			plan.Commits,
@@ -118,7 +119,7 @@ func (p Planner) cutReady(
 	// What a round brings is fresh for the next: a statement that needs only
 	// code born long ago and a registration born just now is ready only then.
 	for {
-		ready := ReadyDeferred(graph, own, born, seen.fresh)
+		ready := deferral.ReadyDeferred(graph, own, born, seen.fresh)
 		if len(ready) == 0 {
 			break
 		}

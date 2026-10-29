@@ -1,4 +1,4 @@
-package planning
+package deferral
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"

@@ -1,4 +1,4 @@
-package planning
+package deferral
 
 import (
 	"slices"
@@ -29,7 +29,7 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 	)
 
 	own := owners.Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			code.Key: "a", later.Key: "b",
 			setup.Key: reach.SharedFeature, first.Key: reach.SharedFeature, plain.Key: reach.SharedFeature,
 		},
@@ -81,7 +81,7 @@ func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 	)
 
 	own := owners.Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			registration.Key: reach.SharedFeature, feature.Key: "a",
 			both.Key: reach.SharedFeature, onlyWiring.Key: reach.SharedFeature,
 		},

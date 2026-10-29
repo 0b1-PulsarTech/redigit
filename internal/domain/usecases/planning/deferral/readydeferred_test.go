@@ -1,4 +1,4 @@
-package planning
+package deferral
 
 import (
 	"slices"
@@ -25,7 +25,7 @@ func TestReadyDeferredIgnoresAnInterfaceATypeOnlyFills(t *testing.T) {
 		nil,
 	)
 	own := owners.Ownership{
-		Owner:    map[entities.DeclKey]FeatureID{subject.Key: "a", port.Key: "b"},
+		Owner:    map[entities.DeclKey]reach.FeatureID{subject.Key: "a", port.Key: "b"},
 		Deferred: reach.Wiring{double.Key: true},
 		Roots:    reach.Wiring{},
 	}

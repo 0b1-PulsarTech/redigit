@@ -1,4 +1,4 @@
-package planning
+package deferral
 
 import (
 	"slices"
@@ -25,7 +25,7 @@ func TestSharedSubjectsDropsWhatOnlyAFeatureReads(t *testing.T) {
 		},
 	)
 
-	own := owners.Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := owners.Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		test.Key:     reach.SharedFeature,
 		entries.Key:  reach.SharedFeature,
 		declares.Key: "webrouters",
@@ -55,7 +55,7 @@ func TestReadyDeferredDoesNotWaitForASubjectOnlyAFeatureReads(t *testing.T) {
 	)
 
 	own := owners.Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			test.Key: reach.SharedFeature, entries.Key: reach.SharedFeature, declares.Key: "webrouters",
 		},
 		Deferred: reach.Wiring{test.Key: true},

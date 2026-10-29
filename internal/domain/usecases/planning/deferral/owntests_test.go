@@ -1,4 +1,4 @@
-package planning
+package deferral
 
 import (
 	"slices"
@@ -32,7 +32,7 @@ func TestOwnTests(t *testing.T) {
 	)
 
 	own := owners.Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			code.Key: "a", later.Key: "b", root.Key: reach.SharedFeature,
 			testCode.Key: reach.SharedFeature, testLater.Key: reach.SharedFeature, testRoot.Key: reach.SharedFeature,
 		},
