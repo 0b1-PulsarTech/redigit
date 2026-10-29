@@ -26,7 +26,7 @@ func TestAnchorTests(t *testing.T) {
 		[]entities.Anchor{{Decl: named.Key, To: other.Key, Reason: entities.ReasonTestOf}},
 	)
 
-	anchored, _ := anchorTests(graph, entities.Ordering{})
+	anchored, _ := AnchorTests(graph, entities.Ordering{})
 	got := reach.TestSubjects(anchored)
 
 	testCases := []struct {
@@ -136,7 +136,7 @@ func TestAnchorTestsWaitsForTheEarliestOfATwin(t *testing.T) {
 		early.Key: 3, late.Key: 90, helper.Key: 3,
 	}}
 
-	anchored, raised := anchorTests(graph, order)
+	anchored, raised := AnchorTests(graph, order)
 	got := reach.TestSubjects(anchored)[helper.Key]
 
 	if !slices.Equal(got, []entities.DeclKey{early.Key}) {
@@ -168,7 +168,7 @@ func TestAnchorTestsLiftsAReaderOfALiftedHelper(t *testing.T) {
 		source.Key: 40, helper.Key: 2, reader.Key: 5,
 	}}
 
-	_, raised := anchorTests(graph, order)
+	_, raised := AnchorTests(graph, order)
 
 	if raised.Of(helper.Key) != 40 || raised.Of(reader.Key) != 40 {
 		t.Fatalf(

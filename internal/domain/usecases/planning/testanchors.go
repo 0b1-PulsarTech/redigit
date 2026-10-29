@@ -9,7 +9,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// anchorTests gives every test-side declaration the subject its file is about,
+// AnchorTests gives every test-side declaration the subject its file is about,
 // so a helper, a fixture or a sentinel error is born with the code its suite
 // exercises. Only a Test function names a subject on its own; the pieces around
 // it carry nothing but the kernel symbols they use, and the first feature to
@@ -19,7 +19,7 @@ import (
 // The subject is the declarations of the twin source file; failing that, what
 // the file's own tests exercise; failing that, the package. A package's other
 // tests also wait for the one that opens it with TestMain (see openingTests).
-func anchorTests(
+func AnchorTests(
 	graph entities.Graph,
 	order entities.Ordering,
 ) (entities.Graph, entities.Ordering) {

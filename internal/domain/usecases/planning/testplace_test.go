@@ -81,7 +81,7 @@ func TestPlaceTests(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := placeTests(graph, keysOf(testCase.keys))
+			got := PlaceTests(graph, keysOf(testCase.keys))
 			if want := keysOf(testCase.want); !slices.Equal(got, want) {
 				t.Fatalf("placeTests() = %v, want %v", got, want)
 			}

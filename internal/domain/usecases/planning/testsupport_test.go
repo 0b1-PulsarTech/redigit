@@ -23,7 +23,7 @@ func TestTestSupportIsWhatOnlyOtherPackagesTestsRead(t *testing.T) {
 		nil,
 	)
 
-	got := testSupport(graph)
+	got := TestSupport(graph)
 
 	if !got[checker.Key] || !got[inner.Key] {
 		t.Errorf("testSupport() = %v, want the checker and what only it reads", got)
@@ -45,7 +45,7 @@ func TestTestSupportLeavesAFunctionOnlyItsOwnTestsReadAsCode(t *testing.T) {
 		nil,
 	)
 
-	if testSupport(graph)[subject.Key] {
+	if TestSupport(graph)[subject.Key] {
 		t.Fatal("a function only its own package's tests read was taken for test support")
 	}
 }

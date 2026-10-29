@@ -62,7 +62,7 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		return p.emitByCapability(graph, order, ownershipFrom(p.cfg.Capabilities, graph)), nil
 	}
 
-	graph, order = anchorTests(graph, order)
+	graph, order = AnchorTests(graph, order)
 	p.sizes = generatedSizes(graph)
 	own := assign(graph)
 

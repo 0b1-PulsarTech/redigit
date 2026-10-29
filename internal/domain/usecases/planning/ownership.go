@@ -52,7 +52,7 @@ func assign(graph entities.Graph) ownership {
 		loose: reach.LooseLines(graph),
 	}
 
-	own.support = testSupport(graph)
+	own.support = TestSupport(graph)
 	own.deferred = reach.DeferTests(graph, own.roots, own.support)
 
 	entries := reach.EntryPoints(graph, own.roots)

@@ -4,10 +4,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// placeTests moves each test-side declaration to just behind the last thing it
+// PlaceTests moves each test-side declaration to just behind the last thing it
 // needs or exercises in the same commit group, so a suite is read with its
 // subject. A move never passes a dependency and never splits an atom.
-func placeTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
+func PlaceTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	place := newPlacement(graph, keys)
 
 	for _, key := range keys {
