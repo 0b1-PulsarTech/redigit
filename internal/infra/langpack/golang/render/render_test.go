@@ -1,4 +1,4 @@
-package golang
+package render
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 // TestRenderCorpusRoundTrip is the renderer's own validation: rendering with
@@ -23,8 +24,6 @@ func TestRenderCorpusRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read testdata/render: %v", err)
 	}
-
-	syntax := NewSyntax()
 
 	for _, entry := range entries {
 		t.Run(entry.Name(), func(t *testing.T) {
@@ -47,7 +46,7 @@ func TestRenderCorpusRoundTrip(t *testing.T) {
 				keep[i] = d.Key
 			}
 
-			got, err := syntax.Render(context.Background(), source, keep)
+			got, err := Render(context.Background(), source, keep)
 			if err != nil {
 				t.Fatalf("Render() error = %v", err)
 			}
@@ -78,9 +77,7 @@ import "fmt"
 func Foo() { fmt.Println("x") }
 `
 
-	syntax := NewSyntax()
-
-	got, err := syntax.Render(context.Background(), []byte(src), nil)
+	got, err := Render(context.Background(), []byte(src), nil)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -102,11 +99,9 @@ func Foo() { fmt.Println("foo") }
 func Bar() { fmt.Println("bar") }
 `
 
-	syntax := NewSyntax()
-
 	keep := []entities.DeclKey{{Kind: entities.KindFunc, Name: "Bar"}}
 
-	got, err := syntax.Render(context.Background(), []byte(src), keep)
+	got, err := Render(context.Background(), []byte(src), keep)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -135,11 +130,9 @@ func UseJSON() { _ = json.Marshal }
 func UseFmt() { fmt.Println() }
 `
 
-	syntax := NewSyntax()
-
 	keep := []entities.DeclKey{{Kind: entities.KindFunc, Name: "UseJSON"}}
 
-	got, err := syntax.Render(context.Background(), []byte(src), keep)
+	got, err := Render(context.Background(), []byte(src), keep)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -176,11 +169,9 @@ import (
 func Foo() {}
 `
 
-	syntax := NewSyntax()
-
 	keep := []entities.DeclKey{{Kind: entities.KindFunc, Name: "Foo"}}
 
-	got, err := syntax.Render(context.Background(), []byte(src), keep)
+	got, err := Render(context.Background(), []byte(src), keep)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -215,11 +206,9 @@ const (
 )
 `
 
-	syntax := NewSyntax()
-
 	keep := []entities.DeclKey{{Kind: entities.KindValue, Name: "DefaultTimeout"}}
 
-	got, err := syntax.Render(context.Background(), []byte(src), keep)
+	got, err := Render(context.Background(), []byte(src), keep)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -256,8 +245,6 @@ const (
 )
 `
 
-	syntax := NewSyntax()
-
 	testCases := []struct {
 		name string
 		keep []entities.DeclKey
@@ -277,7 +264,7 @@ const (
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := syntax.Render(context.Background(), []byte(src), testCase.keep)
+			got, err := Render(context.Background(), []byte(src), testCase.keep)
 			if err != nil {
 				t.Fatalf("Render() error = %v", err)
 			}
@@ -292,9 +279,7 @@ const (
 func TestRenderParseError(t *testing.T) {
 	t.Parallel()
 
-	syntax := NewSyntax()
-
-	_, err := syntax.Render(context.Background(), []byte("package sample\nfunc ("), nil)
+	_, err := Render(context.Background(), []byte("package sample\nfunc ("), nil)
 	if err == nil {
 		t.Fatal("Render() error = nil, want a parse error")
 	}
@@ -350,7 +335,7 @@ func TestRenderKeepsAVersionedImport(t *testing.T) {
 
 			source := []byte(testCase.source)
 
-			decls, err := NewSyntax().Declarations(context.Background(), "a.go", source)
+			decls, err := syntax.Declarations(context.Background(), "a.go", source)
 			if err != nil {
 				t.Fatalf("Declarations() = %v", err)
 			}
@@ -360,7 +345,7 @@ func TestRenderKeepsAVersionedImport(t *testing.T) {
 				keys = append(keys, decl.Key)
 			}
 
-			out, err := NewSyntax().Render(context.Background(), source, keys)
+			out, err := Render(context.Background(), source, keys)
 			if err != nil {
 				t.Fatalf("Render() = %v", err)
 			}
@@ -395,7 +380,7 @@ func Use(items []Item) {
 var _ operator.Reader = Item{}
 `
 
-	got, err := NewSyntax().Render(
+	got, err := Render(
 		context.Background(),
 		[]byte(src), []entities.DeclKey{{Kind: entities.KindFunc, Name: "Use"}},
 	)
@@ -420,7 +405,7 @@ func TestRenderSlicesSqlcOutputAndKeepsItsMarker(t *testing.T) {
 		{Kind: entities.KindMethod, Name: "Queries.List"},
 	}
 
-	got, err := NewSyntax().Render(context.Background(), []byte(src), keep)
+	got, err := Render(context.Background(), []byte(src), keep)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -440,7 +425,7 @@ func TestRenderKeepsImportGroupsWhenSiblingsAreDropped(t *testing.T) {
 		"type A struct {\n\tN sql.NullString\n\tT time.Time\n\tI ids.ID\n}\n\n" +
 		"type B struct{ J json.RawMessage; P pg.Text }\n"
 
-	got, err := NewSyntax().Render(
+	got, err := Render(
 		context.Background(), []byte(src),
 		[]entities.DeclKey{{Kind: entities.KindType, Name: "A"}},
 	)
@@ -482,7 +467,7 @@ const (
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			out, err := NewSyntax().Render(context.Background(), []byte(src), []entities.DeclKey{
+			out, err := Render(context.Background(), []byte(src), []entities.DeclKey{
 				{File: "sample.go", Kind: entities.KindValue, Name: testCase.keep},
 			})
 			if err != nil {
@@ -526,7 +511,7 @@ func TestDeclarationlessFileIsCarried(t *testing.T) {
 
 			source := []byte(testCase.source)
 
-			decls, err := NewSyntax().Declarations(context.Background(), "deps.go", source)
+			decls, err := syntax.Declarations(context.Background(), "deps.go", source)
 			if err != nil {
 				t.Fatalf("Declarations() = %v", err)
 			}
@@ -539,7 +524,7 @@ func TestDeclarationlessFileIsCarried(t *testing.T) {
 				t.Fatalf("kind = %q, want %q", decls[0].Key.Kind, entities.KindOther)
 			}
 
-			rendered, err := NewSyntax().Render(
+			rendered, err := Render(
 				context.Background(),
 				source,
 				[]entities.DeclKey{decls[0].Key},
@@ -563,7 +548,7 @@ func TestDeclarationlessFileRendersEmptyBeforeItIsBorn(t *testing.T) {
 
 	source := []byte("package infra\n\nimport _ \"example.com/a\"\n")
 
-	rendered, err := NewSyntax().Render(context.Background(), source, nil)
+	rendered, err := Render(context.Background(), source, nil)
 	if err != nil {
 		t.Fatalf("Render() = %v", err)
 	}
@@ -582,7 +567,7 @@ func TestRenderReproducesAGeneratedFile(t *testing.T) {
 	source := []byte("// Code generated by MockGen. DO NOT EDIT.\n" +
 		"package store\n\ntype MockReader struct{}\n")
 
-	decls, err := NewSyntax().Declarations(t.Context(), "store/reader_mock_test.go", source)
+	decls, err := syntax.Declarations(t.Context(), "store/reader_mock_test.go", source)
 	if err != nil {
 		t.Fatalf("Declarations() = %v", err)
 	}
@@ -592,7 +577,7 @@ func TestRenderReproducesAGeneratedFile(t *testing.T) {
 		keep = append(keep, decl.Key)
 	}
 
-	got, err := NewSyntax().Render(t.Context(), source, keep)
+	got, err := Render(t.Context(), source, keep)
 	if err != nil {
 		t.Fatalf("Render() = %v", err)
 	}

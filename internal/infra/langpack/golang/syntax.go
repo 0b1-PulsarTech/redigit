@@ -5,6 +5,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/render"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
@@ -27,4 +28,8 @@ func (Syntax) Declarations(
 	source []byte,
 ) ([]entities.Decl, error) {
 	return syntax.Declarations(ctx, path, source)
+}
+
+func (Syntax) Render(ctx context.Context, source []byte, keep []entities.DeclKey) ([]byte, error) {
+	return render.Render(ctx, source, keep)
 }

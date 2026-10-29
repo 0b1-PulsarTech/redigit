@@ -1,4 +1,4 @@
-package golang
+package render
 
 import (
 	"go/ast"

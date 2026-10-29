@@ -1,4 +1,4 @@
-package golang
+package render
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 // survive filtering - the same fix dst applies, done by hand: a comment
 // travels with the node CommentMap attached it to, so it is dropped when that
 // node is dropped and kept, in place, when it survives.
-func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, error) {
+func Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, error) {
 	keepSet := make(map[syntax.Ident]bool, len(keep))
 	for _, k := range keep {
 		keepSet[syntax.Ident{Kind: k.Kind, Name: k.Name}] = true

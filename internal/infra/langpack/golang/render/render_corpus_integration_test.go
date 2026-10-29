@@ -1,6 +1,6 @@
 //go:build integration
 
-package golang
+package render
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 // TestRenderRoundTripsRealSource is the validation the renderer cannot be
@@ -20,7 +21,6 @@ import (
 // consts with iota, generics, and external test packages.
 func TestRenderRoundTripsRealSource(t *testing.T) {
 	root := repoRoot(t)
-	syntax := NewSyntax()
 	ctx := context.Background()
 
 	var checked int
@@ -64,7 +64,7 @@ func TestRenderRoundTripsRealSource(t *testing.T) {
 			keys = append(keys, decl.Key)
 		}
 
-		rendered, err := syntax.Render(ctx, source, keys)
+		rendered, err := Render(ctx, source, keys)
 		if err != nil {
 			t.Errorf("%s: Render() = %v", rel, err)
 
