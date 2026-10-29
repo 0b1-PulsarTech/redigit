@@ -10,6 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/gencode"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/tests"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
@@ -40,14 +41,14 @@ var rules = []rule{
 	Sqlc{},
 	Atoms{},
 	Migration{},
-	Anchor{},
+	tests.Anchor{},
 	Encloses{},
 	Assertion{},
 	Conversion{},
 	Bound{},
 	buildtags.Rule{},
 	Embed{},
-	RoutePath{},
+	tests.RoutePath{},
 }
 
 // atomRule is the optional second output of a rule: declarations that must be

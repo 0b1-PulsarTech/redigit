@@ -1,4 +1,4 @@
-package golang
+package tests
 
 import (
 	"go/ast"

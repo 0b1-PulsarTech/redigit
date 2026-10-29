@@ -1,4 +1,4 @@
-package golang
+package tests
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 // TestTestAnchorRuleLastMatchNotFirst is the named trap: TestFSStorePutGet
@@ -18,7 +19,7 @@ func TestTestAnchorRuleLastMatchNotFirst(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, filepath.Join("store", "fs_store.go"), `package store
+	testkit.WriteFile(t, root, filepath.Join("store", "fs_store.go"), `package store
 
 type FS struct{}
 
@@ -26,7 +27,7 @@ func (FS) Put(key string, value []byte) error { return nil }
 
 func (FS) Get(key string) ([]byte, error) { return nil, nil }
 `)
-	writeFile(t, root, filepath.Join("store", "fs_store_test.go"), `package store
+	testkit.WriteFile(t, root, filepath.Join("store", "fs_store_test.go"), `package store
 
 import "testing"
 
@@ -34,9 +35,8 @@ func TestFSStorePutGet(t *testing.T) {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join("store", "fs_store.go"),
 		filepath.Join("store", "fs_store_test.go"),
 	})
@@ -114,13 +114,13 @@ func TestTestAnchorRuleNoTwinFileSearchesUnit(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, filepath.Join("store", "types.go"), `package store
+	testkit.WriteFile(t, root, filepath.Join("store", "types.go"), `package store
 
 type Cache struct{}
 
 func (Cache) Get(key string) ([]byte, error) { return nil, nil }
 `)
-	writeFile(t, root, filepath.Join("store", "cache_test.go"), `package store
+	testkit.WriteFile(t, root, filepath.Join("store", "cache_test.go"), `package store
 
 import "testing"
 
@@ -128,9 +128,8 @@ func TestCacheGet(t *testing.T) {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join("store", "types.go"),
 		filepath.Join("store", "cache_test.go"),
 	})
@@ -156,7 +155,7 @@ func TestTestAnchorRuleNoSubjectNoAnchor(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, filepath.Join("store", "helper_test.go"), `package store
+	testkit.WriteFile(t, root, filepath.Join("store", "helper_test.go"), `package store
 
 import "testing"
 
@@ -164,9 +163,8 @@ func TestZzzUnrelated(t *testing.T) {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{filepath.Join("store", "helper_test.go")})
+	decls := testkit.DeclareAll(t, root, []string{filepath.Join("store", "helper_test.go")})
 
 	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
@@ -220,11 +218,11 @@ func TestTestAnchorRuleMatchesABareFunction(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, filepath.Join("idnorm", "provider_message_id.go"), `package idnorm
+	testkit.WriteFile(t, root, filepath.Join("idnorm", "provider_message_id.go"), `package idnorm
 
 func NormalizeProviderMessageID(raw string) (string, error) { return raw, nil }
 `)
-	writeFile(t, root, filepath.Join("idnorm", "provider_message_id_test.go"), `package idnorm
+	testkit.WriteFile(t, root, filepath.Join("idnorm", "provider_message_id_test.go"), `package idnorm
 
 import "testing"
 
@@ -232,9 +230,8 @@ func TestNormalizeProviderMessageID(t *testing.T) {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join("idnorm", "provider_message_id.go"),
 		filepath.Join("idnorm", "provider_message_id_test.go"),
 	})
@@ -260,13 +257,13 @@ func TestTestAnchorRulePrefersTheCalledDeclarationOverTheName(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, filepath.Join("norm", "norm.go"), `package norm
+	testkit.WriteFile(t, root, filepath.Join("norm", "norm.go"), `package norm
 
 func Canonicalize(raw string) string { return raw }
 
 func Other(raw string) string { return raw }
 `)
-	writeFile(t, root, filepath.Join("norm", "norm_test.go"), `package norm
+	testkit.WriteFile(t, root, filepath.Join("norm", "norm_test.go"), `package norm
 
 import "testing"
 
@@ -281,9 +278,8 @@ func TestOtherCasesTableDriven(t *testing.T) {
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join("norm", "norm.go"),
 		filepath.Join("norm", "norm_test.go"),
 	})
@@ -312,17 +308,17 @@ func TestTestAnchorRuleWidensToTheUnitWhenTheTwinMisses(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, filepath.Join("svc", "handle.go"), `package svc
+	testkit.WriteFile(t, root, filepath.Join("svc", "handle.go"), `package svc
 
 const unrelatedConstant = 1
 `)
-	writeFile(t, root, filepath.Join("svc", "server.go"), `package svc
+	testkit.WriteFile(t, root, filepath.Join("svc", "server.go"), `package svc
 
 type Server struct{}
 
 func (Server) Handle() error { return nil }
 `)
-	writeFile(t, root, filepath.Join("svc", "handle_test.go"), `package svc
+	testkit.WriteFile(t, root, filepath.Join("svc", "handle_test.go"), `package svc
 
 import "testing"
 
@@ -330,9 +326,8 @@ func TestServerHandle(t *testing.T) {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join("svc", "handle.go"),
 		filepath.Join("svc", "server.go"),
 		filepath.Join("svc", "handle_test.go"),

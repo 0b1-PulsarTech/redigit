@@ -1,4 +1,4 @@
-package golang
+package tests
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestRoutePathRuleAnchors(t *testing.T) {
@@ -16,12 +17,12 @@ func TestRoutePathRuleAnchors(t *testing.T) {
 	paths := make([]string, 0, len(files))
 
 	for name, content := range files {
-		writeFile(t, root, name, content)
+		testkit.WriteFile(t, root, name, content)
 
 		paths = append(paths, name)
 	}
 
-	decls := declareAll(t, NewSyntax(), root, paths)
+	decls := testkit.DeclareAll(t, root, paths)
 
 	anchors, err := RoutePath{}.Anchors(
 		context.Background(), entities.Snapshot{Root: root}, decls,
