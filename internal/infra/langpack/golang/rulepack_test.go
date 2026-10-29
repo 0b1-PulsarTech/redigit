@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestRulePackName(t *testing.T) {
@@ -22,7 +23,7 @@ func TestRulePackEdgesUnionsEveryRule(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "weekday.go", `package sample
+	testkit.WriteFile(t, root, "weekday.go", `package sample
 
 type Weekday int
 
@@ -33,9 +34,8 @@ const (
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{"weekday.go"})
+	decls := testkit.DeclareAll(t, root, []string{"weekday.go"})
 
 	pack := NewRulePack(nil)
 
@@ -62,13 +62,13 @@ func TestRulePackAnchorsUnionsEveryRule(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "fs.go", `package sample
+	testkit.WriteFile(t, root, "fs.go", `package sample
 
 type FS struct{}
 
 func (FS) Get(key string) ([]byte, error) { return nil, nil }
 `)
-	writeFile(t, root, "fs_test.go", `package sample
+	testkit.WriteFile(t, root, "fs_test.go", `package sample
 
 import "testing"
 
@@ -76,9 +76,8 @@ func TestFSGet(t *testing.T) {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{"fs.go", "fs_test.go"})
+	decls := testkit.DeclareAll(t, root, []string{"fs.go", "fs_test.go"})
 
 	anchors, err := NewRulePack(nil).Anchors(context.Background(), snap, decls)
 	if err != nil {
@@ -136,8 +135,8 @@ func TestRulePackLeavesOtherLanguagesAlone(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "lib/money.dart", "import 'x.dart';\n\nfinal class Money {}\n")
-	writeFile(t, root, "test/money_test.dart", "void main() {}\n")
+	testkit.WriteFile(t, root, "lib/money.dart", "import 'x.dart';\n\nfinal class Money {}\n")
+	testkit.WriteFile(t, root, "test/money_test.dart", "void main() {}\n")
 
 	snap := entities.Snapshot{Root: root, Files: []string{"lib/money.dart", "test/money_test.dart"}}
 	decls := []entities.Decl{
