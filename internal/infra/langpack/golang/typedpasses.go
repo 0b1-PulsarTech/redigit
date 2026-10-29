@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 )
 
 // hiddenPasses is one extra load per tag set that shows the Go files the run's
@@ -17,12 +18,12 @@ import (
 // trees between fail with "undefined: NewGatewayVerifier". Each pass covers only
 // the packages holding a hidden file, under the tags that satisfy it.
 func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]loadPass, error) {
-	constrained, err := BuildConstraints(snap)
+	constrained, err := buildtags.BuildConstraints(snap)
 	if err != nil {
 		return nil, err
 	}
 
-	hidden, err := Hidden(constrained, tags)
+	hidden, err := buildtags.Hidden(constrained, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func showingTags(line string, tags []string) ([]string, bool) {
 		return nil, false
 	}
 
-	named := ConstraintTags(expr)
+	named := buildtags.ConstraintTags(expr)
 	slices.Sort(named)
 
 	// Tags a constraint can name by hand are few; anything wider is not a build
@@ -126,6 +127,6 @@ func showingTags(line string, tags []string) ([]string, bool) {
 func satisfies(expr constraint.Expr, tags []string) bool {
 	return expr.Eval(func(name string) bool {
 		return slices.Contains(tags, name) || name == runtime.GOOS || name == runtime.GOARCH ||
-			(name == "unix" && IsUnix(runtime.GOOS))
+			(name == "unix" && buildtags.IsUnix(runtime.GOOS))
 	})
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 )
 
 // rule is one independently testable edge source. RulePack is a Composite
@@ -42,7 +43,7 @@ var rules = []rule{
 	assertionRule{},
 	conversionRule{},
 	boundRule{},
-	Rule{},
+	buildtags.Rule{},
 	embedRule{},
 	routePathRule{},
 }

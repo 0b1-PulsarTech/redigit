@@ -17,6 +17,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/web"
 	"github.com/wrapped-owls/redigit/internal/infra/lsp"
 )
@@ -216,12 +217,12 @@ func release(ctx context.Context, opened ...closer) {
 // which constraints a tag satisfies is a per-language question and the
 // auditing use case knows no language.
 func unseen(snap entities.Snapshot, tags []string) ([]auditing.Unseen, error) {
-	constrained, err := golang.BuildConstraints(snap)
+	constrained, err := buildtags.BuildConstraints(snap)
 	if err != nil {
 		return nil, fmt.Errorf("read build constraints: %w", err)
 	}
 
-	hidden, err := golang.Hidden(constrained, tags)
+	hidden, err := buildtags.Hidden(constrained, tags)
 	if err != nil {
 		return nil, fmt.Errorf("evaluate build constraints: %w", err)
 	}
