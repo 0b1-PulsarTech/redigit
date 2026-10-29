@@ -1,4 +1,4 @@
-package golang
+package gencode
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestGoverterRuleEdges(t *testing.T) {
@@ -14,26 +15,25 @@ func TestGoverterRuleEdges(t *testing.T) {
 	root := t.TempDir()
 	dir := "convert"
 
-	writeFile(t, root, filepath.Join(dir, "thing_conv.go"), `package convert
+	testkit.WriteFile(t, root, filepath.Join(dir, "thing_conv.go"), `package convert
 
 // goverter:converter
 type Converter interface {
 	ToDTO(Thing) ThingDTO
 }
 `)
-	writeFile(t, root, filepath.Join(dir, "converter_gen.go"), `package convert
+	testkit.WriteFile(t, root, filepath.Join(dir, "converter_gen.go"), `package convert
 
 func (c *ConverterImpl) ToDTO(t Thing) ThingDTO { return ThingDTO{} }
 `)
-	writeFile(t, root, filepath.Join(dir, "unrelated.go"), `package convert
+	testkit.WriteFile(t, root, filepath.Join(dir, "unrelated.go"), `package convert
 
 func Unrelated() {}
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join(dir, "thing_conv.go"),
 		filepath.Join(dir, "converter_gen.go"),
 		filepath.Join(dir, "unrelated.go"),
@@ -69,22 +69,21 @@ func TestGoverterRuleNoDirectiveNoEdge(t *testing.T) {
 	root := t.TempDir()
 	dir := "convert"
 
-	writeFile(t, root, filepath.Join(dir, "thing_conv.go"), `package convert
+	testkit.WriteFile(t, root, filepath.Join(dir, "thing_conv.go"), `package convert
 
 // plain interface, no goverter directive
 type Converter interface {
 	ToDTO(Thing) ThingDTO
 }
 `)
-	writeFile(t, root, filepath.Join(dir, "converter_gen.go"), `package convert
+	testkit.WriteFile(t, root, filepath.Join(dir, "converter_gen.go"), `package convert
 
 func (c *ConverterImpl) ToDTO(t Thing) ThingDTO { return ThingDTO{} }
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{
+	decls := testkit.DeclareAll(t, root, []string{
 		filepath.Join(dir, "thing_conv.go"),
 		filepath.Join(dir, "converter_gen.go"),
 	})

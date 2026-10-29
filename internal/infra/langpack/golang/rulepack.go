@@ -9,6 +9,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/gencode"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
@@ -33,9 +34,9 @@ type rule interface {
 // rules is the compile-time registry. Registering a rule here is what makes
 // it run; nothing else discovers a rule implicitly.
 var rules = []rule{
-	Goverter{},
-	Mockgen{},
-	Generate{},
+	gencode.Goverter{},
+	gencode.Mockgen{},
+	gencode.Generate{},
 	Sqlc{},
 	Atoms{},
 	Migration{},
