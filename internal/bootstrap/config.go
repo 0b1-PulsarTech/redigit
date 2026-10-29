@@ -11,20 +11,14 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/rewriting"
 )
 
-// Config is everything a run needs, read once and treated as read-only after.
 type Config struct {
-	// Repo is the repository to read, and Rev the revision holding the tree
-	// to rebuild. Neither is tied to where this binary was built.
+	// Neither is tied to where this binary was built.
 	Repo string
 	Rev  string
-	// BuildTags is passed to the language server. It is explicit rather than
-	// inferred because leaving it empty is a real choice with a cost: a file
-	// behind a build constraint is invisible to reference queries, so its
-	// declarations arrive with no edges. Auditing.Unseen names the files that
-	// happened to, which is what keeps the cost from being silent.
+	// Explicit, since empty is a real choice: a file behind a build constraint
+	// has no edges, and Auditing.Unseen names the files that happened to.
 	BuildTags []string
-	// ServerCommand and ServerArgs launch the language server. Configurable
-	// so nothing in this tool hardcodes what Go is.
+	// Configurable so nothing in this tool hardcodes what Go is.
 	ServerCommand string
 	ServerArgs    []string
 
@@ -34,35 +28,28 @@ type Config struct {
 	Auditing auditing.Config
 	Rewrite  rewriting.Config
 
-	// BlobDir, when set, writes blobs to a plain directory instead of the
-	// repository's object database. It costs duplication and buys the promise
-	// that nothing is written into a repository somebody else is using.
+	// Writes blobs to a plain directory: duplication, but nothing is written
+	// into a repository somebody else is using.
 	BlobDir string
 
 	Author AuthorConfig
 
-	// ChunkMap is the operator-supplied escape hatch for a format this tool
-	// cannot parse (docs/PLANO-EMISSAO.md:113-133). It only refines the
-	// opaque pack's whole-file default; a path a specific pack already
-	// understands structurally is refused rather than overridden.
+	// Only refines the opaque pack's whole-file default; a path a specific
+	// pack understands structurally is refused (docs/PLANO-EMISSAO.md:113-133).
 	ChunkMap entities.ChunkMap
 
-	// Virtual maps a module a bundler plugin makes up ("virtual:x") to the
-	// file of the tree it is compiled from, which no import names.
+	// A module a bundler plugin makes up ("virtual:x") to the file it compiles from.
 	Virtual map[string]string
 }
 
-// AuthorConfig is who a rebuilt history is attributed to, and from when. The
-// timestamp is fixed rather than read from the clock so two runs of the same
-// plan produce the same commits; a rebuild whose identifiers change on every
-// run cannot be compared with the previous round.
 type AuthorConfig struct {
 	Name  string
 	Email string
+	// Fixed, not read from the clock: a rebuild whose ids change every run
+	// cannot be compared with the previous round.
 	Start time.Time
 }
 
-// Defaults is the configuration a run starts from before flags narrow it.
 func Defaults() Config {
 	return Config{
 		Rev:           "HEAD",
