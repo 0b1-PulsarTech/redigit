@@ -62,7 +62,10 @@ func TestDeferLibraryEntries(t *testing.T) {
 	free := decl("lib/a.go", "A", "lib")
 	owned := decl("lib/b.go", "B", "lib")
 	own := Ownership{
-		Owner:    map[entities.DeclKey]reach.FeatureID{free.Key: reach.SharedFeature, owned.Key: "f"},
+		Owner: map[entities.DeclKey]reach.FeatureID{
+			free.Key:  reach.SharedFeature,
+			owned.Key: "f",
+		},
 		Deferred: reach.Wiring{},
 		Loose:    reach.Wiring{},
 	}
@@ -98,8 +101,12 @@ func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
 
 	own := Ownership{
 		Owner: map[entities.DeclKey]reach.FeatureID{
-			plain.Key: reach.SharedFeature, sibling.Key: reach.SharedFeature, generated.Key: reach.SharedFeature,
-			table.Key: reach.SharedFeature, owned.Key: "f", held.Key: reach.SharedFeature,
+			plain.Key:     reach.SharedFeature,
+			sibling.Key:   reach.SharedFeature,
+			generated.Key: reach.SharedFeature,
+			table.Key:     reach.SharedFeature,
+			owned.Key:     "f",
+			held.Key:      reach.SharedFeature,
 		},
 		Deferred: reach.Wiring{held.Key: true},
 	}

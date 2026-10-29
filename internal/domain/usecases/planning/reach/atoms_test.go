@@ -26,7 +26,10 @@ func TestAtomGroups(t *testing.T) {
 	}
 
 	got := groups["dbgen/models.go"]
-	slices.SortFunc(got, func(first, second entities.DeclKey) int { return cmp.Compare(first.Name, second.Name) })
+	slices.SortFunc(
+		got,
+		func(first, second entities.DeclKey) int { return cmp.Compare(first.Name, second.Name) },
+	)
 
 	want := []entities.DeclKey{typeA.Key, typeB.Key}
 	if !slices.Equal(got, want) {

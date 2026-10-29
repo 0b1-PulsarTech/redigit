@@ -28,7 +28,11 @@ func (p Planner) emit(
 		// explains, and the declarations in it are read for the first time
 		// hundreds of commits later.
 		fresh := map[entities.DeclKey]bool{}
-		shared, late := deferral.SplitLate(graph, owners.UnbornProviders(graph, own, members, born), members)
+		shared, late := deferral.SplitLate(
+			graph,
+			owners.UnbornProviders(graph, own, members, born),
+			members,
+		)
 
 		if len(shared) > 0 {
 			plan.Commits = append(

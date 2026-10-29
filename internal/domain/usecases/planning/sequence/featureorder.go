@@ -6,7 +6,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-func FeatureNeeds(graph entities.Graph, own owners.Ownership) map[reach.FeatureID]map[reach.FeatureID]bool {
+func FeatureNeeds(
+	graph entities.Graph,
+	own owners.Ownership,
+) map[reach.FeatureID]map[reach.FeatureID]bool {
 	needs := map[reach.FeatureID]map[reach.FeatureID]bool{}
 	behind := map[entities.DeclKey]map[reach.FeatureID]bool{}
 

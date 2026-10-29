@@ -148,7 +148,10 @@ func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 	)
 
 	own := Ownership{
-		Owner: map[entities.DeclKey]reach.FeatureID{member.Key: "a", event.Key: reach.SharedFeature},
+		Owner: map[entities.DeclKey]reach.FeatureID{
+			member.Key: "a",
+			event.Key:  reach.SharedFeature,
+		},
 	}
 	born := map[entities.DeclKey]bool{event.Key: true}
 

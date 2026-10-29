@@ -95,7 +95,10 @@ func Assign(graph entities.Graph) Ownership {
 
 	own.packages = sharedPackages(graph, own)
 
-	slices.SortFunc(own.Order, func(first, second reach.FeatureID) int { return cmp.Compare(first, second) })
+	slices.SortFunc(
+		own.Order,
+		func(first, second reach.FeatureID) int { return cmp.Compare(first, second) },
+	)
 
 	return own
 }

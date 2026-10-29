@@ -35,7 +35,12 @@ func TestCutPrefersAPackageBoundaryOverTheRawCap(t *testing.T) {
 	commits := New(Config{MaxFiles: 12}).cut(
 		entities.NewGraph(nil, nil, nil),
 		entities.Ordering{},
-		bucket{keys: keys, shape: entities.ShapeLayer, feature: reach.SharedFeature, reason: "test"},
+		bucket{
+			keys:    keys,
+			shape:   entities.ShapeLayer,
+			feature: reach.SharedFeature,
+			reason:  "test",
+		},
 	)
 
 	if len(commits) != 2 {
@@ -67,7 +72,12 @@ func TestCutFallsBackToTheCapWhenOnePackageAloneExceedsIt(t *testing.T) {
 	commits := New(Config{MaxFiles: 3}).cut(
 		entities.NewGraph(nil, nil, nil),
 		entities.Ordering{},
-		bucket{keys: keys, shape: entities.ShapeLayer, feature: reach.SharedFeature, reason: "test"},
+		bucket{
+			keys:    keys,
+			shape:   entities.ShapeLayer,
+			feature: reach.SharedFeature,
+			reason:  "test",
+		},
 	)
 
 	if len(commits) != 3 {
@@ -114,7 +124,12 @@ func TestCutNeverSplitsAnAtom(t *testing.T) {
 	commits := New(Config{MaxFiles: 2}).cut(
 		entities.NewGraph(decls, nil, nil),
 		entities.Ordering{},
-		bucket{keys: keys, shape: entities.ShapeLayer, feature: reach.SharedFeature, reason: "test"},
+		bucket{
+			keys:    keys,
+			shape:   entities.ShapeLayer,
+			feature: reach.SharedFeature,
+			reason:  "test",
+		},
 	)
 
 	for _, commit := range commits {

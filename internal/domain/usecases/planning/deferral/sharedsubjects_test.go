@@ -56,7 +56,9 @@ func TestReadyDeferredDoesNotWaitForASubjectOnlyAFeatureReads(t *testing.T) {
 
 	own := owners.Ownership{
 		Owner: map[entities.DeclKey]reach.FeatureID{
-			test.Key: reach.SharedFeature, entries.Key: reach.SharedFeature, declares.Key: "webrouters",
+			test.Key:     reach.SharedFeature,
+			entries.Key:  reach.SharedFeature,
+			declares.Key: "webrouters",
 		},
 		Deferred: reach.Wiring{test.Key: true},
 		Roots:    reach.Wiring{},

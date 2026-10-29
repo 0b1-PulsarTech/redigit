@@ -62,7 +62,9 @@ func ReadyDeferred(
 
 	// Only what needs something fresh is ready: otherwise whatever needs only
 	// shared code is ready at the first feature and drags that code in.
-	return owners.SortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
+	return owners.SortedKeys(
+		anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready),
+	)
 }
 
 func waitsOn(

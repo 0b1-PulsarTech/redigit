@@ -60,8 +60,11 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 
 	own := owners.Ownership{
 		Owner: map[entities.DeclKey]reach.FeatureID{
-			code.Key: "a", later.Key: "b",
-			setup.Key: reach.SharedFeature, first.Key: reach.SharedFeature, plain.Key: reach.SharedFeature,
+			code.Key:  "a",
+			later.Key: "b",
+			setup.Key: reach.SharedFeature,
+			first.Key: reach.SharedFeature,
+			plain.Key: reach.SharedFeature,
 		},
 		Deferred: reach.Wiring{setup.Key: true, first.Key: true, plain.Key: true},
 		Roots:    reach.Wiring{},
@@ -188,9 +191,12 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 			t.Parallel()
 
 			owner := map[entities.DeclKey]reach.FeatureID{
-				suite.Key: reach.SharedFeature, require.Key: reach.SharedFeature, indirect.Key: reach.SharedFeature,
-				query.Key:   reach.SharedFeature,
-				counted.Key: reach.SharedFeature, feature.Key: "a",
+				suite.Key:    reach.SharedFeature,
+				require.Key:  reach.SharedFeature,
+				indirect.Key: reach.SharedFeature,
+				query.Key:    reach.SharedFeature,
+				counted.Key:  reach.SharedFeature,
+				feature.Key:  "a",
 			}
 			own := owners.Ownership{
 				Owner:    owner,

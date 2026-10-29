@@ -33,7 +33,8 @@ func onlyOtherTestsRead(graph entities.Graph, decl entities.Decl, support reach.
 
 	for _, edge := range graph.Consumers(decl.Key) {
 		consumer, found := graph.Decl(edge.Dependent)
-		if !found || entities.IsStructural(edge.Reason) || reach.IsAfterword(graph, edge.Dependent) {
+		if !found || entities.IsStructural(edge.Reason) ||
+			reach.IsAfterword(graph, edge.Dependent) {
 			continue
 		}
 
