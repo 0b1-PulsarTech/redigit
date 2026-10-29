@@ -64,7 +64,7 @@ func TestBoundRuleTiesAConstructorThatNamesABoundType(t *testing.T) {
 	reply := boundDecl(file, entities.KindMethod, "replyExecutor.Reply", spans[2])
 	assertion := boundDecl(file, entities.KindValue, "_ Replier = replyExecutor{}", spans[3])
 
-	edges, err := (boundRule{}).Edges(
+	edges, err := (Bound{}).Edges(
 		t.Context(), snap, []entities.Decl{replier, executor, constructor, reply, assertion},
 	)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestBoundRuleIgnoresATypeNoInterfaceTakes(t *testing.T) {
 		IsInterface: true,
 	}
 
-	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+	edges, err := (Bound{}).Edges(t.Context(), snap, []entities.Decl{
 		iface,
 		boundDecl(file, entities.KindType, "plain", spans[0]),
 		boundDecl(file, entities.KindFunc, "newPlain", spans[1]),
@@ -178,7 +178,7 @@ func TestBoundRuleDoesNotMakeAMethodWaitForItsSiblings(t *testing.T) {
 	reply := boundDecl(file, entities.KindMethod, "replyExecutor.Reply", spans[1])
 	closeM := boundDecl(file, entities.KindMethod, "replyExecutor.Close", spans[2])
 
-	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+	edges, err := (Bound{}).Edges(t.Context(), snap, []entities.Decl{
 		replier,
 		boundDecl(file, entities.KindType, "replyExecutor", spans[0]),
 		reply,
@@ -215,7 +215,7 @@ func TestBoundRuleDoesNotMakeATypeWaitForItsOwnMethods(t *testing.T) {
 
 	executor := boundDecl(file, entities.KindType, "replyExecutor", spans[0])
 
-	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+	edges, err := (Bound{}).Edges(t.Context(), snap, []entities.Decl{
 		{
 			Key:         entities.DeclKey{File: "i.go", Kind: entities.KindType, Name: "Replier"},
 			Unit:        "aiturn",
@@ -258,7 +258,7 @@ func TestBoundRuleBindsATypeHandedToAStructField(t *testing.T) {
 	hand := boundDecl(file, entities.KindMethod, "noopHandover.HandToHuman", spans[1])
 	builder := boundDecl(file, entities.KindFunc, "newDeps", spans[2])
 
-	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+	edges, err := (Bound{}).Edges(t.Context(), snap, []entities.Decl{
 		iface, boundDecl(file, entities.KindType, "noopHandover", spans[0]), hand, builder,
 	})
 	if err != nil {
@@ -287,7 +287,7 @@ func TestBoundRuleDoesNotBindAPlainConstruction(t *testing.T) {
 		"func use() error {\n\tp := plain{}\n\n\treturn p.Do()\n}",
 	)
 
-	edges, err := (boundRule{}).Edges(t.Context(), snap, []entities.Decl{
+	edges, err := (Bound{}).Edges(t.Context(), snap, []entities.Decl{
 		{
 			Key:         entities.DeclKey{File: "i.go", Kind: entities.KindType, Name: "Replier"},
 			Unit:        "aiturn",

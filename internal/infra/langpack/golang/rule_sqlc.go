@@ -6,16 +6,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// sqlcRule links what sqlc generates to what it generated from. A query
+// Sqlc links what sqlc generates to what it generated from. A query
 // function waits for the "-- name:" block it came from, the block for every
 // table it reads, and a table's struct for the generated package root. Linked
 // by directory, every query landed hundreds of commits before the table it
 // reads, and a function was born with no caller.
-type sqlcRule struct{}
+type Sqlc struct{}
 
-func (sqlcRule) Name() string { return "sqlc" }
+func (Sqlc) Name() string { return "sqlc" }
 
-func (sqlcRule) Edges(
+func (Sqlc) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -62,7 +62,7 @@ func (sqlcRule) Edges(
 	return edges, nil
 }
 
-func (sqlcRule) Anchors(
+func (Sqlc) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,

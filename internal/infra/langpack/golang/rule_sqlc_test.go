@@ -13,7 +13,7 @@ func TestSqlcRuleEdges(t *testing.T) {
 
 	snap, decls := schemaTree(t)
 
-	edges, err := sqlcRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Sqlc{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestSqlcRuleEdges(t *testing.T) {
 func TestSqlcRuleNoQueryFilesNoEdges(t *testing.T) {
 	t.Parallel()
 
-	edges, err := sqlcRule{}.Edges(context.Background(), entities.Snapshot{Root: t.TempDir()}, nil)
+	edges, err := Sqlc{}.Edges(context.Background(), entities.Snapshot{Root: t.TempDir()}, nil)
 	if err != nil || len(edges) != 0 {
 		t.Fatalf("Edges() = %v, %v; want none", edges, err)
 	}

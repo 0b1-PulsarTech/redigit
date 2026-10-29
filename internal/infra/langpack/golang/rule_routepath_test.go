@@ -23,7 +23,7 @@ func TestRoutePathRuleAnchors(t *testing.T) {
 
 	decls := declareAll(t, NewSyntax(), root, paths)
 
-	anchors, err := routePathRule{}.Anchors(
+	anchors, err := RoutePath{}.Anchors(
 		context.Background(), entities.Snapshot{Root: root}, decls,
 	)
 	if err != nil {

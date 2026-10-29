@@ -8,7 +8,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
-// methodSetRule keeps the methods a type's own declaration requires of it
+// MethodSet keeps the methods a type's own declaration requires of it
 // with the type. "type ErrNotFound struct{ BaseError[ErrNotFound,
 // *ErrNotFound] }" instantiates a generic whose constraint demands Error() of
 // the pointer, so the declaration compiles only once that method exists - and a
@@ -19,16 +19,16 @@ import (
 //
 // When the instantiation is in some OTHER declaration, the methods are plain
 // edges: that declaration reads them, the type does not need them to exist.
-type methodSetRule struct{ source *typed.Source }
+type MethodSet struct{ Source *typed.Source }
 
-func (methodSetRule) Name() string { return "method-set" }
+func (MethodSet) Name() string { return "method-set" }
 
-func (r methodSetRule) Edges(
+func (r MethodSet) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	facts, err := r.source.Facts(ctx, snap, decls)
+	facts, err := r.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (r methodSetRule) Edges(
 	return edges, nil
 }
 
-func (methodSetRule) Anchors(
+func (MethodSet) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -55,12 +55,12 @@ func (methodSetRule) Anchors(
 }
 
 // Atoms groups each type that requires methods of itself with those methods.
-func (r methodSetRule) Atoms(
+func (r MethodSet) Atoms(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (map[entities.DeclKey]string, error) {
-	facts, err := r.source.Facts(ctx, snap, decls)
+	facts, err := r.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}

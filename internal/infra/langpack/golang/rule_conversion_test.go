@@ -129,7 +129,7 @@ func TestConversionRuleTiesAConstructorToTheMethods(t *testing.T) {
 		IsInterface: true,
 	}
 
-	edges, err := (conversionRule{}).Edges(
+	edges, err := (Conversion{}).Edges(
 		t.Context(), snap, []entities.Decl{constructor, evaluate, rule},
 	)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestConversionRuleTiesAConstructorToTheMethods(t *testing.T) {
 func TestConversionRuleIsSilentWithNoInterface(t *testing.T) {
 	t.Parallel()
 
-	edges, err := (conversionRule{}).Edges(
+	edges, err := (Conversion{}).Edges(
 		t.Context(),
 		entities.Snapshot{},
 		[]entities.Decl{{

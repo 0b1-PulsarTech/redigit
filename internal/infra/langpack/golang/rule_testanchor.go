@@ -10,7 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// testAnchorRule pulls a test toward the declaration it exercises. It is an
+// Anchor pulls a test toward the declaration it exercises. It is an
 // Anchor, not an Edge: "not before the function" is only a floor, and with
 // only the floor a package's whole suite arrived six hundred commits late.
 //
@@ -24,11 +24,11 @@ import (
 // TestFSStorePutGet names the type FS and the methods Put and Get, and a
 // scan that stopped at the first match (the type, at the first cut) reported
 // a defect where the test was correctly waiting on the method.
-type testAnchorRule struct{}
+type Anchor struct{}
 
-func (testAnchorRule) Name() string { return "test-anchor" }
+func (Anchor) Name() string { return "test-anchor" }
 
-func (testAnchorRule) Edges(
+func (Anchor) Edges(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -36,7 +36,7 @@ func (testAnchorRule) Edges(
 	return nil, nil
 }
 
-func (testAnchorRule) Anchors(
+func (Anchor) Anchors(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,

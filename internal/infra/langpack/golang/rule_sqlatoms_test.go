@@ -13,7 +13,7 @@ func TestSQLAtomRuleAtoms(t *testing.T) {
 
 	snap, decls := schemaTree(t)
 
-	atoms, err := sqlAtomRule{}.Atoms(context.Background(), snap, decls)
+	atoms, err := Atoms{}.Atoms(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Atoms() error = %v", err)
 	}
@@ -37,7 +37,7 @@ func TestSQLAtomRuleAtoms(t *testing.T) {
 func TestSQLAtomRuleWithoutSchemaGroupsNothing(t *testing.T) {
 	t.Parallel()
 
-	atoms, err := sqlAtomRule{}.Atoms(
+	atoms, err := Atoms{}.Atoms(
 		context.Background(),
 		entities.Snapshot{Root: t.TempDir()},
 		nil,

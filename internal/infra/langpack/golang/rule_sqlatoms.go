@@ -6,16 +6,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// sqlAtomRule groups what one schema change touches into one commit: a table
+// Atoms groups what one schema change touches into one commit: a table
 // is its ORM file, its statements and its generated struct; a query is its
 // block and the functions sqlc wrote for it. Neither side compiles or applies
 // alone - a struct with no table, or a table the ORM has no type for, is a
 // tree schemadiff or sqlc rejects.
-type sqlAtomRule struct{}
+type Atoms struct{}
 
-func (sqlAtomRule) Name() string { return "sql-atoms" }
+func (Atoms) Name() string { return "sql-atoms" }
 
-func (sqlAtomRule) Edges(
+func (Atoms) Edges(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -23,7 +23,7 @@ func (sqlAtomRule) Edges(
 	return nil, nil
 }
 
-func (sqlAtomRule) Anchors(
+func (Atoms) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -31,7 +31,7 @@ func (sqlAtomRule) Anchors(
 	return nil, nil
 }
 
-func (sqlAtomRule) Atoms(
+func (Atoms) Atoms(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,

@@ -9,16 +9,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// goverterRule links a generated converter_gen.go to the sibling *conv.go
+// Goverter links a generated converter_gen.go to the sibling *conv.go
 // interface, carrying a "goverter:" directive, that goverter read to produce
 // it. Neither file names the other: the link exists only because both live
 // in the same directory and one runs a generator whose directive lives in
 // the other.
-type goverterRule struct{}
+type Goverter struct{}
 
-func (goverterRule) Name() string { return "goverter" }
+func (Goverter) Name() string { return "goverter" }
 
-func (goverterRule) Edges(
+func (Goverter) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -81,7 +81,7 @@ func directiveDecls(
 	return providers, nil
 }
 
-func (goverterRule) Anchors(
+func (Goverter) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,

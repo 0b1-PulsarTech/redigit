@@ -171,7 +171,7 @@ func TestAssertionRuleTiesTheAssertionToTheReceiversMethods(t *testing.T) {
 		Unit: "somewhere/else",
 	}
 
-	edges, err := (assertionRule{}).Edges(
+	edges, err := (Assertion{}).Edges(
 		t.Context(), snap, []entities.Decl{assertion, encode, decode, elsewhere},
 	)
 	if err != nil {
@@ -219,7 +219,7 @@ func TestAssertionRuleIgnoresAnOrdinaryValue(t *testing.T) {
 		Unit: "permitek",
 	}
 
-	edges, err := (assertionRule{}).Edges(t.Context(), snap, []entities.Decl{value, method})
+	edges, err := (Assertion{}).Edges(t.Context(), snap, []entities.Decl{value, method})
 	if err != nil {
 		t.Fatalf("Edges() = %v", err)
 	}

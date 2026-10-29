@@ -113,7 +113,7 @@ func TestGenerateRuleTiesAMockToItsDirective(t *testing.T) {
 		Span: entities.Span{Start: 0, End: 60},
 	}
 
-	edges, err := (generateRule{}).Edges(t.Context(), snap, []entities.Decl{reader, mock})
+	edges, err := (Generate{}).Edges(t.Context(), snap, []entities.Decl{reader, mock})
 	if err != nil {
 		t.Fatalf("Edges() = %v", err)
 	}
@@ -148,7 +148,7 @@ func TestGenerateRuleIgnoresAnAbsentDestination(t *testing.T) {
 		Unit: "a",
 	}
 
-	edges, err := (generateRule{}).Edges(t.Context(), snap, []entities.Decl{reader})
+	edges, err := (Generate{}).Edges(t.Context(), snap, []entities.Decl{reader})
 	if err != nil {
 		t.Fatalf("Edges() = %v", err)
 	}

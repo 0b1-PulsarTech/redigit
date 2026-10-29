@@ -92,7 +92,7 @@ type Names struct{ Set[string] }
 			t.Parallel()
 
 			snap, decls := testkit.Fixture(t, testCase.files)
-			rule := methodSetRule{source: typed.NewSource(nil)}
+			rule := MethodSet{Source: typed.NewSource(nil)}
 
 			checkAtoms(t, rule, snap, decls, testCase.wantAtom)
 			checkEdges(t, rule, snap, decls, testCase.wantEdges)
@@ -102,7 +102,7 @@ type Names struct{ Set[string] }
 
 func checkAtoms(
 	t *testing.T,
-	rule methodSetRule,
+	rule MethodSet,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 	want []entities.DeclKey,
@@ -127,7 +127,7 @@ func checkAtoms(
 
 func checkEdges(
 	t *testing.T,
-	rule methodSetRule,
+	rule MethodSet,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 	want []entities.Edge,

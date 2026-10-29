@@ -9,16 +9,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/routes"
 )
 
-// routePathRule anchors a test that names a URL path to the declarations that
+// RoutePath anchors a test that names a URL path to the declarations that
 // register the route group serving it. An end-to-end suite talks HTTP, so no
 // reference ties it to the handler it drives, and with only the helpers it
 // imports to wait for it was born hundreds of commits before the route it
 // calls existed. See routes.Groups for what a group is and which one wins.
-type routePathRule struct{}
+type RoutePath struct{}
 
-func (routePathRule) Name() string { return "route-path" }
+func (RoutePath) Name() string { return "route-path" }
 
-func (routePathRule) Edges(
+func (RoutePath) Edges(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -26,7 +26,7 @@ func (routePathRule) Edges(
 	return nil, nil
 }
 
-func (routePathRule) Anchors(
+func (RoutePath) Anchors(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,

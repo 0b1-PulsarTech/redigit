@@ -11,15 +11,15 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// generateRule ties a generated file to the declaration carrying the
+// Generate ties a generated file to the declaration carrying the
 // "//go:generate" directive that writes it. Without it a mock was born 195
 // commits before its directive - not merely early: running the generator in
 // that tree finds no directive, so the file is not reproducible there.
-type generateRule struct{}
+type Generate struct{}
 
-func (generateRule) Name() string { return "go-generate" }
+func (Generate) Name() string { return "go-generate" }
 
-func (generateRule) Edges(
+func (Generate) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -55,7 +55,7 @@ func (generateRule) Edges(
 	return edges, nil
 }
 
-func (generateRule) Anchors(
+func (Generate) Anchors(
 	_ context.Context,
 	_ entities.Snapshot,
 	_ []entities.Decl,

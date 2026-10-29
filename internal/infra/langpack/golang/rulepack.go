@@ -33,20 +33,20 @@ type rule interface {
 // rules is the compile-time registry. Registering a rule here is what makes
 // it run; nothing else discovers a rule implicitly.
 var rules = []rule{
-	goverterRule{},
-	mockgenRule{},
-	generateRule{},
-	sqlcRule{},
-	sqlAtomRule{},
-	migrationRule{},
-	testAnchorRule{},
-	enclosesRule{},
-	assertionRule{},
-	conversionRule{},
-	boundRule{},
+	Goverter{},
+	Mockgen{},
+	Generate{},
+	Sqlc{},
+	Atoms{},
+	Migration{},
+	Anchor{},
+	Encloses{},
+	Assertion{},
+	Conversion{},
+	Bound{},
 	buildtags.Rule{},
-	embedRule{},
-	routePathRule{},
+	Embed{},
+	RoutePath{},
 }
 
 // atomRule is the optional second output of a rule: declarations that must be
@@ -74,10 +74,10 @@ func NewRulePack(tags []string) RulePack {
 	source := typed.NewSource(tags)
 
 	return RulePack{rules: append(slices.Clone(rules),
-		methodSetRule{source: source},
-		typedConversionRule{source: source},
-		escapedRule{source: source},
-		typedUseRule{source: source},
+		MethodSet{Source: source},
+		TypedConversion{Source: source},
+		Escaped{Source: source},
+		Reference{Source: source},
 	)}
 }
 
@@ -99,7 +99,7 @@ func (p RulePack) Edges(
 // FilterEdges drops the structural edges the sqlc output would otherwise
 // carry, whichever side found them.
 func (p RulePack) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
-	return dropSqlcConstruction(snap, edges)
+	return DropConstruction(snap, edges)
 }
 
 func (p RulePack) Anchors(

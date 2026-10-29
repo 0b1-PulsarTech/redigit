@@ -43,7 +43,7 @@ func TestDropSqlcConstruction(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := dropSqlcConstruction(snap, []entities.Edge{testCase.edge})
+			got := DropConstruction(snap, []entities.Edge{testCase.edge})
 			if kept := slices.Contains(got, testCase.edge); kept != testCase.kept {
 				t.Fatalf("kept = %v, want %v", kept, testCase.kept)
 			}

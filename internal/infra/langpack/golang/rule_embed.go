@@ -15,23 +15,23 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// embedRule makes a //go:embed declaration wait for a file its pattern matches.
+// Embed makes a //go:embed declaration wait for a file its pattern matches.
 // The pattern is a string no reference query reads, and go refuses one that
 // matches nothing ("pattern *.sql: no matching files found"), so an embedding
 // file born before its data broke every tree in between.
 //
 // One matching file is enough to build, so the first by name is the provider:
 // the rest of the data may arrive later without breaking anything.
-type embedRule struct{}
+type Embed struct{}
 
-func (embedRule) Name() string { return "embed" }
+func (Embed) Name() string { return "embed" }
 
 const (
 	embedDirective = "//go:embed"
 	allPrefix      = "all:"
 )
 
-func (embedRule) Edges(
+func (Embed) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -71,7 +71,7 @@ func (embedRule) Edges(
 	return edges, nil
 }
 
-func (embedRule) Anchors(
+func (Embed) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,

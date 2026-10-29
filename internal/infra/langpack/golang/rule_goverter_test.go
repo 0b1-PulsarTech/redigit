@@ -39,7 +39,7 @@ func Unrelated() {}
 		filepath.Join(dir, "unrelated.go"),
 	})
 
-	edges, err := goverterRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Goverter{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -89,7 +89,7 @@ func (c *ConverterImpl) ToDTO(t Thing) ThingDTO { return ThingDTO{} }
 		filepath.Join(dir, "converter_gen.go"),
 	})
 
-	edges, err := goverterRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Goverter{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}

@@ -60,7 +60,7 @@ func TestEscapedRule(t *testing.T) {
 				"use.go":   "package fixture\n\n" + testCase.use,
 			})
 
-			edges, err := escapedRule{source: typed.NewSource(nil)}.Edges(
+			edges, err := Escaped{Source: typed.NewSource(nil)}.Edges(
 				context.Background(), snap, decls,
 			)
 			if err != nil {
@@ -98,7 +98,7 @@ func (m Missing) Wrap() error { return error(m) }
 `,
 	})
 
-	edges, err := escapedRule{source: typed.NewSource(nil)}.Edges(
+	edges, err := Escaped{Source: typed.NewSource(nil)}.Edges(
 		context.Background(), snap, decls,
 	)
 	if err != nil {

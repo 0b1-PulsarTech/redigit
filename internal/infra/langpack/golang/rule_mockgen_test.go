@@ -43,7 +43,7 @@ func (m *MockReader) Read() error { return nil }
 		filepath.Join(dir, "reader_mock_test.go"),
 	})
 
-	edges, err := mockgenRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Mockgen{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -87,7 +87,7 @@ func (m *MockReader) Read() error { return nil }
 		filepath.Join("mocks", "reader_mock_test.go"),
 	})
 
-	edges, err := mockgenRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Mockgen{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -129,7 +129,7 @@ func (m *MockReader) Read() error { return nil }
 		filepath.Join("internal", "store", "mocks", "reader_mock_test.go"),
 	})
 
-	edges, err := mockgenRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Mockgen{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -216,7 +216,7 @@ func Plain() {}
 
 	decls := declareAll(t, syntax, root, []string{"plain.go"})
 
-	edges, err := mockgenRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Mockgen{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}

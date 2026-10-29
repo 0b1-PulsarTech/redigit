@@ -15,18 +15,18 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
-// mockgenRule links a generated mock to the interface it structurally
+// Mockgen links a generated mock to the interface it structurally
 // mirrors. The only record of that link is a "// Source:" header comment, in
 // one of three formats: a bare filename in the mock's own directory, an
 // import path carrying "(interfaces: A,B,C)", or a relative path that climbs
 // out of the directory with "..". The mirrored interface name is recovered
 // from the mock's own identifiers: a NewMock/Mock prefix and a MockRecorder
 // suffix are mockgen's own naming convention, not ours.
-type mockgenRule struct{}
+type Mockgen struct{}
 
-func (mockgenRule) Name() string { return "mockgen" }
+func (Mockgen) Name() string { return "mockgen" }
 
-func (r mockgenRule) Edges(
+func (r Mockgen) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -219,7 +219,7 @@ func mockSubjectName(key entities.DeclKey) (string, bool) {
 	return "", false
 }
 
-func (mockgenRule) Anchors(
+func (Mockgen) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,

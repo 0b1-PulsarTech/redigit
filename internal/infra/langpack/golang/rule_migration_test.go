@@ -13,7 +13,7 @@ func TestMigrationRuleEdges(t *testing.T) {
 
 	snap, decls := schemaTree(t)
 
-	edges, err := migrationRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Migration{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -63,7 +63,7 @@ func TestMigrationRuleEdges(t *testing.T) {
 func TestMigrationRuleWithoutMigrationsHasNoEdges(t *testing.T) {
 	t.Parallel()
 
-	edges, err := migrationRule{}.Edges(
+	edges, err := Migration{}.Edges(
 		context.Background(), entities.Snapshot{Root: t.TempDir()}, nil,
 	)
 	if err != nil || len(edges) != 0 {

@@ -66,7 +66,7 @@ func TestTypedConversionRule(t *testing.T) {
 				"use.go":   "package fixture\n\n" + testCase.use,
 			})
 
-			edges, err := typedConversionRule{source: typed.NewSource(nil)}.Edges(
+			edges, err := TypedConversion{Source: typed.NewSource(nil)}.Edges(
 				context.Background(), snap, decls,
 			)
 			if err != nil {
@@ -110,7 +110,7 @@ func Narrow(w Wide) Reader { return w }
 `,
 	})
 
-	edges, err := typedConversionRule{source: typed.NewSource(nil)}.Edges(
+	edges, err := TypedConversion{Source: typed.NewSource(nil)}.Edges(
 		context.Background(), snap, decls,
 	)
 	if err != nil {

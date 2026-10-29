@@ -8,16 +8,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// conversionRule ties a function that RETURNS an interface to the methods of
+// Conversion ties a function that RETURNS an interface to the methods of
 // the concrete type it returns. "func New() Rule { return &factRule{} }"
 // converts implicitly, so it compiles only once factRule has every method Rule
 // demands, and no reference query sees that. Same requirement as the assertion
 // rule, in the form that failed 416 of 520 trees.
-type conversionRule struct{}
+type Conversion struct{}
 
-func (conversionRule) Name() string { return "interface-conversion" }
+func (Conversion) Name() string { return "interface-conversion" }
 
-func (conversionRule) Edges(
+func (Conversion) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -51,7 +51,7 @@ func (conversionRule) Edges(
 	return edges, nil
 }
 
-func (conversionRule) Anchors(
+func (Conversion) Anchors(
 	_ context.Context,
 	_ entities.Snapshot,
 	_ []entities.Decl,

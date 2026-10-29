@@ -11,7 +11,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// enclosesRule keeps a value or constructor with the type it belongs to: a
+// Encloses keeps a value or constructor with the type it belongs to: a
 // value declaration typed as a type in the same file, or a function whose
 // sole result is a type in the same file, starts where that type starts.
 // Without it, "type Channel string" lands in one commit and the constants
@@ -20,11 +20,11 @@ import (
 // The link is read from the declaration's own syntax (a ValueSpec's declared
 // type, a FuncType's single result), not from a reference graph: RulePack
 // gets no Resolver, only the declarations Syntax already found.
-type enclosesRule struct{}
+type Encloses struct{}
 
-func (enclosesRule) Name() string { return "encloses" }
+func (Encloses) Name() string { return "encloses" }
 
-func (enclosesRule) Edges(
+func (Encloses) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -196,7 +196,7 @@ func valueEncloses(
 	return edges
 }
 
-func (enclosesRule) Anchors(
+func (Encloses) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,

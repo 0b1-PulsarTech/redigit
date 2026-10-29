@@ -27,7 +27,7 @@ const (
 
 	decls := declareAll(t, syntax, root, []string{"weekday.go"})
 
-	edges, err := enclosesRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -62,7 +62,7 @@ func NewWithErr() (*Repo, error) { return nil, nil }
 
 	decls := declareAll(t, syntax, root, []string{"repo.go"})
 
-	edges, err := enclosesRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -101,7 +101,7 @@ func Helper() int { return 1 }
 
 	decls := declareAll(t, syntax, root, []string{"misc.go"})
 
-	edges, err := enclosesRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -130,7 +130,7 @@ var _ io.Reader = (*Reader)(nil)
 
 	decls := declareAll(t, syntax, root, []string{"assert.go"})
 
-	edges, err := enclosesRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -147,7 +147,7 @@ var _ io.Reader = (*Reader)(nil)
 func TestEnclosesRuleAnchorsIsEmpty(t *testing.T) {
 	t.Parallel()
 
-	anchors, err := enclosesRule{}.Anchors(context.Background(), entities.Snapshot{}, nil)
+	anchors, err := Encloses{}.Anchors(context.Background(), entities.Snapshot{}, nil)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -168,7 +168,7 @@ func TestEnclosesRuleNoTypesInFileSkipsRead(t *testing.T) {
 		{Key: entities.DeclKey{File: "misc.go", Kind: entities.KindFunc, Name: "Helper"}},
 	}
 
-	edges, err := enclosesRule{}.Edges(context.Background(), snap, decls)
+	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}

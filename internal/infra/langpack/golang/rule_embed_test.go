@@ -82,7 +82,7 @@ func TestEmbedRuleMakesTheEmbeddingDeclarationWaitForItsData(t *testing.T) {
 			decls := append(declareAll(t, NewSyntax(), root, []string{embedGo}), data...)
 			snap := entities.Snapshot{Root: root, Files: paths}
 
-			edges, err := embedRule{}.Edges(context.Background(), snap, decls)
+			edges, err := Embed{}.Edges(context.Background(), snap, decls)
 			if err != nil {
 				t.Fatalf("Edges() error = %v", err)
 			}

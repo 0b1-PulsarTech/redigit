@@ -41,7 +41,7 @@ func TestFSStorePutGet(t *testing.T) {}
 		filepath.Join("store", "fs_store_test.go"),
 	})
 
-	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -135,7 +135,7 @@ func TestCacheGet(t *testing.T) {}
 		filepath.Join("store", "cache_test.go"),
 	})
 
-	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -168,7 +168,7 @@ func TestZzzUnrelated(t *testing.T) {}
 
 	decls := declareAll(t, syntax, root, []string{filepath.Join("store", "helper_test.go")})
 
-	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -239,7 +239,7 @@ func TestNormalizeProviderMessageID(t *testing.T) {}
 		filepath.Join("idnorm", "provider_message_id_test.go"),
 	})
 
-	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -288,7 +288,7 @@ func TestOtherCasesTableDriven(t *testing.T) {
 		filepath.Join("norm", "norm_test.go"),
 	})
 
-	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -338,7 +338,7 @@ func TestServerHandle(t *testing.T) {}
 		filepath.Join("svc", "handle_test.go"),
 	})
 
-	anchors, err := testAnchorRule{}.Anchors(context.Background(), snap, decls)
+	anchors, err := Anchor{}.Anchors(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}
@@ -360,7 +360,7 @@ func TestServerHandle(t *testing.T) {}
 func TestTestAnchorRuleEdgesIsEmpty(t *testing.T) {
 	t.Parallel()
 
-	edges, err := testAnchorRule{}.Edges(context.Background(), entities.Snapshot{}, nil)
+	edges, err := Anchor{}.Edges(context.Background(), entities.Snapshot{}, nil)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}

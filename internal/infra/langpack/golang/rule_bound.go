@@ -9,15 +9,15 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// boundRule ties every declaration that MENTIONS an interface-bound concrete
+// Bound ties every declaration that MENTIONS an interface-bound concrete
 // type to that type's methods; boundTypes says what binds one. Enumerating the
 // syntaxes that hand T to an interface does not converge - four rounds found
 // four - because the right question needs a type checker this layer lacks.
-type boundRule struct{}
+type Bound struct{}
 
-func (boundRule) Name() string { return "interface-bound" }
+func (Bound) Name() string { return "interface-bound" }
 
-func (boundRule) Edges(
+func (Bound) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -60,7 +60,7 @@ func (boundRule) Edges(
 	return edges, nil
 }
 
-func (boundRule) Anchors(
+func (Bound) Anchors(
 	_ context.Context,
 	_ entities.Snapshot,
 	_ []entities.Decl,

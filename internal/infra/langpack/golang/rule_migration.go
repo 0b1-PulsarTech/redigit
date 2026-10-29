@@ -8,17 +8,17 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// migrationRule orders the statements of a migration against what they build
+// Migration orders the statements of a migration against what they build
 // on: a statement after the table it adds to, a foreign key after the table
 // it points at, a statement after the extension whose type or function it
 // names, a table after the ORM type it was generated from. Placed by
 // file, 9 of 12 migrations landed ahead of their own source, one by 735
 // commits, and the 12 files arrived in a single commit at the end.
-type migrationRule struct{}
+type Migration struct{}
 
-func (migrationRule) Name() string { return "migration" }
+func (Migration) Name() string { return "migration" }
 
-func (migrationRule) Edges(
+func (Migration) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -106,7 +106,7 @@ func schemaEdge(dependent, provider entities.DeclKey) entities.Edge {
 	return entities.Edge{Dependent: dependent, Provider: provider, Reason: entities.ReasonSchema}
 }
 
-func (migrationRule) Anchors(
+func (Migration) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,

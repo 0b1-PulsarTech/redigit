@@ -8,16 +8,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// assertionRule ties a compile-time interface assertion to the methods that
+// Assertion ties a compile-time interface assertion to the methods that
 // make it hold. "var _ I = (*T)(nil)" names T and no method, so a reference
 // query sees T alone - but the line compiles only once EVERY method I demands
 // exists, and a method with no caller has nothing else pulling it forward.
 // That failed 224 trees with "cannot use (*factEqualsRule)(nil)".
-type assertionRule struct{}
+type Assertion struct{}
 
-func (assertionRule) Name() string { return "interface-assertion" }
+func (Assertion) Name() string { return "interface-assertion" }
 
-func (assertionRule) Edges(
+func (Assertion) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -49,7 +49,7 @@ func (assertionRule) Edges(
 	return edges, nil
 }
 
-func (assertionRule) Anchors(
+func (Assertion) Anchors(
 	_ context.Context,
 	_ entities.Snapshot,
 	_ []entities.Decl,
