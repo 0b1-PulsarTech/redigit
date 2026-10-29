@@ -12,7 +12,14 @@ import (
 
 var errVirtualForm = errors.New("--virtual wants ID=PATH")
 
-func parse(args []string) (bootstrap.Config, int, error) {
+func newFlagSet() *flag.FlagSet {
+	set := flag.NewFlagSet("redigit", flag.ContinueOnError)
+	set.SetOutput(io.Discard)
+
+	return set
+}
+
+func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 	cfg := bootstrap.Defaults()
 
 	var (
@@ -23,8 +30,6 @@ func parse(args []string) (bootstrap.Config, int, error) {
 		far          int
 	)
 
-	set := flag.NewFlagSet("redigit", flag.ContinueOnError)
-	set.SetOutput(io.Discard)
 	set.StringVar(&cfg.Repo, "repo", "", "repository to read")
 	set.StringVar(&cfg.Rev, "rev", cfg.Rev, "revision to read")
 	set.StringVar(&tags, "tags", "", "comma-separated build tags")

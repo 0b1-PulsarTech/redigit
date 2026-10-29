@@ -75,7 +75,7 @@ func TestParse(t *testing.T) {
 func checkParseResult(t *testing.T, testCase parseTestCase) {
 	t.Helper()
 
-	cfg, far, err := parse(testCase.args)
+	cfg, far, err := parse(newFlagSet(), testCase.args)
 
 	if testCase.wantErr {
 		if !errors.Is(err, ErrUsage) {
@@ -185,7 +185,7 @@ func TestParseVirtual(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg, _, err := parse(testCase.args)
+			cfg, _, err := parse(newFlagSet(), testCase.args)
 
 			if testCase.wantErr {
 				if !errors.Is(err, ErrUsage) {

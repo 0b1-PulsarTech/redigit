@@ -42,7 +42,7 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, star
 
 	command := args[0]
 
-	cfg, far, err := parse(args[1:])
+	cfg, far, err := parse(newFlagSet(), args[1:])
 	if err != nil {
 		_, _ = fmt.Fprint(stderr, usage)
 
