@@ -8,9 +8,9 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-func unbornProviders(
+func UnbornProviders(
 	graph entities.Graph,
-	own ownership,
+	own Ownership,
 	members []entities.DeclKey,
 	born map[entities.DeclKey]bool,
 ) []entities.DeclKey {
@@ -53,7 +53,7 @@ func unbornProviders(
 		}
 	}
 
-	return sortedKeys(wanted)
+	return SortedKeys(wanted)
 }
 
 // sharedIndex is the shared-kernel structure a single unbornProviders walk
@@ -66,7 +66,7 @@ type sharedIndex struct {
 	subjects map[entities.DeclKey][]entities.DeclKey
 	// walked is what the walk has taken into the shared commit so far.
 	walked map[entities.DeclKey]bool
-	own    ownership
+	own    Ownership
 }
 
 // siblingsOf is everything current's place in the shared kernel drags along
@@ -74,7 +74,7 @@ type sharedIndex struct {
 // anchored to it that is itself already safe to pull.
 func (index sharedIndex) siblingsOf(
 	graph entities.Graph,
-	own ownership,
+	own Ownership,
 	born map[entities.DeclKey]bool,
 	current entities.DeclKey,
 ) []entities.DeclKey {
@@ -86,7 +86,7 @@ func (index sharedIndex) siblingsOf(
 	foreign := index.takesForeign(own, current)
 
 	for _, edge := range graph.Needs(current) {
-		if (foreign || own.owner[edge.Provider] == reach.SharedFeature) &&
+		if (foreign || own.Owner[edge.Provider] == reach.SharedFeature) &&
 			!driftsToTest(graph, edge) && !entities.FillsInterface(graph, edge) {
 			out = append(out, edge.Provider)
 		}
@@ -103,7 +103,7 @@ func (index sharedIndex) siblingsOf(
 	// early is safe only once its own needs are already met (born, or shared
 	// and walked by this same closure).
 	for _, test := range index.testsOf[current] {
-		if own.owner[test] == reach.SharedFeature && index.safeToPull(graph, test, born) {
+		if own.Owner[test] == reach.SharedFeature && index.safeToPull(graph, test, born) {
 			out = append(out, test)
 		}
 	}
@@ -119,7 +119,7 @@ func (index sharedIndex) packageOf(
 	current entities.DeclKey,
 ) []entities.DeclKey {
 	decl, found := graph.Decl(current)
-	if !found || index.own.owner[current] != reach.SharedFeature {
+	if !found || index.own.Owner[current] != reach.SharedFeature {
 		return nil
 	}
 
@@ -138,7 +138,7 @@ func testAnchors(graph entities.Graph) map[entities.DeclKey][]entities.DeclKey {
 	return out
 }
 
-func remaining(graph entities.Graph, born map[entities.DeclKey]bool) []entities.DeclKey {
+func Remaining(graph entities.Graph, born map[entities.DeclKey]bool) []entities.DeclKey {
 	left := map[entities.DeclKey]bool{}
 
 	for _, decl := range graph.Decls() {
@@ -147,10 +147,10 @@ func remaining(graph entities.Graph, born map[entities.DeclKey]bool) []entities.
 		}
 	}
 
-	return sortedKeys(left)
+	return SortedKeys(left)
 }
 
-func sortedKeys(set map[entities.DeclKey]bool) []entities.DeclKey {
+func SortedKeys(set map[entities.DeclKey]bool) []entities.DeclKey {
 	out := make([]entities.DeclKey, 0, len(set))
 	for key := range set {
 		out = append(out, key)
@@ -164,7 +164,7 @@ func sortedKeys(set map[entities.DeclKey]bool) []entities.DeclKey {
 	return out
 }
 
-func markBorn(born map[entities.DeclKey]bool, keys []entities.DeclKey) {
+func MarkBorn(born map[entities.DeclKey]bool, keys []entities.DeclKey) {
 	for _, key := range keys {
 		born[key] = true
 	}

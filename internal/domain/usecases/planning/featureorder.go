@@ -7,7 +7,7 @@ import (
 
 // featureNeeds is which features have to be built before which. A feature needs
 // another when any declaration it owns waits on a declaration the other owns.
-func featureNeeds(graph entities.Graph, own ownership) map[FeatureID]map[FeatureID]bool {
+func featureNeeds(graph entities.Graph, own Ownership) map[FeatureID]map[FeatureID]bool {
 	needs := map[FeatureID]map[FeatureID]bool{}
 	behind := map[entities.DeclKey]map[FeatureID]bool{}
 
@@ -24,13 +24,13 @@ func featureNeeds(graph entities.Graph, own ownership) map[FeatureID]map[Feature
 	}
 
 	for _, edge := range graph.Edges() {
-		from := own.owner[edge.Dependent]
-		add(from, own.owner[edge.Provider])
+		from := own.Owner[edge.Dependent]
+		add(from, own.Owner[edge.Provider])
 
 		// What a deferred declaration needs is not shared by construction: it
 		// was shared by being deferred. A feature reaching it is built after
 		// the features it waits for.
-		if own.deferred[edge.Provider] && from != reach.SharedFeature {
+		if own.Deferred[edge.Provider] && from != reach.SharedFeature {
 			for feature := range featuresBehind(graph, own, edge.Provider, behind) {
 				add(from, feature)
 			}
@@ -44,7 +44,7 @@ func featureNeeds(graph entities.Graph, own ownership) map[FeatureID]map[Feature
 // reached through other deferred declarations.
 func featuresBehind(
 	graph entities.Graph,
-	own ownership,
+	own Ownership,
 	start entities.DeclKey,
 	memo map[entities.DeclKey]map[FeatureID]bool,
 ) map[FeatureID]bool {
@@ -67,13 +67,13 @@ func featuresBehind(
 
 			seen[edge.Provider] = true
 
-			if owner := own.owner[edge.Provider]; owner != reach.SharedFeature {
+			if owner := own.Owner[edge.Provider]; owner != reach.SharedFeature {
 				out[owner] = true
 
 				continue
 			}
 
-			if own.deferred[edge.Provider] {
+			if own.Deferred[edge.Provider] {
 				queue = append(queue, edge.Provider)
 			}
 		}
@@ -88,10 +88,10 @@ func featuresBehind(
 // is the tie-break between features neither of which needs the other, so a
 // rebuilt history still follows the original chronology wherever the dependency
 // graph leaves the choice open.
-func earliest(own ownership, order entities.Ordering) map[FeatureID]entities.Position {
+func earliest(own Ownership, order entities.Ordering) map[FeatureID]entities.Position {
 	out := map[FeatureID]entities.Position{}
 
-	for key, feature := range own.owner {
+	for key, feature := range own.Owner {
 		at := order.Of(key)
 		if !at.IsSet() {
 			continue

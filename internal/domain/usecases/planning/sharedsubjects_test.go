@@ -24,7 +24,7 @@ func TestSharedSubjectsDropsWhatOnlyAFeatureReads(t *testing.T) {
 		},
 	)
 
-	own := ownership{owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
 		test.Key:     reach.SharedFeature,
 		entries.Key:  reach.SharedFeature,
 		declares.Key: "webrouters",
@@ -53,12 +53,12 @@ func TestReadyDeferredDoesNotWaitForASubjectOnlyAFeatureReads(t *testing.T) {
 		},
 	)
 
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			test.Key: reach.SharedFeature, entries.Key: reach.SharedFeature, declares.Key: "webrouters",
 		},
-		deferred: reach.Wiring{test.Key: true},
-		roots:    reach.Wiring{},
+		Deferred: reach.Wiring{test.Key: true},
+		Roots:    reach.Wiring{},
 	}
 
 	born := map[entities.DeclKey]bool{entries.Key: true}

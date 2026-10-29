@@ -9,7 +9,7 @@ import (
 func (p Planner) emit(
 	graph entities.Graph,
 	order entities.Ordering,
-	own ownership,
+	own Ownership,
 	features []FeatureID,
 ) entities.Plan {
 	byFeature := groupByFeature(graph, own)
@@ -26,7 +26,7 @@ func (p Planner) emit(
 		// explains, and the declarations in it are read for the first time
 		// hundreds of commits later.
 		fresh := map[entities.DeclKey]bool{}
-		shared, late := splitLate(graph, unbornProviders(graph, own, members, born), members)
+		shared, late := splitLate(graph, UnbornProviders(graph, own, members, born), members)
 
 		if len(shared) > 0 {
 			plan.Commits = append(
@@ -39,8 +39,8 @@ func (p Planner) emit(
 				})...,
 			)
 
-			markBorn(born, shared)
-			markBorn(fresh, shared)
+			MarkBorn(born, shared)
+			MarkBorn(fresh, shared)
 		}
 
 		// A deferred statement walked in ahead of its feature took the
@@ -51,8 +51,8 @@ func (p Planner) emit(
 
 		members = append(members, late...)
 
-		markBorn(born, members)
-		markBorn(fresh, members)
+		MarkBorn(born, members)
+		MarkBorn(fresh, members)
 
 		// A test is born with the code it exercises when the feature completes
 		// that code, so the suite and its subject are read together.
@@ -68,7 +68,7 @@ func (p Planner) emit(
 			})...,
 		)
 
-		markBorn(born, owned)
+		MarkBorn(born, owned)
 
 		plan.Commits = append(
 			plan.Commits,
@@ -83,11 +83,11 @@ func (p Planner) emit(
 	return plan
 }
 
-func groupByFeature(graph entities.Graph, own ownership) map[FeatureID][]entities.DeclKey {
+func groupByFeature(graph entities.Graph, own Ownership) map[FeatureID][]entities.DeclKey {
 	out := map[FeatureID][]entities.DeclKey{}
 
 	for _, decl := range graph.Decls() {
-		feature := own.owner[decl.Key]
+		feature := own.Owner[decl.Key]
 		out[feature] = append(out[feature], decl.Key)
 	}
 
@@ -106,7 +106,7 @@ type births struct {
 func (p Planner) cutReady(
 	graph entities.Graph,
 	order entities.Ordering,
-	own ownership,
+	own Ownership,
 	feature FeatureID,
 	seen births,
 ) []entities.PlannedCommit {
@@ -122,9 +122,9 @@ func (p Planner) cutReady(
 			break
 		}
 
-		round := append(unbornProviders(graph, own, ready, born), ready...)
-		markBorn(born, round)
-		markBorn(seen.fresh, round)
+		round := append(UnbornProviders(graph, own, ready, born), ready...)
+		MarkBorn(born, round)
+		MarkBorn(seen.fresh, round)
 
 		keys = append(keys, round...)
 	}

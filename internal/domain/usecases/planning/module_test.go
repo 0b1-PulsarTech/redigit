@@ -38,10 +38,10 @@ func TestAssignSharesALibraryWhole(t *testing.T) {
 		},
 		nil,
 	)
-	own := assign(graph)
+	own := Assign(graph)
 
 	for _, member := range []entities.Decl{first, second} {
-		if got := own.owner[member.Key]; got != reach.SharedFeature {
+		if got := own.Owner[member.Key]; got != reach.SharedFeature {
 			t.Fatalf(
 				"%s owner = %q, want the shared bucket: a library has no capability",
 				member.Key,
@@ -50,7 +50,7 @@ func TestAssignSharesALibraryWhole(t *testing.T) {
 		}
 	}
 
-	if got := own.owner[handler.Key]; got != "app/api" {
+	if got := own.Owner[handler.Key]; got != "app/api" {
 		t.Fatalf("handler owner = %q, want its own feature", got)
 	}
 }
@@ -60,19 +60,19 @@ func TestDeferLibraryEntries(t *testing.T) {
 
 	free := decl("lib/a.go", "A", "lib")
 	owned := decl("lib/b.go", "B", "lib")
-	own := ownership{
-		owner:    map[entities.DeclKey]FeatureID{free.Key: reach.SharedFeature, owned.Key: "f"},
-		deferred: reach.Wiring{},
-		loose:    reach.Wiring{},
+	own := Ownership{
+		Owner:    map[entities.DeclKey]FeatureID{free.Key: reach.SharedFeature, owned.Key: "f"},
+		Deferred: reach.Wiring{},
+		Loose:    reach.Wiring{},
 	}
 
 	deferLibraryEntries(own, []entities.Decl{free, owned})
 
-	if !own.deferred[free.Key] || !own.loose[free.Key] {
+	if !own.Deferred[free.Key] || !own.Loose[free.Key] {
 		t.Fatalf("the unowned entry %s is not deferred as loose", free.Key)
 	}
 
-	if own.deferred[owned.Key] {
+	if own.Deferred[owned.Key] {
 		t.Fatalf("the owned entry %s was deferred", owned.Key)
 	}
 }

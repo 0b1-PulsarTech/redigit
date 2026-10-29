@@ -23,7 +23,7 @@ func TestAnchorHelpersKeepsAHelperOnlyWithAChosenReader(t *testing.T) {
 		},
 		nil,
 	)
-	own := ownership{owner: map[entities.DeclKey]FeatureID{}}
+	own := Ownership{Owner: map[entities.DeclKey]FeatureID{}}
 	pool := map[entities.DeclKey]bool{
 		prod.Key: true, chosenTest.Key: true, read.Key: true, unread.Key: true, nested.Key: true,
 	}

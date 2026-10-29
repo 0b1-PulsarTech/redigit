@@ -10,14 +10,14 @@ import (
 // it. One that needs a ready root waits for that root's turn.
 func ownTests(
 	graph entities.Graph,
-	own ownership,
+	own Ownership,
 	born, fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := reach.TestSubjects(graph)
 	taken := map[entities.DeclKey]bool{}
 
 	for _, key := range readyDeferred(graph, own, born, fresh) {
-		if !own.roots[key] && !born[key] {
+		if !own.Roots[key] && !born[key] {
 			taken[key] = true
 		}
 	}
@@ -27,7 +27,7 @@ func ownTests(
 
 		for key := range taken {
 			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
-				return !born[provider] && !taken[provider] && own.deferred[provider]
+				return !born[provider] && !taken[provider] && own.Deferred[provider]
 			}) {
 				continue
 			}
@@ -38,5 +38,5 @@ func ownTests(
 		}
 	}
 
-	return sortedKeys(taken)
+	return SortedKeys(taken)
 }

@@ -30,18 +30,18 @@ func TestOwnTests(t *testing.T) {
 		nil,
 	)
 
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			code.Key: "a", later.Key: "b", root.Key: reach.SharedFeature,
 			testCode.Key: reach.SharedFeature, testLater.Key: reach.SharedFeature, testRoot.Key: reach.SharedFeature,
 		},
-		deferred: reach.Wiring{
+		Deferred: reach.Wiring{
 			root.Key:      true,
 			testCode.Key:  true,
 			testLater.Key: true,
 			testRoot.Key:  true,
 		},
-		roots: reach.Wiring{root.Key: true},
+		Roots: reach.Wiring{root.Key: true},
 	}
 
 	born := map[entities.DeclKey]bool{code.Key: true}

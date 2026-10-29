@@ -23,12 +23,12 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 		},
 		nil,
 	)
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			repo.Key: reach.SharedFeature, build.Key: "wire/di", elsewhere.Key: "wire/di",
 			plain.Key: "wire/di", checkTest.Key: "wire/di",
 		},
-		deferred: reach.Wiring{},
+		Deferred: reach.Wiring{},
 	}
 
 	shareCompanions(graph, own)
@@ -48,7 +48,7 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := own.owner[testCase.decl.Key]; got != testCase.want {
+			if got := own.Owner[testCase.decl.Key]; got != testCase.want {
 				t.Fatalf("owner = %q, want %q", got, testCase.want)
 			}
 		})

@@ -23,10 +23,10 @@ func TestReadyDeferredIgnoresAnInterfaceATypeOnlyFills(t *testing.T) {
 		},
 		nil,
 	)
-	own := ownership{
-		owner:    map[entities.DeclKey]FeatureID{subject.Key: "a", port.Key: "b"},
-		deferred: reach.Wiring{double.Key: true},
-		roots:    reach.Wiring{},
+	own := Ownership{
+		Owner:    map[entities.DeclKey]FeatureID{subject.Key: "a", port.Key: "b"},
+		Deferred: reach.Wiring{double.Key: true},
+		Roots:    reach.Wiring{},
 	}
 	born := map[entities.DeclKey]bool{subject.Key: true}
 	fresh := map[entities.DeclKey]bool{subject.Key: true}

@@ -12,7 +12,7 @@ func TestAssign(t *testing.T) {
 	t.Parallel()
 
 	graph, _, named := twoFeatures()
-	own := assign(graph)
+	own := Assign(graph)
 
 	testCases := []struct {
 		name      string
@@ -36,11 +36,11 @@ func TestAssign(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := own.owner[testCase.decl.Key]; got != testCase.wantOwner {
+			if got := own.Owner[testCase.decl.Key]; got != testCase.wantOwner {
 				t.Fatalf("owner = %q, want %q", got, testCase.wantOwner)
 			}
 
-			if got := own.reach[testCase.decl.Key]; got != testCase.wantReach {
+			if got := own.Reach[testCase.decl.Key]; got != testCase.wantReach {
 				t.Fatalf("reach = %d, want %d", got, testCase.wantReach)
 			}
 		})
@@ -56,7 +56,7 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 	loopA := decl("z/one.go", "One", "z")
 	loopB := decl("z/two.go", "Two", "z")
 
-	own := assign(entities.NewGraph(
+	own := Assign(entities.NewGraph(
 		[]entities.Decl{entry, loopA, loopB},
 		[]entities.Edge{needs(loopA, loopB), needs(loopB, loopA)},
 		nil,
@@ -65,11 +65,11 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 	for _, key := range []entities.DeclKey{loopA.Key, loopB.Key} {
 		// Dropping it would leave a hole in the final tree that the invariant
 		// only catches once every explanation for it is gone.
-		if _, found := own.reach[key]; !found {
+		if _, found := own.Reach[key]; !found {
 			t.Fatalf("%s was dropped instead of marked shared", key)
 		}
 
-		if got := own.owner[key]; got != reach.SharedFeature {
+		if got := own.Owner[key]; got != reach.SharedFeature {
 			t.Fatalf("%s owner = %q, want the shared bucket", key, got)
 		}
 	}
@@ -83,7 +83,7 @@ func TestAssignHasNoSharingThreshold(t *testing.T) {
 
 	graph, _, named := twoFeatures()
 
-	if got := assign(graph).owner[named["kernel"].Key]; got != reach.SharedFeature {
+	if got := Assign(graph).Owner[named["kernel"].Key]; got != reach.SharedFeature {
 		t.Fatalf("owner = %q, want the shared bucket", got)
 	}
 }
@@ -107,17 +107,17 @@ func TestAssignMergesAnAtomIntoOneOwner(t *testing.T) {
 		readerA := decl("a/h.go", "A", "a")
 		readerB := decl("b/h.go", "B", "b")
 
-		own := assign(entities.NewGraph(
+		own := Assign(entities.NewGraph(
 			[]entities.Decl{typeA, typeB, readerA, readerB},
 			[]entities.Edge{needs(readerA, typeA), needs(readerB, typeB)},
 			nil,
 		))
 
-		if got := own.owner[typeA.Key]; got != reach.SharedFeature {
+		if got := own.Owner[typeA.Key]; got != reach.SharedFeature {
 			t.Fatalf("TypeA owner = %q, want the shared bucket", got)
 		}
 
-		if got := own.owner[typeB.Key]; got != reach.SharedFeature {
+		if got := own.Owner[typeB.Key]; got != reach.SharedFeature {
 			t.Fatalf("TypeB owner = %q, want the shared bucket", got)
 		}
 	})
@@ -129,17 +129,17 @@ func TestAssignMergesAnAtomIntoOneOwner(t *testing.T) {
 		readerA := decl("a/one.go", "One", "a")
 		readerA2 := decl("a/two.go", "Two", "a")
 
-		own := assign(entities.NewGraph(
+		own := Assign(entities.NewGraph(
 			[]entities.Decl{typeA, typeB, readerA, readerA2},
 			[]entities.Edge{needs(readerA, typeA), needs(readerA2, typeB)},
 			nil,
 		))
 
-		if got := own.owner[typeA.Key]; got != "a" {
+		if got := own.Owner[typeA.Key]; got != "a" {
 			t.Fatalf("TypeA owner = %q, want %q", got, "a")
 		}
 
-		if got := own.owner[typeB.Key]; got != "a" {
+		if got := own.Owner[typeB.Key]; got != "a" {
 			t.Fatalf("TypeB owner = %q, want %q", got, "a")
 		}
 	})
@@ -150,8 +150,8 @@ func TestAssignOrdersFeaturesDeterministically(t *testing.T) {
 
 	graph, _, _ := twoFeatures()
 
-	first := assign(graph).order
-	second := assign(graph).order
+	first := Assign(graph).Order
+	second := Assign(graph).Order
 
 	if !slices.Equal(first, second) {
 		t.Fatalf("feature order is not stable: %v then %v", first, second)

@@ -44,9 +44,9 @@ func readsRoots(
 	return reads
 }
 
-// productOf is the root of the product a feature serves; a feature serving none
+// ProductOf is the root of the product a feature serves; a feature serving none
 // is its own.
-func productOf(group map[FeatureID]FeatureID, feature FeatureID) FeatureID {
+func ProductOf(group map[FeatureID]FeatureID, feature FeatureID) FeatureID {
 	if root, found := group[feature]; found {
 		return root
 	}

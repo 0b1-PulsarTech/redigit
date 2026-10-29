@@ -10,12 +10,12 @@ import (
 // be born after its reader. Atoms, tests and test helpers escape the reach
 // count, so a provider of a shared declaration is shared too, and an atom goes
 // whole.
-func shareDependencies(graph entities.Graph, own ownership) {
+func shareDependencies(graph entities.Graph, own Ownership) {
 	atoms := reach.AtomGroups(graph)
 	queue := make([]entities.DeclKey, 0, graph.Len())
 
 	for _, decl := range graph.Decls() {
-		if own.owner[decl.Key] == reach.SharedFeature && !own.deferred[decl.Key] {
+		if own.Owner[decl.Key] == reach.SharedFeature && !own.Deferred[decl.Key] {
 			queue = append(queue, decl.Key)
 		}
 	}
@@ -35,13 +35,13 @@ func shareDependencies(graph entities.Graph, own ownership) {
 		}
 
 		for _, key := range provided {
-			owner, known := own.owner[key]
+			owner, known := own.Owner[key]
 			if !known || owner == reach.SharedFeature {
 				continue
 			}
 
-			own.owner[key] = reach.SharedFeature
-			own.reach[key] = max(own.reach[key], own.reach[current])
+			own.Owner[key] = reach.SharedFeature
+			own.Reach[key] = max(own.Reach[key], own.Reach[current])
 
 			queue = append(queue, key)
 		}
@@ -52,10 +52,10 @@ func shareDependencies(graph entities.Graph, own ownership) {
 // the providers a feature owns. A statement of the assembly is deferred, so
 // assign never shared what it reads; walked in ahead of its feature, it would
 // be born before them, and so would whatever those read in turn.
-func (index sharedIndex) takesForeign(own ownership, current entities.DeclKey) bool {
-	if own.roots[current] {
+func (index sharedIndex) takesForeign(own Ownership, current entities.DeclKey) bool {
+	if own.Roots[current] {
 		return true
 	}
 
-	return index.walked[current] && own.owner[current] != reach.SharedFeature
+	return index.walked[current] && own.Owner[current] != reach.SharedFeature
 }

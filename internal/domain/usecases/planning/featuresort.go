@@ -60,7 +60,7 @@ func sortFeatures(
 	rules featureRules,
 ) (sorted []FeatureID, cyclic []FeatureID) {
 	needs, waits, at, group, cost := rules.needs, rules.waits, rules.at, rules.group, rules.cost
-	product := func(feature FeatureID) FeatureID { return productOf(group, feature) }
+	product := func(feature FeatureID) FeatureID { return ProductOf(group, feature) }
 
 	readers := productReaders(waits, product)
 	pending := slices.Clone(features)

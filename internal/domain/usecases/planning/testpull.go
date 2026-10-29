@@ -36,7 +36,7 @@ func (index sharedIndex) safeToPull(
 			switch {
 			case birth.IsSoft(edge.Reason) || seen[provider] || born[provider]:
 				continue
-			case index.own.owner[provider] != reach.SharedFeature:
+			case index.own.Owner[provider] != reach.SharedFeature:
 				return false
 			}
 

@@ -13,7 +13,7 @@ import (
 // needs only shared code is ready at the first feature and drags that code in.
 func readyDeferred(
 	graph entities.Graph,
-	own ownership,
+	own Ownership,
 	born map[entities.DeclKey]bool,
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
@@ -21,7 +21,7 @@ func readyDeferred(
 	atoms := reach.AtomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
-	for key := range own.deferred {
+	for key := range own.Deferred {
 		if !born[key] {
 			ready[key] = true
 		}
@@ -39,11 +39,11 @@ func readyDeferred(
 		switch {
 		case born[provider]:
 			return false
-		case own.deferred[provider]:
+		case own.Deferred[provider]:
 			return !ready[provider]
-		case own.owner[provider] != reach.SharedFeature:
+		case own.Owner[provider] != reach.SharedFeature:
 			return true
-		case own.reach[provider] == 0:
+		case own.Reach[provider] == 0:
 			return false
 		default:
 			return strict && !isManifestKey(graph, provider) ||
@@ -55,7 +55,7 @@ func readyDeferred(
 		changed = false
 
 		for key := range ready {
-			strict := !own.roots[key]
+			strict := !own.Roots[key]
 
 			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
 				return waits(provider, strict)
@@ -69,7 +69,7 @@ func readyDeferred(
 		}
 	}
 
-	return sortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
+	return SortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
 }
 
 func waitsOn(
@@ -106,11 +106,11 @@ func atomMembers(
 // the others in with everything they need.
 func atomWaits(
 	members []entities.DeclKey,
-	own ownership,
+	own Ownership,
 	born, ready map[entities.DeclKey]bool,
 ) bool {
 	for _, member := range members {
-		if own.deferred[member] && !born[member] && !ready[member] {
+		if own.Deferred[member] && !born[member] && !ready[member] {
 			return true
 		}
 	}
@@ -120,14 +120,14 @@ func atomWaits(
 
 // usedBeyondWiring is whether a shared declaration has a consumer that is not
 // itself wiring or a test, a consumer some feature will be built for.
-func usedBeyondWiring(graph entities.Graph, own ownership, key entities.DeclKey) bool {
+func usedBeyondWiring(graph entities.Graph, own Ownership, key entities.DeclKey) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
 		if !found || entities.IsTestSide(consumer) || entities.IsStructural(edge.Reason) {
 			continue
 		}
 
-		if !own.roots[edge.Dependent] && !own.deferred[edge.Dependent] {
+		if !own.Roots[edge.Dependent] && !own.Deferred[edge.Dependent] {
 			return true
 		}
 	}

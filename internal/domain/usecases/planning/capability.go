@@ -23,10 +23,10 @@ type Capabilities map[entities.DeclKey]FeatureID
 // map names belongs to exactly one slice, so nothing is shared and nothing is
 // unreached; a declaration the map does not name stays SharedFeature, which is
 // where the unreached already went.
-func ownershipFrom(capabilities Capabilities, graph entities.Graph) ownership {
-	own := ownership{
-		owner: make(map[entities.DeclKey]FeatureID, graph.Len()),
-		reach: make(map[entities.DeclKey]int, graph.Len()),
+func ownershipFrom(capabilities Capabilities, graph entities.Graph) Ownership {
+	own := Ownership{
+		Owner: make(map[entities.DeclKey]FeatureID, graph.Len()),
+		Reach: make(map[entities.DeclKey]int, graph.Len()),
 	}
 
 	seen := map[FeatureID]bool{}
@@ -37,17 +37,17 @@ func ownershipFrom(capabilities Capabilities, graph entities.Graph) ownership {
 			feature = reach.SharedFeature
 		}
 
-		own.owner[decl.Key] = feature
-		own.reach[decl.Key] = 1
+		own.Owner[decl.Key] = feature
+		own.Reach[decl.Key] = 1
 
 		if feature != reach.SharedFeature && !seen[feature] {
 			seen[feature] = true
 
-			own.order = append(own.order, feature)
+			own.Order = append(own.Order, feature)
 		}
 	}
 
-	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
+	slices.SortFunc(own.Order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
 
 	return own
 }
@@ -60,7 +60,7 @@ func ownershipFrom(capabilities Capabilities, graph entities.Graph) ownership {
 func (p Planner) emitByCapability(
 	graph entities.Graph,
 	order entities.Ordering,
-	own ownership,
+	own Ownership,
 ) entities.Plan {
 	atoms := make(map[entities.DeclKey]string, graph.Len())
 	keys := make([]entities.DeclKey, 0, graph.Len())
@@ -80,7 +80,7 @@ func (p Planner) emitByCapability(
 			return FeatureID(atom)
 		}
 
-		return own.owner[key]
+		return own.Owner[key]
 	})
 
 	run := &commitRun{
@@ -90,7 +90,7 @@ func (p Planner) emitByCapability(
 	}
 
 	for _, key := range keys {
-		run.take(key, own.owner[key], atoms[key], weightOf(graph, key))
+		run.take(key, own.Owner[key], atoms[key], weightOf(graph, key))
 	}
 
 	run.flush()

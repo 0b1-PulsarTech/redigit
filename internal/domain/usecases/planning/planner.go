@@ -65,24 +65,24 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 
 	graph, order = testplace.AnchorTests(graph, order)
 	p.sizes = generatedSizes(graph)
-	own := assign(graph)
+	own := Assign(graph)
 
 	// No entry point means no declaration is unconsumed, which only happens
 	// when a cycle spans the whole graph. Emitting one flat layer commit
 	// would look like success and would throw away every vertical slice.
-	if len(own.order) == 0 {
+	if len(own.Order) == 0 {
 		return entities.Plan{}, fmt.Errorf(
 			"%w: no entry point in %d declarations; the graph is entirely cyclic",
 			apperr.ErrIncomplete, graph.Len(),
 		)
 	}
 
-	sorted, cyclic := sortFeatures(own.order, featureRules{
+	sorted, cyclic := sortFeatures(own.Order, featureRules{
 		needs: featureNeeds(graph, own),
-		waits: own.waits,
+		waits: own.Waits,
 		at:    earliest(own, order),
-		group: own.group,
-		cost:  own.cost,
+		group: own.Group,
+		cost:  own.Cost,
 	})
 
 	// Reachability ownership should make this unreachable: if a declaration

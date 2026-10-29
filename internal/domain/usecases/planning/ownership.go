@@ -9,78 +9,78 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/testplace"
 )
 
-// ownership is which feature each declaration belongs to, and how many features
+// Ownership is which feature each declaration belongs to, and how many features
 // reach it. The count is the whole decision: a declaration reached by one
 // feature is part of that feature and is born with it; one reached by many is
 // infrastructure and has to be born before all of them.
-type ownership struct {
-	owner map[entities.DeclKey]FeatureID
-	reach map[entities.DeclKey]int
-	order []FeatureID
-	// deferred is the wiring and its tests: owned only once the features are
+type Ownership struct {
+	Owner map[entities.DeclKey]FeatureID
+	Reach map[entities.DeclKey]int
+	Order []FeatureID
+	// Deferred is the wiring and its tests: owned only once the features are
 	// in build order, by the last one they need.
-	deferred reach.Wiring
-	roots    reach.Wiring
-	// support is the code only other packages' tests read; it is deferred and
+	Deferred reach.Wiring
+	Roots    reach.Wiring
+	// Support is the code only other packages' tests read; it is deferred and
 	// born with the first test that needs it.
-	support reach.Wiring
-	// loose is what nothing reads, deferred and born once what it names exists:
+	Support reach.Wiring
+	// Loose is what nothing reads, deferred and born once what it names exists:
 	// the manifest lines and the entries of a library.
-	loose reach.Wiring
+	Loose reach.Wiring
 	// packages is, per unit, the shared declarations of production code that no
 	// test and no deferral holds back.
 	packages map[entities.UnitID][]entities.DeclKey
-	// group is the product a feature belongs to, named by the module-root
+	// Group is the product a feature belongs to, named by the module-root
 	// feature it serves, so the features of one product are ordered together.
-	group map[FeatureID]FeatureID
-	// waits is the module roots a feature should come after.
-	waits map[FeatureID]map[FeatureID]bool
-	// cost is how many declarations a feature needs in all, its own and the
+	Group map[FeatureID]FeatureID
+	// Waits is the module roots a feature should come after.
+	Waits map[FeatureID]map[FeatureID]bool
+	// Cost is how many declarations a feature needs in all, its own and the
 	// shared ones, so the smallest working feature can come first.
-	cost map[FeatureID]int
+	Cost map[FeatureID]int
 }
 
-// assign walks back from every entry point and counts, per declaration, how
+// Assign walks back from every entry point and counts, per declaration, how
 // many distinct features can reach it. Counting insiders would pin every
 // package to the instant the source history happened to create it.
-func assign(graph entities.Graph) ownership {
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{},
-		reach: map[entities.DeclKey]int{},
-		group: map[FeatureID]FeatureID{},
-		cost:  map[FeatureID]int{},
-		roots: reach.CodeWiring(graph, entities.FindWiring(graph)),
-		loose: reach.LooseLines(graph),
+func Assign(graph entities.Graph) Ownership {
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{},
+		Reach: map[entities.DeclKey]int{},
+		Group: map[FeatureID]FeatureID{},
+		Cost:  map[FeatureID]int{},
+		Roots: reach.CodeWiring(graph, entities.FindWiring(graph)),
+		Loose: reach.LooseLines(graph),
 	}
 
-	own.support = testplace.TestSupport(graph)
-	own.deferred = reach.DeferTests(graph, own.roots, own.support)
+	own.Support = testplace.TestSupport(graph)
+	own.Deferred = reach.DeferTests(graph, own.Roots, own.Support)
 
-	entries := reach.EntryPoints(graph, own.roots)
+	entries := reach.EntryPoints(graph, own.Roots)
 	walk := walkEntries(graph, own, entries)
 
 	unionAtoms(graph, walk.reachedBy)
-	own.group = joinProducts(walk.reachedBy, walk.rootHeads)
-	own.order = walk.order
+	own.Group = joinProducts(walk.reachedBy, walk.rootHeads)
+	own.Order = walk.order
 
 	for key, features := range walk.reachedBy {
 		for feature := range features {
-			own.cost[feature]++
+			own.Cost[feature]++
 
 			if walk.built[feature] {
-				own.reach[key]++
+				own.Reach[key]++
 			}
 		}
 
-		own.owner[key] = soleOwner(features)
+		own.Owner[key] = soleOwner(features)
 
 		// The code only test support reaches has no feature to be built in.
-		if !walk.built[own.owner[key]] {
-			own.owner[key] = reach.SharedFeature
+		if !walk.built[own.Owner[key]] {
+			own.Owner[key] = reach.SharedFeature
 		}
 	}
 
-	own.waits = readsRoots(graph, own.owner, walk.rootOf)
+	own.Waits = readsRoots(graph, own.Owner, walk.rootOf)
 
 	shareUnreached(graph, own)
 
@@ -89,8 +89,8 @@ func assign(graph entities.Graph) ownership {
 
 	// What is deferred is born when it is ready, not with a feature that
 	// happens to own part of what it needs.
-	for key := range own.deferred {
-		own.owner[key] = reach.SharedFeature
+	for key := range own.Deferred {
+		own.Owner[key] = reach.SharedFeature
 	}
 
 	shareCompanions(graph, own)
@@ -99,7 +99,7 @@ func assign(graph entities.Graph) ownership {
 
 	own.packages = sharedPackages(graph, own)
 
-	slices.SortFunc(own.order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
+	slices.SortFunc(own.Order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
 
 	return own
 }
@@ -108,11 +108,11 @@ func assign(graph entities.Graph) ownership {
 // nobody consumes yet. It is shared rather than silently dropped: dropping it
 // would leave a hole in the final tree that the tree invariant catches far too
 // late to explain.
-func shareUnreached(graph entities.Graph, own ownership) {
+func shareUnreached(graph entities.Graph, own Ownership) {
 	for _, decl := range graph.Decls() {
-		if _, found := own.reach[decl.Key]; !found {
-			own.reach[decl.Key] = 0
-			own.owner[decl.Key] = reach.SharedFeature
+		if _, found := own.Reach[decl.Key]; !found {
+			own.Reach[decl.Key] = 0
+			own.Owner[decl.Key] = reach.SharedFeature
 		}
 	}
 }

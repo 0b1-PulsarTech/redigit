@@ -26,12 +26,12 @@ func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
 		nil,
 	)
 
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			plain.Key: reach.SharedFeature, sibling.Key: reach.SharedFeature, generated.Key: reach.SharedFeature,
 			table.Key: reach.SharedFeature, owned.Key: "f", held.Key: reach.SharedFeature,
 		},
-		deferred: reach.Wiring{held.Key: true},
+		Deferred: reach.Wiring{held.Key: true},
 	}
 
 	got := sharedPackages(graph, own)["lib"]

@@ -18,7 +18,7 @@ type entryWalk struct {
 	order []FeatureID
 }
 
-func walkEntries(graph entities.Graph, own ownership, entries []entities.Decl) entryWalk {
+func walkEntries(graph entities.Graph, own Ownership, entries []entities.Decl) entryWalk {
 	walk := entryWalk{
 		reachedBy:    map[entities.DeclKey]map[FeatureID]bool{},
 		entryModules: map[string]bool{},
@@ -30,12 +30,12 @@ func walkEntries(graph entities.Graph, own ownership, entries []entities.Decl) e
 	for _, entry := range entries {
 		feature := reach.FeatureOf(entry)
 
-		if !own.support[entry.Key] && !walk.built[feature] {
+		if !own.Support[entry.Key] && !walk.built[feature] {
 			walk.built[feature] = true
 			walk.order = append(walk.order, feature)
 		}
 
-		if isHead(graph, entry, own.roots) {
+		if isHead(graph, entry, own.Roots) {
 			walk.entryModules[moduleDir(graph, entry)] = true
 
 			if atModuleRoot(graph, entry) {

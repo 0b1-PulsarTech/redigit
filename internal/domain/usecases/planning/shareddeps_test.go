@@ -21,7 +21,7 @@ func TestShareDependenciesPullsWhatASharedDeclarationNeeds(t *testing.T) {
 	helper := decl("conv/helper.go", "Seconds", "conv")
 	deeper := decl("conv/deeper.go", "Scale", "conv")
 
-	own := assign(entities.NewGraph(
+	own := Assign(entities.NewGraph(
 		[]entities.Decl{entryA, entryB, converterA, converterB, helper, deeper},
 		[]entities.Edge{
 			needs(entryA, converterA),
@@ -33,13 +33,13 @@ func TestShareDependenciesPullsWhatASharedDeclarationNeeds(t *testing.T) {
 	))
 
 	for _, key := range []entities.DeclKey{converterA.Key, converterB.Key, helper.Key, deeper.Key} {
-		if got := own.owner[key]; got != reach.SharedFeature {
+		if got := own.Owner[key]; got != reach.SharedFeature {
 			t.Errorf("%s owner = %q, want the shared bucket", key, got)
 		}
 	}
 
 	for _, key := range []entities.DeclKey{entryA.Key, entryB.Key} {
-		if got := own.owner[key]; got == reach.SharedFeature {
+		if got := own.Owner[key]; got == reach.SharedFeature {
 			t.Errorf("%s owner = shared, want its own feature: only providers are pulled", key)
 		}
 	}
@@ -51,13 +51,13 @@ func TestShareDependenciesLeavesAFeatureItsOwn(t *testing.T) {
 	entry := decl("a/main.go", "A", "a")
 	helper := decl("a/helper.go", "Help", "a")
 
-	own := assign(entities.NewGraph(
+	own := Assign(entities.NewGraph(
 		[]entities.Decl{entry, helper},
 		[]entities.Edge{needs(entry, helper)},
 		nil,
 	))
 
-	if got := own.owner[helper.Key]; got != "a" {
+	if got := own.Owner[helper.Key]; got != "a" {
 		t.Fatalf("helper owner = %q, want %q", got, "a")
 	}
 }
@@ -79,17 +79,17 @@ func TestShareDependenciesMovesAnAtomWhole(t *testing.T) {
 		nil,
 	)
 
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			wired.Key: reach.SharedFeature, gen.Key: "a", sibling.Key: "a",
 		},
-		reach: map[entities.DeclKey]int{},
+		Reach: map[entities.DeclKey]int{},
 	}
 
 	shareDependencies(graph, own)
 
 	for _, key := range []entities.DeclKey{gen.Key, sibling.Key} {
-		if got := own.owner[key]; got != reach.SharedFeature {
+		if got := own.Owner[key]; got != reach.SharedFeature {
 			t.Errorf("%s owner = %q, want the shared bucket: an atom is not split", key, got)
 		}
 	}

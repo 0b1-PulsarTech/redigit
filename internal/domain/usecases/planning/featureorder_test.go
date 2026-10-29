@@ -85,7 +85,7 @@ func TestFeatureNeeds(t *testing.T) {
 	t.Parallel()
 
 	graph, _, _ := twoFeatures()
-	own := assign(graph)
+	own := Assign(graph)
 	needs := featureNeeds(graph, own)
 
 	// The lead slice is one feature end to end, so it needs nothing from
@@ -107,7 +107,7 @@ func TestEarliest(t *testing.T) {
 	t.Parallel()
 
 	graph, order, _ := twoFeatures()
-	own := assign(graph)
+	own := Assign(graph)
 	at := earliest(own, order)
 
 	if got := at["lead/api"]; got != 1 {
@@ -141,10 +141,10 @@ func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 		nil,
 	)
 
-	own := assign(graph)
+	own := Assign(graph)
 
 	_, cyclic := sortFeatures(
-		own.order,
+		own.Order,
 		featureRules{
 			needs: featureNeeds(graph, own),
 			at:    earliest(own, entities.Ordering{}),
@@ -210,7 +210,7 @@ func TestFeatureNeedsBehindADeferred(t *testing.T) {
 				testCase.edges,
 				nil,
 			)
-			got := featureNeeds(graph, ownership{owner: owner, deferred: testCase.deferred})
+			got := featureNeeds(graph, Ownership{Owner: owner, Deferred: testCase.deferred})
 
 			if got["lead/api"]["bill/api"] != testCase.want {
 				t.Fatalf("featureNeeds() lead/api -> bill/api = %v, want %v",

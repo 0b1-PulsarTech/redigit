@@ -12,7 +12,7 @@ import (
 func touched(
 	graph entities.Graph,
 	subjects map[entities.DeclKey][]entities.DeclKey,
-	own ownership,
+	own Ownership,
 	ready, fresh map[entities.DeclKey]bool,
 ) map[entities.DeclKey]bool {
 	out := map[entities.DeclKey]bool{}
@@ -26,7 +26,7 @@ func touched(
 			}
 
 			needed := needsFresh(graph, subjects, key, fresh, out)
-			if own.loose[key] {
+			if own.Loose[key] {
 				needed = needed || reach.TiedToFresh(graph, key, fresh, out)
 			}
 

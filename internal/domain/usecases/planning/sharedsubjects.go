@@ -12,13 +12,13 @@ import (
 // commits behind the code it tests.
 func sharedSubjects(
 	graph entities.Graph,
-	own ownership,
+	own Ownership,
 ) map[entities.DeclKey][]entities.DeclKey {
 	out := map[entities.DeclKey][]entities.DeclKey{}
 
 	for test, subjects := range reach.TestSubjects(graph) {
 		for _, subject := range subjects {
-			if own.owner[subject] == reach.SharedFeature {
+			if own.Owner[subject] == reach.SharedFeature {
 				out[test] = append(out[test], subject)
 			}
 		}

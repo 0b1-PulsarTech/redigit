@@ -27,13 +27,13 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 		nil,
 	)
 
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			code.Key: "a", later.Key: "b",
 			setup.Key: reach.SharedFeature, first.Key: reach.SharedFeature, plain.Key: reach.SharedFeature,
 		},
-		deferred: reach.Wiring{setup.Key: true, first.Key: true, plain.Key: true},
-		roots:    reach.Wiring{},
+		Deferred: reach.Wiring{setup.Key: true, first.Key: true, plain.Key: true},
+		Roots:    reach.Wiring{},
 	}
 
 	born := map[entities.DeclKey]bool{code.Key: true}
@@ -79,16 +79,16 @@ func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 		nil,
 	)
 
-	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{
+		Owner: map[entities.DeclKey]FeatureID{
 			registration.Key: reach.SharedFeature, feature.Key: "a",
 			both.Key: reach.SharedFeature, onlyWiring.Key: reach.SharedFeature,
 		},
-		reach: map[entities.DeclKey]int{
+		Reach: map[entities.DeclKey]int{
 			both.Key: 2, onlyWiring.Key: 1,
 		},
-		deferred: reach.Wiring{registration.Key: true},
-		roots:    reach.Wiring{registration.Key: true},
+		Deferred: reach.Wiring{registration.Key: true},
+		Roots:    reach.Wiring{registration.Key: true},
 	}
 
 	fresh := map[entities.DeclKey]bool{onlyWiring.Key: true}

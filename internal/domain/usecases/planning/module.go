@@ -44,7 +44,7 @@ func isHead(graph entities.Graph, entry entities.Decl, roots reach.Wiring) bool 
 // head shared. A library has no capability of its own, so no feature owns it;
 // each declaration is born with the first feature that needs it, and the
 // package grows one consumer at a time.
-func shareLibraries(graph entities.Graph, own ownership, heads map[string]bool) {
+func shareLibraries(graph entities.Graph, own Ownership, heads map[string]bool) {
 	read := readFromOutside(graph)
 
 	for _, decl := range graph.Decls() {
@@ -57,7 +57,7 @@ func shareLibraries(graph entities.Graph, own ownership, heads map[string]bool) 
 			continue
 		}
 
-		own.owner[decl.Key] = reach.SharedFeature
+		own.Owner[decl.Key] = reach.SharedFeature
 	}
 }
 
@@ -99,25 +99,25 @@ func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 // yet, an interface assertion. No feature needs them and no feature owns them,
 // so left to the end they stretched a library's history from its first package
 // to the last commit; deferred, each is born right after what it names.
-func deferLibraryEntries(own ownership, entries []entities.Decl) {
+func deferLibraryEntries(own Ownership, entries []entities.Decl) {
 	for _, entry := range entries {
-		if own.owner[entry.Key] != reach.SharedFeature || own.deferred[entry.Key] {
+		if own.Owner[entry.Key] != reach.SharedFeature || own.Deferred[entry.Key] {
 			continue
 		}
 
-		own.deferred[entry.Key] = true
-		own.loose[entry.Key] = true
+		own.Deferred[entry.Key] = true
+		own.Loose[entry.Key] = true
 	}
 }
 
 // sharedPackages groups the shared production declarations by package. A
 // package is one importable thing: the first feature to need any of it brings
 // the rest, so it is not rebuilt one consumer at a time over the whole history.
-func sharedPackages(graph entities.Graph, own ownership) map[entities.UnitID][]entities.DeclKey {
+func sharedPackages(graph entities.Graph, own Ownership) map[entities.UnitID][]entities.DeclKey {
 	out := map[entities.UnitID][]entities.DeclKey{}
 
 	for _, decl := range graph.Decls() {
-		if own.owner[decl.Key] != reach.SharedFeature || own.deferred[decl.Key] ||
+		if own.Owner[decl.Key] != reach.SharedFeature || own.Deferred[decl.Key] ||
 			entities.IsTestSide(decl) || decl.Generated || decl.Key.Kind == entities.KindOther ||
 			feedsData(graph, decl.Key) {
 			continue
