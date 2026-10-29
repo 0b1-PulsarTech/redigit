@@ -17,19 +17,29 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
-type rule interface {
-	Name() string
-	Edges(
-		ctx context.Context,
-		snap entities.Snapshot,
-		decls []entities.Decl,
-	) ([]entities.Edge, error)
-	Anchors(
-		ctx context.Context,
-		snap entities.Snapshot,
-		decls []entities.Decl,
-	) ([]entities.Anchor, error)
-}
+type (
+	rule interface {
+		Name() string
+		Edges(
+			ctx context.Context,
+			snap entities.Snapshot,
+			decls []entities.Decl,
+		) ([]entities.Edge, error)
+		Anchors(
+			ctx context.Context,
+			snap entities.Snapshot,
+			decls []entities.Decl,
+		) ([]entities.Anchor, error)
+	}
+
+	atomRule interface {
+		Atoms(
+			ctx context.Context,
+			snap entities.Snapshot,
+			decls []entities.Decl,
+		) (map[entities.DeclKey]string, error)
+	}
+)
 
 var rules = []rule{
 	gencode.Goverter{},
@@ -46,14 +56,6 @@ var rules = []rule{
 	buildtags.Rule{},
 	wiring.Embed{},
 	tests.RoutePath{},
-}
-
-type atomRule interface {
-	Atoms(
-		ctx context.Context,
-		snap entities.Snapshot,
-		decls []entities.Decl,
-	) (map[entities.DeclKey]string, error)
 }
 
 type RulePack struct {
