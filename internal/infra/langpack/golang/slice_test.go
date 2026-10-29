@@ -133,8 +133,8 @@ func TestSliceBindsTheSignatureAndTheLocals(t *testing.T) {
 
 	has := func(from, to int) bool {
 		return slices.ContainsFunc(edges, func(edge entities.Edge) bool {
-			return edge.Dependent.Name == stmtName("Mount", from) &&
-				edge.Provider.Name == stmtName("Mount", to) &&
+			return edge.Dependent.Name == StmtName("Mount", from) &&
+				edge.Provider.Name == StmtName("Mount", to) &&
 				edge.Reason == entities.ReasonBody
 		})
 	}
@@ -149,7 +149,7 @@ func TestSliceBindsTheSignatureAndTheLocals(t *testing.T) {
 	}
 
 	headEdge := slices.ContainsFunc(edges, func(edge entities.Edge) bool {
-		return edge.Dependent.Name == stmtName("Mount", 3) && edge.Provider == head.Key
+		return edge.Dependent.Name == StmtName("Mount", 3) && edge.Provider == head.Key
 	})
 	if !headEdge {
 		t.Fatalf("edges = %v, want every statement to need the signature", edges)
