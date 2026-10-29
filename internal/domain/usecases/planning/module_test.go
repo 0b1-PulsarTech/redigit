@@ -53,3 +53,25 @@ func TestAssignSharesALibraryWhole(t *testing.T) {
 		t.Fatalf("handler owner = %q, want its own feature", got)
 	}
 }
+
+func TestDeferLibraryEntries(t *testing.T) {
+	t.Parallel()
+
+	free := decl("lib/a.go", "A", "lib")
+	owned := decl("lib/b.go", "B", "lib")
+	own := ownership{
+		owner:    map[entities.DeclKey]FeatureID{free.Key: SharedFeature, owned.Key: "f"},
+		deferred: wiring{},
+		loose:    wiring{},
+	}
+
+	deferLibraryEntries(own, []entities.Decl{free, owned})
+
+	if !own.deferred[free.Key] || !own.loose[free.Key] {
+		t.Fatalf("the unowned entry %s is not deferred as loose", free.Key)
+	}
+
+	if own.deferred[owned.Key] {
+		t.Fatalf("the owned entry %s was deferred", owned.Key)
+	}
+}
