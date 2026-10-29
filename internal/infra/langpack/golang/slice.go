@@ -84,7 +84,7 @@ func (Syntax) Slice(
 
 	cut := bodyCut{fset: fset, fn: fn, decl: decl, stmts: decl.Body.List}
 
-	if elements, _ := ReturnedElements(decl.Body); len(elements) >= MinGroup {
+	if elements, _ := syntax.ReturnedElements(decl.Body); len(elements) >= syntax.MinGroup {
 		cut.elements = elements
 
 		return cut.sliceElements(), true, nil
@@ -189,7 +189,7 @@ func (cut bodyCut) slice() indexing.Sliced {
 // alone. The head keeps an atom the function already had.
 func (cut bodyCut) atomOf(groups groups, index int) string {
 	root := groups.find(index)
-	if groups.size(root) < MinGroup {
+	if groups.size(root) < syntax.MinGroup {
 		if index == len(cut.stmts) {
 			return cut.fn.Atom
 		}
@@ -249,7 +249,7 @@ func (cut bodyCut) members() []entities.Decl {
 			Key: entities.DeclKey{
 				File: cut.fn.Key.File,
 				Kind: entities.KindStmt,
-				Name: StmtName(cut.fn.Key.Name, index),
+				Name: syntax.StmtName(cut.fn.Key.Name, index),
 			},
 			Unit:   cut.fn.Unit,
 			Span:   entities.Span{Start: start, End: end},
@@ -272,7 +272,7 @@ func (cut bodyCut) edges(flow bodyFlow) []entities.Edge {
 		return entities.DeclKey{
 			File: cut.fn.Key.File,
 			Kind: entities.KindStmt,
-			Name: StmtName(cut.fn.Key.Name, index),
+			Name: syntax.StmtName(cut.fn.Key.Name, index),
 		}
 	}
 
@@ -326,7 +326,7 @@ func (cut bodyCut) sliceElements() indexing.Sliced {
 
 func (cut bodyCut) elementAtom(joined groups, index int) string {
 	root := joined.find(index)
-	if joined.size(root) < MinGroup {
+	if joined.size(root) < syntax.MinGroup {
 		return ""
 	}
 
