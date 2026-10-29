@@ -122,7 +122,11 @@ func atomCases() []atomCase {
 		{
 			"the first table with the migration checksum",
 			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
-			testkit.DeclKey("database/migrations/atlas.sum", entities.KindOther, syntax.FileDeclName),
+			testkit.DeclKey(
+				"database/migrations/atlas.sum",
+				entities.KindOther,
+				syntax.FileDeclName,
+			),
 			true,
 		},
 		{

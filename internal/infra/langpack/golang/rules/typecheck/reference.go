@@ -2,6 +2,7 @@ package typecheck
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
@@ -18,7 +19,7 @@ func (rule Reference) Edges(
 ) ([]entities.Edge, error) {
 	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("type-check facts: %w", err)
 	}
 
 	edges := make([]entities.Edge, 0, len(facts.Uses))

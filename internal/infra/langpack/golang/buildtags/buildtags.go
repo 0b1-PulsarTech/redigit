@@ -46,7 +46,7 @@ func BuildConstraints(snap entities.Snapshot) ([]BuildTag, error) {
 	for _, file := range snap.Files {
 		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("build constraint source: %w", err)
 		}
 
 		tag, found, err := buildTagFor(file, source)

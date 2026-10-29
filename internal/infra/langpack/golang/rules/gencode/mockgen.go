@@ -31,7 +31,7 @@ func (rule Mockgen) Edges(
 	for file, mockDecls := range byFile {
 		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mockgen source: %w", err)
 		}
 
 		sourceLine, ok := mockgenSourceLine(source)

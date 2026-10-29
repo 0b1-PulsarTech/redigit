@@ -86,7 +86,11 @@ func (visitor *conversionVisitor) call(call *ast.CallExpr) {
 	params := sig.Params()
 
 	for index, arg := range call.Args {
-		visitor.scan.convert(arg.Pos(), checked.TypeOf(arg), paramAt(sig, params, index, call.Ellipsis))
+		visitor.scan.convert(
+			arg.Pos(),
+			checked.TypeOf(arg),
+			paramAt(sig, params, index, call.Ellipsis),
+		)
 	}
 }
 

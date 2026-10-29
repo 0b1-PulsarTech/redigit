@@ -176,7 +176,7 @@ func modulesOf(snap entities.Snapshot) ([]module, error) {
 
 		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("go.mod source: %w", err)
 		}
 
 		if name := modfile.ModulePath(source); name != "" {

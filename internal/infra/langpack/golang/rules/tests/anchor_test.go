@@ -217,12 +217,17 @@ func TestTestAnchorRuleMatchesABareFunction(t *testing.T) {
 
 func NormalizeProviderMessageID(raw string) (string, error) { return raw, nil }
 `)
-	testkit.WriteFile(t, root, filepath.Join("idnorm", "provider_message_id_test.go"), `package idnorm
+	testkit.WriteFile(
+		t,
+		root,
+		filepath.Join("idnorm", "provider_message_id_test.go"),
+		`package idnorm
 
 import "testing"
 
 func TestNormalizeProviderMessageID(t *testing.T) {}
-`)
+`,
+	)
 
 	snap := entities.Snapshot{Root: root}
 

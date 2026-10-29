@@ -20,7 +20,12 @@ func TestBuildConstraints(t *testing.T) {
 	testkit.WriteFile(t, root, "linux_only.go", "//go:build linux\n\npackage sample\n")
 	testkit.WriteFile(t, root, "plain.go", "package sample\n")
 	testkit.WriteFile(t, root, "legacy.go", "// +build integration\n\npackage sample\n")
-	testkit.WriteFile(t, root, "combo.go", "//go:build linux && (amd64 || arm64)\n\npackage sample\n")
+	testkit.WriteFile(
+		t,
+		root,
+		"combo.go",
+		"//go:build linux && (amd64 || arm64)\n\npackage sample\n",
+	)
 
 	snap := entities.Snapshot{
 		Root:  root,
@@ -114,7 +119,12 @@ func TestBuildConstraintsFileInSubdir(t *testing.T) {
 
 	root := t.TempDir()
 
-	testkit.WriteFile(t, root, filepath.Join("pkg", "windows.go"), "//go:build windows\n\npackage pkg\n")
+	testkit.WriteFile(
+		t,
+		root,
+		filepath.Join("pkg", "windows.go"),
+		"//go:build windows\n\npackage pkg\n",
+	)
 
 	snap := entities.Snapshot{Root: root, Files: []string{filepath.Join("pkg", "windows.go")}}
 

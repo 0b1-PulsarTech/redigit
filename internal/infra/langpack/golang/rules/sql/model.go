@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"fmt"
 	"path"
 	"slices"
 	"strings"
@@ -92,7 +93,7 @@ func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
 	for _, file := range migrationFiles(snap.Files) {
 		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
-			return err
+			return fmt.Errorf("sql model source: %w", err)
 		}
 
 		for _, stmt := range sqlstmt.Split(source) {
@@ -222,7 +223,7 @@ func (model *sqlModel) readQueries(snap entities.Snapshot) error {
 	for _, file := range queryFiles(snap.Files) {
 		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
-			return err
+			return fmt.Errorf("sql query source: %w", err)
 		}
 
 		for _, block := range extractQueryBlocks(source) {

@@ -1,6 +1,7 @@
 package typed
 
 import (
+	"fmt"
 	"go/build/constraint"
 	"maps"
 	"path"
@@ -15,12 +16,12 @@ import (
 func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]loadPass, error) {
 	constrained, err := buildtags.BuildConstraints(snap)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build constraints: %w", err)
 	}
 
 	hidden, err := buildtags.Hidden(constrained, tags)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hidden passes: %w", err)
 	}
 
 	byTags := map[string]*loadPass{}

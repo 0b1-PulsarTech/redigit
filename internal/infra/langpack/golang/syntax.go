@@ -2,6 +2,7 @@ package golang
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
@@ -24,11 +25,21 @@ func (Syntax) Declarations(
 	path string,
 	source []byte,
 ) ([]entities.Decl, error) {
-	return syntax.Declarations(ctx, path, source)
+	decls, err := syntax.Declarations(ctx, path, source)
+	if err != nil {
+		return nil, fmt.Errorf("go declarations: %w", err)
+	}
+
+	return decls, nil
 }
 
 func (Syntax) Render(ctx context.Context, source []byte, keep []entities.DeclKey) ([]byte, error) {
-	return render.Render(ctx, source, keep)
+	rendered, err := render.Render(ctx, source, keep)
+	if err != nil {
+		return nil, fmt.Errorf("go render: %w", err)
+	}
+
+	return rendered, nil
 }
 
 func (Syntax) Slice(
@@ -36,5 +47,10 @@ func (Syntax) Slice(
 	fn entities.Decl,
 	source []byte,
 ) (indexing.Sliced, bool, error) {
-	return slicing.Slice(ctx, fn, source)
+	sliced, found, err := slicing.Slice(ctx, fn, source)
+	if err != nil {
+		return indexing.Sliced{}, false, fmt.Errorf("go slice: %w", err)
+	}
+
+	return sliced, found, nil
 }

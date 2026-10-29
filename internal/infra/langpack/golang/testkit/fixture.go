@@ -16,8 +16,15 @@ func DeclareAll(t *testing.T, root string, paths []string) []entities.Decl {
 
 	var all []entities.Decl
 
+	tree, err := os.OpenRoot(root)
+	if err != nil {
+		t.Fatalf("open %s: %v", root, err)
+	}
+
+	defer func() { _ = tree.Close() }()
+
 	for _, path := range paths {
-		source, err := os.ReadFile(filepath.Join(root, path))
+		source, err := tree.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}

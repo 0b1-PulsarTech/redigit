@@ -18,7 +18,10 @@ func newDeclLocator(decls []entities.Decl) declLocator {
 	byFile := declsource.GroupByFile(decls)
 
 	for _, group := range byFile {
-		slices.SortFunc(group, func(left, right entities.Decl) int { return left.Span.Start - right.Span.Start })
+		slices.SortFunc(
+			group,
+			func(left, right entities.Decl) int { return left.Span.Start - right.Span.Start },
+		)
 	}
 
 	return declLocator{byFile: byFile}

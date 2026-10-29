@@ -2,6 +2,7 @@ package gencode
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -60,7 +61,7 @@ func directiveDecls(
 
 		source, err := declsource.ReadSource(snap, file)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("goverter source: %w", err)
 		}
 
 		for _, candidate := range candidates {

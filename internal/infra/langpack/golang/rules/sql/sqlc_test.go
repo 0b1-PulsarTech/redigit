@@ -45,7 +45,11 @@ func TestSqlcRuleEdges(t *testing.T) {
 		{
 			"a generated function after its query",
 			queryEdge(
-				testkit.DeclKey("dbgen/template.sql.go", entities.KindMethod, "Queries.ListTemplates"),
+				testkit.DeclKey(
+					"dbgen/template.sql.go",
+					entities.KindMethod,
+					"Queries.ListTemplates",
+				),
 				block,
 			),
 		},
@@ -106,7 +110,12 @@ func TestExtractQueryNames(t *testing.T) {
 
 			for index, name := range got {
 				if name != testCase.want[index] {
-					t.Fatalf("extractQueryNames()[%d] = %q, want %q", index, name, testCase.want[index])
+					t.Fatalf(
+						"extractQueryNames()[%d] = %q, want %q",
+						index,
+						name,
+						testCase.want[index],
+					)
 				}
 			}
 		})

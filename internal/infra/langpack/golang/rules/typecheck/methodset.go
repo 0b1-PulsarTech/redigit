@@ -2,6 +2,7 @@ package typecheck
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -19,7 +20,7 @@ func (rule MethodSet) Edges(
 ) ([]entities.Edge, error) {
 	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("type-check facts: %w", err)
 	}
 
 	var edges []entities.Edge
@@ -50,7 +51,7 @@ func (rule MethodSet) Atoms(
 ) (map[entities.DeclKey]string, error) {
 	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("type-check facts: %w", err)
 	}
 
 	atoms := map[entities.DeclKey]string{}

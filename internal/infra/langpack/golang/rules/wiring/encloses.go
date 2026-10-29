@@ -61,7 +61,7 @@ func enclosesInFile(
 ) ([]entities.Edge, error) {
 	source, err := declsource.ReadSource(snap, file)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("enclosing source: %w", err)
 	}
 
 	fset := token.NewFileSet()
@@ -108,7 +108,10 @@ func funcEncloses(
 	return []entities.Edge{{Dependent: funcKey, Provider: typeKey, Reason: entities.ReasonEncloses}}
 }
 
-func singleResultType(fn *ast.FuncDecl, types map[string]entities.DeclKey) (entities.DeclKey, bool) {
+func singleResultType(
+	fn *ast.FuncDecl,
+	types map[string]entities.DeclKey,
+) (entities.DeclKey, bool) {
 	if fn.Type.Results == nil {
 		return entities.DeclKey{}, false
 	}
@@ -171,7 +174,12 @@ func valueEncloses(
 				continue
 			}
 
-			if valueKey, found := declsource.FindDecl(fileDecls, file, entities.KindValue, name.Name); found {
+			if valueKey, found := declsource.FindDecl(
+				fileDecls,
+				file,
+				entities.KindValue,
+				name.Name,
+			); found {
 				edges = append(edges, entities.Edge{
 					Dependent: valueKey,
 					Provider:  typeKey,

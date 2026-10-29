@@ -81,7 +81,11 @@ func TestSyntaxPassesErrorsThrough(t *testing.T) {
 		t.Fatal("Declarations() error = nil, want a parse error")
 	}
 
-	if _, err := syntax.Render(ctx, []byte("package"), []entities.DeclKey{{Name: "x"}}); err == nil {
+	if _, err := syntax.Render(
+		ctx,
+		[]byte("package"),
+		[]entities.DeclKey{{Name: "x"}},
+	); err == nil {
 		t.Fatal("Render() error = nil, want a parse error")
 	}
 

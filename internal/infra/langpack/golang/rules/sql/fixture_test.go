@@ -75,7 +75,12 @@ func declarationsOf(root, path string) ([]entities.Decl, error) {
 	}
 
 	if filepath.Ext(path) == ".go" {
-		return syntax.Declarations(context.Background(), path, source)
+		decls, err := syntax.Declarations(context.Background(), path, source)
+		if err != nil {
+			return nil, fmt.Errorf("declarations of %s: %w", path, err)
+		}
+
+		return decls, nil
 	}
 
 	for _, chunker := range chunk.Registry {
