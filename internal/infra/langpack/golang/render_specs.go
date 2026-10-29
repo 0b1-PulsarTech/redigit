@@ -125,19 +125,6 @@ func resetSpacingIfSafe(specs []ast.Spec) {
 	}
 }
 
-func specDoc(spec ast.Spec) *ast.CommentGroup {
-	switch s := spec.(type) {
-	case *ast.ValueSpec:
-		return s.Doc
-	case *ast.TypeSpec:
-		return s.Doc
-	case *ast.ImportSpec:
-		return s.Doc
-	default:
-		return nil
-	}
-}
-
 func resetSpecPos(spec ast.Spec) {
 	switch s := spec.(type) {
 	case *ast.ValueSpec:

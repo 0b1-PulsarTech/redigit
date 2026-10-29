@@ -12,14 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 )
 
-// declIdent identifies a surviving declaration by kind and name only: Render
-// is handed a source file already scoped to one path, so the DeclKey.File a
-// caller carries is redundant here.
-type declIdent struct {
-	kind entities.DeclKind
-	name string
-}
-
 // Render writes source back holding only the declarations named in keep.
 //
 // github.com/dave/dst/decorator would be the natural tool here - it attaches
@@ -135,14 +127,6 @@ func filterDecl(
 	default:
 		return nil
 	}
-}
-
-func funcIdent(d *ast.FuncDecl) declIdent {
-	if d.Recv == nil || len(d.Recv.List) == 0 {
-		return declIdent{entities.KindFunc, d.Name.Name}
-	}
-
-	return declIdent{entities.KindMethod, receiverName(d.Recv) + "." + d.Name.Name}
 }
 
 // keepStatements cuts a function down to the statements the caller kept. A

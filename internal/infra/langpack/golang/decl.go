@@ -250,3 +250,19 @@ func locationOf(
 func utf16Units(encoded []byte) int {
 	return len(utf16.Encode([]rune(string(encoded))))
 }
+
+// declIdent identifies a surviving declaration by kind and name only: Render
+// is handed a source file already scoped to one path, so the DeclKey.File a
+// caller carries is redundant here.
+type declIdent struct {
+	kind entities.DeclKind
+	name string
+}
+
+func funcIdent(d *ast.FuncDecl) declIdent {
+	if d.Recv == nil || len(d.Recv.List) == 0 {
+		return declIdent{entities.KindFunc, d.Name.Name}
+	}
+
+	return declIdent{entities.KindMethod, receiverName(d.Recv) + "." + d.Name.Name}
+}
