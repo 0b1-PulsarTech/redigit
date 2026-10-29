@@ -1,0 +1,15 @@
+{
+  "languages": {"go": {"tags": ["integration"]}, "dart": {}, "web": {"virtual": {"virtual:app": "web/app.dart"}}},
+  "slice": {"functions": ["register*", "Mount*", "main", "run"], "errcheck": true, "shellWithFirst": true},
+  "rules": [
+    {"type": "go-di", "registerFuncs": ["Register*"], "resolveFuncs": ["Get*", "MustGet*"],
+     "injectorTypes": ["Injector"], "roots": ["main"]},
+    {"type": "go-router", "handle": ["*.GET", "*.POST"], "mount": ["Mount*"], "groupMethods": true},
+    {"type": "sql-fk", "paths": ["database/migrations/*.sql"]}
+  ],
+  "passes": [{"type": "tidy-test-after"}, {"type": "finish-cap", "maxAdded": 850, "generatedMax": 900}],
+  "format": {"gofumpt": true, "imports": true, "localPrefix": "github.com/org/"},
+  "write": {"identity": {"name": "n", "email": "e"}, "dateRef": "rebuild/date-ref", "subjects": "subjects.json"},
+  "verify": {"tags": ["integration"], "parallel": 4, "exclude": ["apps/khux/lifted"], "stride": 1},
+  "lineage": {"follow": true, "anchors": [{"rev": "abc123", "kind": "fix"}]}
+}
