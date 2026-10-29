@@ -6,10 +6,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// touched keeps the ready declarations that need something fresh, directly or
-// through another ready declaration. A manifest line does not count: every test
-// of a module needs its go.mod, and that is no reason for the test to arrive
-// with the first declaration that pulled the manifest in.
 func touched(
 	graph entities.Graph,
 	subjects map[entities.DeclKey][]entities.DeclKey,
@@ -18,6 +14,9 @@ func touched(
 ) map[entities.DeclKey]bool {
 	out := map[entities.DeclKey]bool{}
 
+	// A manifest line does not count: every test of a module needs its go.mod,
+	// and that is no reason for the test to arrive with the first declaration
+	// that pulled the manifest in.
 	for changed := true; changed; {
 		changed = false
 

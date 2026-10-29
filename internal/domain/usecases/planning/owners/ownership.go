@@ -9,10 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/testplace"
 )
 
-// Ownership is which feature each declaration belongs to, and how many features
-// reach it. The count is the whole decision: a declaration reached by one
-// feature is part of that feature and is born with it; one reached by many is
-// infrastructure and has to be born before all of them.
 type Ownership struct {
 	Owner map[entities.DeclKey]reach.FeatureID
 	Reach map[entities.DeclKey]int
@@ -40,9 +36,6 @@ type Ownership struct {
 	Cost map[reach.FeatureID]int
 }
 
-// Assign walks back from every entry point and counts, per declaration, how
-// many distinct features can reach it. Counting insiders would pin every
-// package to the instant the source history happened to create it.
 func Assign(graph entities.Graph) Ownership {
 	own := Ownership{
 		Owner: map[entities.DeclKey]reach.FeatureID{},
@@ -53,6 +46,8 @@ func Assign(graph entities.Graph) Ownership {
 		Loose: reach.LooseLines(graph),
 	}
 
+	// Counting insiders would pin every package to the instant the source
+	// history happened to create it.
 	own.Support = testplace.TestSupport(graph)
 	own.Deferred = reach.DeferTests(graph, own.Roots, own.Support)
 
@@ -99,15 +94,11 @@ func Assign(graph entities.Graph) Ownership {
 
 	own.packages = sharedPackages(graph, own)
 
-	slices.SortFunc(own.Order, func(a, b reach.FeatureID) int { return cmp.Compare(a, b) })
+	slices.SortFunc(own.Order, func(first, second reach.FeatureID) int { return cmp.Compare(first, second) })
 
 	return own
 }
 
-// shareUnreached shares what no entry point reaches: dead weight or a root
-// nobody consumes yet. It is shared rather than silently dropped: dropping it
-// would leave a hole in the final tree that the tree invariant catches far too
-// late to explain.
 func shareUnreached(graph entities.Graph, own Ownership) {
 	for _, decl := range graph.Decls() {
 		if _, found := own.Reach[decl.Key]; !found {
@@ -137,14 +128,14 @@ func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[reach.F
 	}
 }
 
-// soleOwner is deliberately not a threshold. A declaration reached by two
-// features belongs to neither: picking one of them would be a guess, and a
-// guess here is what puts a declaration hundreds of commits from its use.
 func soleOwner(features map[reach.FeatureID]bool) reach.FeatureID {
 	if len(features) != 1 {
 		return reach.SharedFeature
 	}
 
+	// A declaration reached by two features belongs to neither: picking one of
+	// them would be a guess, and a guess here is what puts a declaration
+	// hundreds of commits from its use.
 	for feature := range features {
 		return feature
 	}

@@ -33,7 +33,7 @@ func TestUnbornProvidersClosesTransitivelyOverTheSharedKernel(t *testing.T) {
 	want := []entities.DeclKey{event.Key, reason.Key}
 	slices.SortFunc(
 		want,
-		func(a, b entities.DeclKey) int { return cmp.Compare(a.String(), b.String()) },
+		func(first, second entities.DeclKey) int { return cmp.Compare(first.String(), second.String()) },
 	)
 
 	if !slices.Equal(got, want) {
@@ -159,9 +159,6 @@ func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 	}
 }
 
-// A library package is born with its first consumer, not whole: pulling every
-// package of a library when one is read put agentichatter at commit 41 and its
-// first importer at 787.
 func TestUnbornProvidersBringsOnlyTheLibraryDeclarationsAConsumerNeeds(t *testing.T) {
 	t.Parallel()
 
@@ -327,7 +324,7 @@ func TestUnbornProvidersDoesNotFollowAnInterfaceATypeOnlyFills(t *testing.T) {
 	want := []entities.DeclKey{impl.Key, method.Key}
 	slices.SortFunc(
 		want,
-		func(a, b entities.DeclKey) int { return cmp.Compare(a.String(), b.String()) },
+		func(first, second entities.DeclKey) int { return cmp.Compare(first.String(), second.String()) },
 	)
 
 	if !slices.Equal(got, want) {

@@ -10,29 +10,27 @@ import (
 func TestShareDependenciesPullsWhatASharedDeclarationNeeds(t *testing.T) {
 	t.Parallel()
 
-	// A generated converter is read by two features, so it is shared, while the
-	// helper it calls is read through one of them only.
 	entryA := decl("a/main.go", "A", "a")
 	entryB := decl("b/main.go", "B", "b")
 	converterA := decl("conv/gen.go", "ConvertA", "conv")
 	converterB := decl("conv/gen.go", "ConvertB", "conv")
 	converterA.Atom = "conv/gen.go"
 	converterB.Atom = "conv/gen.go"
-	helper := decl("conv/helper.go", "Seconds", "conv")
+	scaffold := decl("conv/helper.go", "Seconds", "conv")
 	deeper := decl("conv/deeper.go", "Scale", "conv")
 
 	own := Assign(entities.NewGraph(
-		[]entities.Decl{entryA, entryB, converterA, converterB, helper, deeper},
+		[]entities.Decl{entryA, entryB, converterA, converterB, scaffold, deeper},
 		[]entities.Edge{
 			needs(entryA, converterA),
 			needs(entryB, converterB),
-			needs(converterA, helper),
-			needs(helper, deeper),
+			needs(converterA, scaffold),
+			needs(scaffold, deeper),
 		},
 		nil,
 	))
 
-	for _, key := range []entities.DeclKey{converterA.Key, converterB.Key, helper.Key, deeper.Key} {
+	for _, key := range []entities.DeclKey{converterA.Key, converterB.Key, scaffold.Key, deeper.Key} {
 		if got := own.Owner[key]; got != reach.SharedFeature {
 			t.Errorf("%s owner = %q, want the shared bucket", key, got)
 		}
@@ -49,15 +47,15 @@ func TestShareDependenciesLeavesAFeatureItsOwn(t *testing.T) {
 	t.Parallel()
 
 	entry := decl("a/main.go", "A", "a")
-	helper := decl("a/helper.go", "Help", "a")
+	scaffold := decl("a/helper.go", "Help", "a")
 
 	own := Assign(entities.NewGraph(
-		[]entities.Decl{entry, helper},
-		[]entities.Edge{needs(entry, helper)},
+		[]entities.Decl{entry, scaffold},
+		[]entities.Edge{needs(entry, scaffold)},
 		nil,
 	))
 
-	if got := own.Owner[helper.Key]; got != "a" {
+	if got := own.Owner[scaffold.Key]; got != "a" {
 		t.Fatalf("helper owner = %q, want %q", got, "a")
 	}
 }
@@ -65,8 +63,6 @@ func TestShareDependenciesLeavesAFeatureItsOwn(t *testing.T) {
 func TestShareDependenciesMovesAnAtomWhole(t *testing.T) {
 	t.Parallel()
 
-	// One half of a generated file is needed by a shared declaration while the
-	// other half is owned by a feature.
 	wired := decl("c/wire.go", "Wire", "c")
 	gen := decl("conv/gen.go", "Gen", "conv")
 	sibling := decl("conv/gen.go", "Sibling", "conv")

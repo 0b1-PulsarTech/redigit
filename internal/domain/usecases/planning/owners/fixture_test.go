@@ -24,9 +24,6 @@ func needs(dependent, provider entities.Decl) entities.Edge {
 	}
 }
 
-// twoFeatures builds the shape the whole planner exists for: two vertical
-// slices that each reach their own use case and repository, plus one kernel
-// declaration both of them read.
 func twoFeatures() (entities.Graph, entities.Ordering, map[string]entities.Decl) {
 	kernel := decl("kernel/id.go", "NewID", "kernel")
 

@@ -5,14 +5,11 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// TestSupport is the code only the tests of other packages read: a fixture, a
-// builder, an assertion no production declaration uses. A function only its
-// own package's tests read is the code under test, not support. Owned as an
-// entry point, support formed a feature of its own and held back every test
-// that needs it; deferred like a test, it is born with the first one.
 func TestSupport(graph entities.Graph) reach.Wiring {
 	out := reach.Wiring{}
 
+	// A function only its own package's tests read is the code under test, not
+	// support.
 	for changed := true; changed; {
 		changed = false
 

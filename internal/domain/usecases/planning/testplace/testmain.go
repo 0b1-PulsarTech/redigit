@@ -7,21 +7,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// opening is how a package's TestMain is tied to the test that opens it.
 type opening struct {
 	anchors []entities.Anchor
 	atoms   map[entities.DeclKey]string
 }
 
-// openingTests ties TestMain to the test its package is likely to be born with,
-// and makes every other test of the package wait for that one. A package whose
-// setup lands hundreds of commits after its first test runs that test without
-// the setup it was written against; one whose setup lands first runs it over
-// nothing. The opener is the test the ordering settled earliest, because
-// choosing it by name made TestMain wait for whichever suite happened to sort
-// first, however late its subject was.
 func openingTests(decls []entities.Decl, order entities.Ordering) opening {
 	mains := map[entities.UnitID]entities.Decl{}
+	// A package whose setup lands hundreds of commits after its first test runs
+	// that test without the setup it was written against; one whose setup lands
+	// first runs it over nothing.
 	tests := map[entities.UnitID][]entities.Decl{}
 
 	for _, decl := range decls {

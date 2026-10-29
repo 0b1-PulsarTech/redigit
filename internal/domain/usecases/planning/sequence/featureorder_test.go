@@ -89,14 +89,10 @@ func TestFeatureNeeds(t *testing.T) {
 	own := owners.Assign(graph)
 	needs := FeatureNeeds(graph, own)
 
-	// The lead slice is one feature end to end, so it needs nothing from
-	// another feature; only the shared kernel, which is not a feature edge.
 	if len(needs["lead/api"]) != 0 {
 		t.Fatalf("lead/api records feature dependencies %v, want none", needs["lead/api"])
 	}
 
-	// An edge into the shared kernel is not a feature dependency; the kernel is
-	// emitted as a layer before whoever needs it.
 	for from, targets := range needs {
 		if _, shared := targets[reach.SharedFeature]; shared {
 			t.Fatalf("%q records a dependency on the shared bucket", from)
@@ -121,10 +117,6 @@ func TestEarliest(t *testing.T) {
 	}
 }
 
-// TestOwnershipNeverBuildsAFeatureCycle pins the property the planner leans on:
-// ownership by reachability cannot produce two features that need each other,
-// because a provider of another feature's declaration is reached by both callers
-// and therefore becomes shared. Trying to construct the cycle is what proved it.
 func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 	t.Parallel()
 
@@ -156,9 +148,6 @@ func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 	}
 }
 
-// A deferred declaration is shared by being deferred, not by being read by
-// several features, so a feature reaching it comes after the features that own
-// what it needs.
 func TestFeatureNeedsBehindADeferred(t *testing.T) {
 	t.Parallel()
 

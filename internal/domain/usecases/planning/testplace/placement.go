@@ -5,8 +5,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// placement is the moves placeTests has decided so far: after[at] are the
-// declarations to land right behind keys[at].
 type placement struct {
 	graph    entities.Graph
 	index    map[entities.DeclKey]int
@@ -81,8 +79,6 @@ func (place *placement) settleAtoms() {
 	}
 }
 
-// move lands key behind the anchor, unless it is already there or nothing
-// anchors it.
 func (place *placement) move(key entities.DeclKey, anchor, from int) {
 	if anchor < 0 || anchor+1 >= from {
 		return
@@ -93,8 +89,6 @@ func (place *placement) move(key entities.DeclKey, anchor, from int) {
 	place.after[anchor] = append(place.after[anchor], key)
 }
 
-// anchorOf is the index of the last thing the declaration needs or exercises
-// that sits in the group, outside its own atom.
 func (place *placement) anchorOf(decl entities.Decl) int {
 	anchor := -1
 

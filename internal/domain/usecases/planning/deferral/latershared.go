@@ -7,11 +7,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// SplitLate parts what the shared commit would bring into what it can carry
-// alone and what reads the feature's own members. A walked-in statement of the
-// assembly reaches the feature's code, and born in the commit before the
-// feature it would name a declaration that does not exist yet; it goes with
-// the feature, in the commit that births what it reads.
 func SplitLate(
 	graph entities.Graph,
 	shared, members []entities.DeclKey,
@@ -63,8 +58,6 @@ func readsAny(graph entities.Graph, key entities.DeclKey, set map[entities.DeclK
 	return false
 }
 
-// atomWaiting is whether another member of the declaration's atom waits: an
-// atom is born in one commit, so it goes late as one.
 func atomWaiting(
 	graph entities.Graph,
 	atoms map[string][]entities.DeclKey,

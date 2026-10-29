@@ -51,8 +51,6 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 	t.Parallel()
 
 	entry := decl("a/main.go", "Main", "a")
-	// A pair that only consumes each other has no tip, so no entry-point walk
-	// ever reaches it, even though both are consumed.
 	loopA := decl("z/one.go", "One", "z")
 	loopB := decl("z/two.go", "Two", "z")
 
@@ -63,8 +61,6 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 	))
 
 	for _, key := range []entities.DeclKey{loopA.Key, loopB.Key} {
-		// Dropping it would leave a hole in the final tree that the invariant
-		// only catches once every explanation for it is gone.
 		if _, found := own.Reach[key]; !found {
 			t.Fatalf("%s was dropped instead of marked shared", key)
 		}
@@ -75,9 +71,6 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 	}
 }
 
-// TestAssignHasNoSharingThreshold pins that reach is not a tunable number.
-// Reached by one feature means owned by it; reached by more means owned by
-// none. There is no third answer to expose as configuration.
 func TestAssignHasNoSharingThreshold(t *testing.T) {
 	t.Parallel()
 

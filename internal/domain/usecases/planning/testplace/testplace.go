@@ -4,12 +4,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// PlaceTests moves each test-side declaration to just behind the last thing it
-// needs or exercises in the same commit group, so a suite is read with its
-// subject. A move never passes a dependency and never splits an atom.
 func PlaceTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	place := newPlacement(graph, keys)
 
+	// A move never passes a dependency and never splits an atom.
 	for _, key := range keys {
 		place.consider(key)
 	}
@@ -33,11 +31,10 @@ func PlaceTests(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKe
 	return gatherTestAtoms(graph, out)
 }
 
-// gatherTestAtoms brings the members of a test-side atom up to its last member,
-// so the atom is not stretched over a commit group. A member moves only when
-// nothing placed between it and the last member needs it.
 func gatherTestAtoms(graph entities.Graph, keys []entities.DeclKey) []entities.DeclKey {
 	index := make(map[entities.DeclKey]int, len(keys))
+	// A member moves only when nothing placed between it and the last member
+	// needs it.
 	atomOf := make(map[entities.DeclKey]string, len(keys))
 	last := map[string]int{}
 

@@ -5,13 +5,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// shareDependencies makes the shared bucket closed under what it needs: shared
-// code is born before every feature, so a provider owned by one feature would
-// be born after its reader. Atoms, tests and test helpers escape the reach
-// count, so a provider of a shared declaration is shared too, and an atom goes
-// whole.
 func shareDependencies(graph entities.Graph, own Ownership) {
 	atoms := reach.AtomGroups(graph)
+	// Atoms, tests and test helpers escape the reach count, so a provider of a
+	// shared declaration is shared too, and an atom goes whole.
 	queue := make([]entities.DeclKey, 0, graph.Len())
 
 	for _, decl := range graph.Decls() {
@@ -48,14 +45,13 @@ func shareDependencies(graph entities.Graph, own Ownership) {
 	}
 }
 
-// takesForeign is whether a declaration walked into the shared commit brings
-// the providers a feature owns. A statement of the assembly is deferred, so
-// assign never shared what it reads; walked in ahead of its feature, it would
-// be born before them, and so would whatever those read in turn.
 func (index sharedIndex) takesForeign(own Ownership, current entities.DeclKey) bool {
 	if own.Roots[current] {
 		return true
 	}
 
+	// A statement of the assembly is deferred, so assign never shared what it
+	// reads; walked in ahead of its feature, it would be born before them, and
+	// so would whatever those read in turn.
 	return index.walked[current] && own.Owner[current] != reach.SharedFeature
 }

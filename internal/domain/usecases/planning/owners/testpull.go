@@ -6,16 +6,14 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// safeToPull is whether a test can be born with the shared kernel: everything it
-// needs, and everything the shared tests it needs themselves need, is born or
-// shared. A shared test is pulled along with its reader, so it is checked as
-// the reader is: its own needs can belong to a feature that is not built yet.
 func (index sharedIndex) safeToPull(
 	graph entities.Graph,
 	key entities.DeclKey,
 	born map[entities.DeclKey]bool,
 ) bool {
 	seen := map[entities.DeclKey]bool{key: true}
+	// A shared test is pulled along with its reader, so it is checked as the
+	// reader is: its own needs can belong to a feature that is not built yet.
 	queue := []entities.DeclKey{key}
 
 	for len(queue) > 0 {
@@ -59,11 +57,10 @@ func (index sharedIndex) safeToPull(
 	return true
 }
 
-// driftsToTest is a soft edge that points at a test: a mock generated from a
-// directive that sits in a test file. The mock is read by that very test, so
-// following the edge would carry the test, and what it needs, ahead of the mock.
 func driftsToTest(graph entities.Graph, edge entities.Edge) bool {
 	provider, found := graph.Decl(edge.Provider)
 
+	// The mock is read by that very test, so following the edge would carry the
+	// test, and what it needs, ahead of the mock.
 	return birth.IsSoft(edge.Reason) && found && entities.IsTestSide(provider)
 }

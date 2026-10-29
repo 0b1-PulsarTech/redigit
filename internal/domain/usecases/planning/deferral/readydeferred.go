@@ -8,10 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// ReadyDeferred is the deferred declarations that can be born now: none of what
-// they need belongs to a feature still to come, and something they need was
-// born with the feature just built. Without the second condition, whatever
-// needs only shared code is ready at the first feature and drags that code in.
 func ReadyDeferred(
 	graph entities.Graph,
 	own owners.Ownership,
@@ -19,6 +15,8 @@ func ReadyDeferred(
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := sharedSubjects(graph, own)
+	// Without the second condition, whatever needs only shared code is ready at
+	// the first feature and drags that code in.
 	atoms := reach.AtomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
@@ -30,12 +28,6 @@ func ReadyDeferred(
 
 	// A test is born once everything it exercises is: pulling what it needs
 	// would put the code under it in the feature that happened to come first.
-	// The wiring has no feature of its own, so it may bring what only it uses;
-	// what a feature also uses is born with that feature, and bringing it early
-	// would pull its whole closure into the first registration. A manifest line
-	// is brought by what imports it: nothing else would ever birth the require
-	// of a module that only tests import, and so is what no built feature
-	// reaches.
 	waits := func(provider entities.DeclKey, strict bool) bool {
 		switch {
 		case born[provider]:
@@ -88,7 +80,6 @@ func waitsOn(
 	return slices.ContainsFunc(subjects[key], waits)
 }
 
-// atomMembers is the members of a declaration's atom, none when it has no atom.
 func atomMembers(
 	graph entities.Graph,
 	atoms map[string][]entities.DeclKey,
@@ -102,9 +93,6 @@ func atomMembers(
 	return atoms[decl.Atom]
 }
 
-// atomWaits is whether an atom has a deferred member that is not ready: the
-// members are born in one commit, so the first to be ready would otherwise pull
-// the others in with everything they need.
 func atomWaits(
 	members []entities.DeclKey,
 	own owners.Ownership,
@@ -119,8 +107,6 @@ func atomWaits(
 	return false
 }
 
-// usedBeyondWiring is whether a shared declaration has a consumer that is not
-// itself wiring or a test, a consumer some feature will be built for.
 func usedBeyondWiring(graph entities.Graph, own owners.Ownership, key entities.DeclKey) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)

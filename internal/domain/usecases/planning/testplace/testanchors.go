@@ -9,16 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// AnchorTests gives every test-side declaration the subject its file is about,
-// so a helper, a fixture or a sentinel error is born with the code its suite
-// exercises. Only a Test function names a subject on its own; the pieces around
-// it carry nothing but the kernel symbols they use, and the first feature to
-// freshen one of those drags them into a commit hundreds of positions before the
-// file's source exists.
-//
-// The subject is the declarations of the twin source file; failing that, what
-// the file's own tests exercise; failing that, the package. A package's other
-// tests also wait for the one that opens it with TestMain (see openingTests).
 func AnchorTests(
 	graph entities.Graph,
 	order entities.Ordering,
@@ -59,9 +49,9 @@ func AnchorTests(
 	opened := openingTests(decls, order)
 	anchors = append(anchors, opened.anchors...)
 
-	for index, decl := range decls {
+	for slot, decl := range decls {
 		if label, found := opened.atoms[decl.Key]; found {
-			decls[index].Atom = label
+			decls[slot].Atom = label
 		}
 	}
 
@@ -76,11 +66,6 @@ func AnchorTests(
 		)
 }
 
-// raisedTests lifts each test to the position of the latest subject it waits
-// for, and whatever reads a lifted test with it. The ordering was settled before
-// these anchors existed, and a cut sorts by position, so a helper positioned by
-// its kernel imports alone is cut ahead of the code its suite exercises, and a
-// test positioned below the helper it calls is cut ahead of it.
 func raisedTests(
 	graph entities.Graph,
 	order entities.Ordering,
@@ -122,11 +107,6 @@ func raisedTests(
 	return order
 }
 
-// productionEdges drops the waits of production code on a test declaration. The
-// method-set rule makes every implementer of an interface wait for the others, so
-// a test double that satisfies apperr's port made the kernel's own error types
-// wait for it, and a sentinel type of one suite was born with the kernel, a
-// thousand commits before that suite. Production cannot import a test file.
 func productionEdges(graph entities.Graph) []entities.Edge {
 	edges := make([]entities.Edge, 0, len(graph.Edges()))
 
@@ -147,8 +127,6 @@ func testSide(graph entities.Graph, key entities.DeclKey) bool {
 	return found && entities.IsTestSide(decl)
 }
 
-// subjectIndex lists the production declarations a test can be about, by file
-// and by directory.
 type subjectIndex struct {
 	order  entities.Ordering
 	byFile map[string][]entities.DeclKey
@@ -176,9 +154,6 @@ func newSubjectIndex(decls []entities.Decl, order entities.Ordering) subjectInde
 	return index
 }
 
-// subjectsOf is what a test-side declaration waits for beyond what it already
-// names: the twin file, else the subjects of its file's tests (for anything but
-// a test with a subject of its own), else the package.
 func (index subjectIndex) subjectsOf(
 	decl entities.Decl,
 	named []entities.DeclKey,
@@ -204,10 +179,6 @@ func (index subjectIndex) subjectsOf(
 	return index.earliest(index.byDir[path.Dir(decl.Key.File)])
 }
 
-// earliest keeps the subjects at the first position of the set. A helper is born
-// with the first piece of the code it serves; waiting for the last, a later
-// feature's method or a compile-time assertion on a port born at the end,
-// carried a whole suite hundreds of commits past its source.
 func (index subjectIndex) earliest(keys []entities.DeclKey) []entities.DeclKey {
 	first := entities.NoPosition
 
@@ -228,9 +199,6 @@ func (index subjectIndex) earliest(keys []entities.DeclKey) []entities.DeclKey {
 	return out
 }
 
-// twinOf is the declarations of the source file a test file is named after: the
-// longest prefix of its stem, cut at each "_", that names a file in the same
-// directory.
 func (index subjectIndex) twinOf(testFile string) []entities.DeclKey {
 	dir, base := path.Split(testFile)
 	segments := strings.Split(strings.TrimSuffix(base, "_test.go"), "_")

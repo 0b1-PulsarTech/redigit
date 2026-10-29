@@ -8,10 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// SortForBirth orders declarations as commits must carry them: by settled
-// position, and WITHIN a position by dependency. The fixed point only
-// guarantees a provider is not LATER, so provider and dependent routinely
-// share a position, and a name tie-break inverts them.
 func SortForBirth(
 	graph entities.Graph,
 	order entities.Ordering,
@@ -19,12 +15,14 @@ func SortForBirth(
 	groupOf func(entities.DeclKey) reach.FeatureID,
 ) []entities.DeclKey {
 	sorted := slices.Clone(keys)
-	slices.SortFunc(sorted, func(a, b entities.DeclKey) int {
-		if left, right := order.Of(a), order.Of(b); left != right {
+	// The fixed point only guarantees a provider is not LATER, so provider and
+	// dependent routinely share a position, and a name tie-break inverts them.
+	slices.SortFunc(sorted, func(first, second entities.DeclKey) int {
+		if left, right := order.Of(first), order.Of(second); left != right {
 			return cmp.Compare(left, right)
 		}
 
-		return cmp.Compare(a.String(), b.String())
+		return cmp.Compare(first.String(), second.String())
 	})
 
 	out := make([]entities.DeclKey, 0, len(sorted))
@@ -43,16 +41,6 @@ func SortForBirth(
 	return out
 }
 
-// byDependency topologically sorts one position's declarations. Only edges
-// with BOTH ends inside the group count: one reaching outside is already
-// satisfied by position. A cycle leaves members pending, keeping name order.
-// Which topological order is picked matters - see nextReady.
-//
-// An atom is one node of the sort: its members are born in one commit, and the
-// ready queue would otherwise interleave them with whatever else shares the
-// position, stretching the atom over hundreds of declarations and every cut
-// across it with it (a commit of 588 files, because no cut was left that split
-// no atom).
 func byDependency(
 	graph entities.Graph,
 	subjects map[entities.DeclKey][]entities.DeclKey,
@@ -95,8 +83,7 @@ func byDependency(
 
 	// A cycle that runs through a soft edge is not a cycle the code has: the
 	// generator directive a mock is written from sits in the file that uses the
-	// mock, and the mock is read by the code beside the directive. Dropping the
-	// soft edges, and only for what is stuck, keeps the reads ahead of the use.
+	// mock, and the mock is read by the code beside the directive.
 	if len(stuck) > 0 {
 		more, rest := drainLinks(stuck, links, groupOf, true)
 		ordered = append(ordered, more...)
@@ -114,23 +101,15 @@ func byDependency(
 	return out
 }
 
-// link is one wait between two nodes of a position: the dependent is emitted
-// after the provider.
 type link struct {
 	provider, dependent entities.DeclKey
 	soft                bool
 }
 
-// IsSoft is an edge that orders without being read: generated output follows
-// its directive and a double follows what it mirrors, yet neither is needed for
-// the other to compile.
 func IsSoft(reason entities.EdgeReason) bool {
 	return reason == entities.ReasonGeneratedBy || reason == entities.ReasonMirrors
 }
 
-// drainLinks runs the ready queue over nodes, counting only the links with both
-// ends among them, and leaves out the soft ones when asked. It returns what it
-// emitted and what a cycle kept back.
 func drainLinks(
 	nodes []entities.DeclKey,
 	links []link,
@@ -165,9 +144,6 @@ func drainLinks(
 	return emitted, stuck
 }
 
-// atomNodes folds a position's atoms into single nodes. The leader of a node is
-// its first member in the group's order, so a declaration in no atom is its own
-// leader and the order of the group is kept.
 type atomNodeSet struct {
 	leaders  []entities.DeclKey
 	leaderOf map[entities.DeclKey]entities.DeclKey
@@ -206,8 +182,6 @@ func atomNodes(graph entities.Graph, group []entities.DeclKey) atomNodeSet {
 	return set
 }
 
-// drain runs the ready queue, emitting each declaration once everything it
-// waits on inside the group has been emitted.
 func drain(
 	group []entities.DeclKey,
 	needs map[entities.DeclKey][]entities.DeclKey,
@@ -252,10 +226,6 @@ func drain(
 	return out
 }
 
-// nextReady picks which of the declarations nothing separates goes next: the
-// slice already being emitted, because switching costs a commit. Taking the
-// first ready one instead - name order - doubled the commit count and spread a
-// slice over 40% of the history.
 func nextReady(
 	ready []entities.DeclKey,
 	groupOf func(entities.DeclKey) reach.FeatureID,
@@ -265,6 +235,8 @@ func nextReady(
 		return 0
 	}
 
+	// Taking the first ready one instead - name order - doubled the commit count
+	// and spread a slice over 40% of the history.
 	for index, candidate := range ready {
 		if groupOf(candidate) == current {
 			return index

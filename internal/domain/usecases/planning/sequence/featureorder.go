@@ -6,8 +6,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// FeatureNeeds is which features have to be built before which. A feature needs
-// another when any declaration it owns waits on a declaration the other owns.
 func FeatureNeeds(graph entities.Graph, own owners.Ownership) map[reach.FeatureID]map[reach.FeatureID]bool {
 	needs := map[reach.FeatureID]map[reach.FeatureID]bool{}
 	behind := map[entities.DeclKey]map[reach.FeatureID]bool{}
@@ -41,8 +39,6 @@ func FeatureNeeds(graph entities.Graph, own owners.Ownership) map[reach.FeatureI
 	return needs
 }
 
-// featuresBehind is the features that own what a deferred declaration needs,
-// reached through other deferred declarations.
 func featuresBehind(
 	graph entities.Graph,
 	own owners.Ownership,
@@ -85,13 +81,12 @@ func featuresBehind(
 	return out
 }
 
-// Earliest is the lowest position any of a feature's declarations reached. It
-// is the tie-break between features neither of which needs the other, so a
-// rebuilt history still follows the original chronology wherever the dependency
-// graph leaves the choice open.
 func Earliest(own owners.Ownership, order entities.Ordering) map[reach.FeatureID]entities.Position {
 	out := map[reach.FeatureID]entities.Position{}
 
+	// It is the tie-break between features neither of which needs the other, so
+	// a rebuilt history still follows the original chronology wherever the
+	// dependency graph leaves the choice open.
 	for key, feature := range own.Owner {
 		at := order.Of(key)
 		if !at.IsSet() {

@@ -2,11 +2,6 @@ package reach
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
-// LooseLines are the lines of a build manifest that no code needs: a workspace
-// entry, a replace whose require nothing imports, an indirect require. Owned as
-// entry points they formed a feature per manifest and pulled every module it
-// names hundreds of commits before the module's first package. They are
-// deferred like a test and born once the modules they name exist.
 func LooseLines(graph entities.Graph) Wiring {
 	out := Wiring{}
 
@@ -26,8 +21,6 @@ func LooseLines(graph entities.Graph) Wiring {
 	return out
 }
 
-// IsManifestLine is a declaration that exists for the build around the code: it
-// waits for a workspace entry or a require and for nothing the program does.
 func IsManifestLine(graph entities.Graph, decl entities.Decl) bool {
 	if decl.Key.Kind != entities.KindOther {
 		return false
@@ -47,7 +40,6 @@ func IsManifestLine(graph entities.Graph, decl entities.Decl) bool {
 	return tied
 }
 
-// unread is whether nothing but tests and other loose lines needs a declaration.
 func unread(graph entities.Graph, key entities.DeclKey, loose Wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
@@ -59,9 +51,6 @@ func unread(graph entities.Graph, key entities.DeclKey, loose Wiring) bool {
 	return true
 }
 
-// TiedToFresh is whether a manifest line names something not yet born: the
-// module a workspace entry points at, the package a require provides. The
-// manifest it sits in is no reason to bring it, or one go.work brings them all.
 func TiedToFresh(graph entities.Graph, key entities.DeclKey, fresh, touched Wiring) bool {
 	for _, edge := range graph.Needs(key) {
 		named := edge.Reason == entities.ReasonWorkspace || edge.Reason == entities.ReasonImport

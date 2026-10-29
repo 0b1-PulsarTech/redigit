@@ -6,10 +6,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// inDependencyOrder arranges what a hard cycle kept back so that whatever
-// waits on a cycle comes after it. Draining stops at the cycle and leaves its
-// dependents pending too; kept in arrival order, a table that points at a
-// cycle member was born ahead of it, by name.
 func inDependencyOrder(stuck []entities.DeclKey, links []link) []entities.DeclKey {
 	providers := map[entities.DeclKey][]entities.DeclKey{}
 	inside := make(map[entities.DeclKey]bool, len(stuck))
@@ -33,8 +29,6 @@ func inDependencyOrder(stuck []entities.DeclKey, links []link) []entities.DeclKe
 	return ordered
 }
 
-// componentsOf is the strongly connected components of nodes, each after every
-// component it waits on, with the members of one in the order they came in.
 func componentsOf(
 	nodes []entities.DeclKey,
 	providers map[entities.DeclKey][]entities.DeclKey,
@@ -55,8 +49,6 @@ func componentsOf(
 	return walk.components
 }
 
-// componentWalk is Tarjan's walk from a dependent to its providers, which
-// closes a component only after every component it waits on.
 type componentWalk struct {
 	providers  map[entities.DeclKey][]entities.DeclKey
 	low        map[entities.DeclKey]int
@@ -100,11 +92,6 @@ func (walk *componentWalk) visit(node entities.DeclKey) {
 	walk.stack = walk.stack[:start]
 }
 
-// CycleExtent widens the extent of every member of a hard cycle to the cycle's
-// last member: mutual references compile in one commit or in none, so a cut
-// between two of them is not a cut the plan may make. An atom is one node of the
-// cycle, since its members are born together: two tables whose ORM types name
-// each other form one, though no single declaration of either does.
 func CycleExtent(graph entities.Graph, keys []entities.DeclKey, extent []int) []int {
 	nodes := atomNodes(graph, keys)
 	providers := map[entities.DeclKey][]entities.DeclKey{}

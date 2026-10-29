@@ -9,8 +9,6 @@ import (
 func TestSortForBirthKeepsAnAtomContiguousWithinAPosition(t *testing.T) {
 	t.Parallel()
 
-	// Both halves of the atom and two loose declarations tie at one position.
-	// The ready queue alone yields first, loose, second, loose.
 	first := decl("gen/a.sql.go", "First", "gen")
 	first.Atom = "gen"
 	second := decl("gen/a.sql.go", "Second", "gen")
@@ -44,28 +42,26 @@ func TestSortForBirthKeepsAnAtomContiguousWithinAPosition(t *testing.T) {
 func TestSortForBirthWaitsForWhatAnAtomMemberNeeds(t *testing.T) {
 	t.Parallel()
 
-	// The second member needs a loose declaration at the same position, so the
-	// whole atom comes after it.
 	first := decl("gen/a.sql.go", "First", "gen")
 	first.Atom = "gen"
 	second := decl("gen/a.sql.go", "Second", "gen")
 	second.Atom = "gen"
-	helper := decl("lib/a.go", "Helper", "lib")
+	scaffold := decl("lib/a.go", "Helper", "lib")
 
 	graph := entities.NewGraph(
-		[]entities.Decl{first, second, helper},
-		[]entities.Edge{needs(second, helper)},
+		[]entities.Decl{first, second, scaffold},
+		[]entities.Edge{needs(second, scaffold)},
 		nil,
 	)
 
 	got := SortForBirth(
 		graph,
 		entities.Ordering{},
-		[]entities.DeclKey{first.Key, second.Key, helper.Key},
+		[]entities.DeclKey{first.Key, second.Key, scaffold.Key},
 		nil,
 	)
 
-	if len(got) != 3 || got[0] != helper.Key {
+	if len(got) != 3 || got[0] != scaffold.Key {
 		t.Fatalf("order = %v, want the helper before the atom", got)
 	}
 }
@@ -73,17 +69,14 @@ func TestSortForBirthWaitsForWhatAnAtomMemberNeeds(t *testing.T) {
 func TestSortForBirthIgnoresAGeneratedByEdgeThatClosesACycle(t *testing.T) {
 	t.Parallel()
 
-	// The mock is generated from a directive on the helper that reads the mock.
-	// Name order puts the helper first, so only dropping the soft edge puts the
-	// mock, which the helper reads, ahead of it.
-	helper := testDecl("pkg/a_test.go", "newUseCaseWithMocks", "pkg")
+	scaffold := testDecl("pkg/a_test.go", "newUseCaseWithMocks", "pkg")
 	mock := testDecl("pkg/z_mock_test.go", "NewMockStore", "pkg")
 
 	graph := entities.NewGraph(
-		[]entities.Decl{helper, mock},
+		[]entities.Decl{scaffold, mock},
 		[]entities.Edge{
-			needs(helper, mock),
-			{Dependent: mock.Key, Provider: helper.Key, Reason: entities.ReasonGeneratedBy},
+			needs(scaffold, mock),
+			{Dependent: mock.Key, Provider: scaffold.Key, Reason: entities.ReasonGeneratedBy},
 		},
 		nil,
 	)
@@ -91,7 +84,7 @@ func TestSortForBirthIgnoresAGeneratedByEdgeThatClosesACycle(t *testing.T) {
 	got := SortForBirth(
 		graph,
 		entities.Ordering{},
-		[]entities.DeclKey{helper.Key, mock.Key},
+		[]entities.DeclKey{scaffold.Key, mock.Key},
 		nil,
 	)
 
@@ -127,7 +120,6 @@ func TestSortForBirthKeepsAHardCycleInArrivalOrder(t *testing.T) {
 func TestSortForBirthPutsWhatWaitsOnAHardCycleAfterIt(t *testing.T) {
 	t.Parallel()
 
-	// The name order puts the dependent first; it needs a member of the cycle.
 	dependent := decl("pkg/0.go", "Dependent", "pkg")
 	first := decl("pkg/a.go", "A", "pkg")
 	second := decl("pkg/b.go", "B", "pkg")

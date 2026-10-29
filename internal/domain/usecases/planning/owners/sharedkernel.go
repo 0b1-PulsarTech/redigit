@@ -56,9 +56,6 @@ func UnbornProviders(
 	return SortedKeys(wanted)
 }
 
-// sharedIndex is the shared-kernel structure a single unbornProviders walk
-// leans on beyond graph.Needs: which declarations a generated file wrote
-// together (atoms), and which test an Anchor points at each of them.
 type sharedIndex struct {
 	atoms   map[string][]entities.DeclKey
 	testsOf map[entities.DeclKey][]entities.DeclKey
@@ -69,9 +66,6 @@ type sharedIndex struct {
 	own    Ownership
 }
 
-// siblingsOf is everything current's place in the shared kernel drags along
-// with it: the providers it needs, the atom it was written in, and any test
-// anchored to it that is itself already safe to pull.
 func (index sharedIndex) siblingsOf(
 	graph entities.Graph,
 	own Ownership,
@@ -111,9 +105,6 @@ func (index sharedIndex) siblingsOf(
 	return out
 }
 
-// packageOf is the rest of the package of a shared declaration a feature reads:
-// a package is one importable thing, so the first feature to need any of it
-// brings the rest instead of growing it one consumer at a time.
 func (index sharedIndex) packageOf(
 	graph entities.Graph,
 	current entities.DeclKey,
@@ -158,7 +149,7 @@ func SortedKeys(set map[entities.DeclKey]bool) []entities.DeclKey {
 
 	slices.SortFunc(
 		out,
-		func(a, b entities.DeclKey) int { return cmp.Compare(a.String(), b.String()) },
+		func(first, second entities.DeclKey) int { return cmp.Compare(first.String(), second.String()) },
 	)
 
 	return out

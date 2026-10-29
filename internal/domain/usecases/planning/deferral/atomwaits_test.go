@@ -62,8 +62,6 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 	}
 }
 
-// A registration waits for the shared code a feature also uses: bringing it
-// early would pull that code's whole closure into the first registration.
 func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 	t.Parallel()
 

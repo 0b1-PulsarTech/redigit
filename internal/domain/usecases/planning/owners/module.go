@@ -7,10 +7,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// moduleDir is the directory of the manifest that makes a declaration's unit a
-// module, or "" when the graph names none. It is the unit of build the owner
-// reads as one piece of the product, so it groups features better than a path
-// prefix, which depends on how a repository happens to be laid out.
 func moduleDir(graph entities.Graph, decl entities.Decl) string {
 	for _, edge := range graph.Needs(decl.Key) {
 		if edge.Reason != entities.ReasonModule {
@@ -24,12 +20,12 @@ func moduleDir(graph entities.Graph, decl entities.Decl) string {
 		return "."
 	}
 
+	// It is the unit of build the owner reads as one piece of the product, so it
+	// groups features better than a path prefix, which depends on how a
+	// repository happens to be laid out.
 	return ""
 }
 
-// isHead reports whether an entry point is plugged into the wiring: a handler,
-// a sink, a worker. An unconsumed declaration nothing registers is dead code or
-// a program of its own, and says nothing about the module it sits in.
 func isHead(graph entities.Graph, entry entities.Decl, roots reach.Wiring) bool {
 	for _, edge := range graph.Consumers(entry.Key) {
 		if roots[edge.Dependent] {
@@ -40,13 +36,12 @@ func isHead(graph entities.Graph, entry entities.Decl, roots reach.Wiring) bool 
 	return false
 }
 
-// shareLibraries makes every module that is read from outside and holds no
-// head shared. A library has no capability of its own, so no feature owns it;
-// each declaration is born with the first feature that needs it, and the
-// package grows one consumer at a time.
 func shareLibraries(graph entities.Graph, own Ownership, heads map[string]bool) {
 	read := readFromOutside(graph)
 
+	// A library has no capability of its own, so no feature owns it; each
+	// declaration is born with the first feature that needs it, and the package
+	// grows one consumer at a time.
 	for _, decl := range graph.Decls() {
 		if entities.IsTestSide(decl) {
 			continue
@@ -61,8 +56,6 @@ func shareLibraries(graph entities.Graph, own Ownership, heads map[string]bool) 
 	}
 }
 
-// readFromOutside is the modules some production declaration of another module
-// reads.
 func readFromOutside(graph entities.Graph) map[string]bool {
 	out := map[string]bool{}
 
@@ -84,8 +77,6 @@ func readFromOutside(graph entities.Graph) map[string]bool {
 	return out
 }
 
-// atModuleRoot is true for a declaration in the directory of its module's
-// manifest: the module's own entry into the program.
 func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 	dir := decl.Unit.Dir()
 	if dir == "" {
@@ -95,10 +86,6 @@ func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 	return dir == moduleDir(graph, decl)
 }
 
-// deferLibraryEntries defers the entries of a library: a function nothing calls
-// yet, an interface assertion. No feature needs them and no feature owns them,
-// so left to the end they stretched a library's history from its first package
-// to the last commit; deferred, each is born right after what it names.
 func deferLibraryEntries(own Ownership, entries []entities.Decl) {
 	for _, entry := range entries {
 		if own.Owner[entry.Key] != reach.SharedFeature || own.Deferred[entry.Key] {
@@ -110,12 +97,12 @@ func deferLibraryEntries(own Ownership, entries []entities.Decl) {
 	}
 }
 
-// sharedPackages groups the shared production declarations by package. A
-// package is one importable thing: the first feature to need any of it brings
-// the rest, so it is not rebuilt one consumer at a time over the whole history.
 func sharedPackages(graph entities.Graph, own Ownership) map[entities.UnitID][]entities.DeclKey {
 	out := map[entities.UnitID][]entities.DeclKey{}
 
+	// A package is one importable thing: the first feature to need any of it
+	// brings the rest, so it is not rebuilt one consumer at a time over the
+	// whole history.
 	for _, decl := range graph.Decls() {
 		if own.Owner[decl.Key] != reach.SharedFeature || own.Deferred[decl.Key] ||
 			entities.IsTestSide(decl) || decl.Generated || decl.Key.Kind == entities.KindOther ||
@@ -129,9 +116,6 @@ func sharedPackages(graph entities.Graph, own Ownership) map[entities.UnitID][]e
 	return out
 }
 
-// feedsData is whether a declaration is one table's schema or query: each is
-// born with the first repository that reads it, not with the rest of its
-// package, or the whole database arrives in the first commit that touches one.
 func feedsData(graph entities.Graph, key entities.DeclKey) bool {
 	for _, edge := range graph.Consumers(key) {
 		if edge.Reason == entities.ReasonSchema || edge.Reason == entities.ReasonQuery {

@@ -5,7 +5,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// entryWalk is what walking back from every entry point finds.
 type entryWalk struct {
 	reachedBy    map[entities.DeclKey]map[reach.FeatureID]bool
 	entryModules map[string]bool

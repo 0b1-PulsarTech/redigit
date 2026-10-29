@@ -6,9 +6,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// OwnTests is the tests, outside the wiring, that the feature just built
-// completes: everything they exercise is born, and the feature supplied part of
-// it. One that needs a ready root waits for that root's turn.
 func OwnTests(
 	graph entities.Graph,
 	own owners.Ownership,

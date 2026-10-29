@@ -2,17 +2,13 @@ package reach
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
-// Wiring is the set of declarations that assemble the program, found by
-// entities.FindWiring.
 type Wiring map[entities.DeclKey]bool
 
-// DeferTests adds to the wiring every test, and whatever else a test file
-// declares, every afterword and every loose manifest line. A test belongs after
-// the code it exercises and a test of the injector needs the whole program, so
-// none of them is owned by a capability up front; each arrives once what it
-// needs exists.
 func DeferTests(graph entities.Graph, roots, support Wiring) Wiring {
 	out := Wiring{}
+	// A test belongs after the code it exercises and a test of the injector
+	// needs the whole program, so none of them is owned by a capability up
+	// front; each arrives once what it needs exists.
 	for key := range roots {
 		out[key] = true
 	}

@@ -5,11 +5,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// readsRoots is, per feature, the module roots whose code it reads directly: the
-// roots it should wait for, so a module does not open as a stray file inside
-// another arc. What it reaches only through shared code is not read by it, and
-// waiting for that would make every feature wait for the whole program. The
-// wait is a preference: modules that read each other are built anyway.
 func readsRoots(
 	graph entities.Graph,
 	owner map[entities.DeclKey]reach.FeatureID,
@@ -17,6 +12,8 @@ func readsRoots(
 ) map[reach.FeatureID]map[reach.FeatureID]bool {
 	reads := map[reach.FeatureID]map[reach.FeatureID]bool{}
 
+	// What it reaches only through shared code is not read by it, and waiting
+	// for that would make every feature wait for the whole program.
 	for _, edge := range graph.Edges() {
 		feature := owner[edge.Dependent]
 		if feature == reach.SharedFeature || entities.IsStructural(edge.Reason) ||
@@ -44,8 +41,6 @@ func readsRoots(
 	return reads
 }
 
-// ProductOf is the root of the product a feature serves; a feature serving none
-// is its own.
 func ProductOf(group map[reach.FeatureID]reach.FeatureID, feature reach.FeatureID) reach.FeatureID {
 	if root, found := group[feature]; found {
 		return root
