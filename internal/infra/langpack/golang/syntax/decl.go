@@ -116,7 +116,7 @@ func buildFuncDecl(
 	if decl.Recv != nil {
 		kind = entities.KindMethod
 
-		if recv := ReceiverName(decl.Recv); recv != "" {
+		if recv := receiverName(decl.Recv); recv != "" {
 			name = recv + "." + name
 		}
 	}
@@ -135,7 +135,7 @@ func buildFuncDecl(
 	}
 }
 
-func ReceiverName(recv *ast.FieldList) string {
+func receiverName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
 	}
@@ -222,5 +222,5 @@ func FuncIdent(fn *ast.FuncDecl) Ident {
 		return Ident{entities.KindFunc, fn.Name.Name}
 	}
 
-	return Ident{entities.KindMethod, ReceiverName(fn.Recv) + "." + fn.Name.Name}
+	return Ident{entities.KindMethod, receiverName(fn.Recv) + "." + fn.Name.Name}
 }

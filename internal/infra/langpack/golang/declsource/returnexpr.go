@@ -61,7 +61,7 @@ func resultsHoldInterface(signature *ast.FuncType, interfaces map[string]bool) b
 	}
 
 	for _, result := range signature.Results.List {
-		if name, found := TypeName(result.Type); found && interfaces[name] {
+		if name, found := typeName(result.Type); found && interfaces[name] {
 			return true
 		}
 	}
@@ -69,18 +69,18 @@ func resultsHoldInterface(signature *ast.FuncType, interfaces map[string]bool) b
 	return false
 }
 
-func TypeName(expr ast.Expr) (string, bool) {
+func typeName(expr ast.Expr) (string, bool) {
 	switch node := expr.(type) {
 	case *ast.Ident:
 		return node.Name, true
 	case *ast.StarExpr:
-		return TypeName(node.X)
+		return typeName(node.X)
 	case *ast.ParenExpr:
-		return TypeName(node.X)
+		return typeName(node.X)
 	case *ast.IndexExpr:
-		return TypeName(node.X)
+		return typeName(node.X)
 	case *ast.IndexListExpr:
-		return TypeName(node.X)
+		return typeName(node.X)
 	case *ast.SelectorExpr:
 		return node.Sel.Name, true
 	default:
