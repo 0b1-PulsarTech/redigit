@@ -29,12 +29,12 @@ func (r mockgenRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := groupByFile(decls)
+	byFile := GroupByFile(decls)
 
 	var edges []entities.Edge
 
 	for file, mockDecls := range byFile {
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +57,7 @@ func (r mockgenRule) Edges(
 
 		for _, dependent := range mockDependents(mockDecls, source) {
 			for _, name := range dependent.subjects {
-				if provider, found := findTypeNamed(candidates, name); found {
+				if provider, found := FindTypeNamed(candidates, name); found {
 					edges = append(edges, entities.Edge{
 						Dependent: dependent.key,
 						Provider:  provider,

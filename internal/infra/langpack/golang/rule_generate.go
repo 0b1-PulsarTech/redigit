@@ -23,12 +23,12 @@ func (generateRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := groupByFile(decls)
+	byFile := GroupByFile(decls)
 
 	var edges []entities.Edge
 
 	for file, fileDecls := range byFile {
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			continue
 		}

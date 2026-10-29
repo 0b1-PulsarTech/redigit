@@ -39,7 +39,7 @@ func calledSubject(
 ) (entities.DeclKey, bool) {
 	source, cached := sources[d.Key.File]
 	if !cached {
-		read, err := readSource(snap, d.Key.File)
+		read, err := ReadSource(snap, d.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -48,7 +48,7 @@ func calledSubject(
 		sources[d.Key.File] = source
 	}
 
-	fn := parseFunc(sliceSpan(source, d.Span))
+	fn := ParseFunc(SliceSpan(source, d.Span))
 	if fn == nil || fn.Body == nil {
 		return entities.DeclKey{}, false
 	}
@@ -108,7 +108,7 @@ func bestSubject(scope []entities.Decl, tokens []string) (entities.DeclKey, bool
 		left := strings.Join(tokens[:cut], "")
 		right := strings.Join(tokens[cut:], "")
 
-		if key, ok := findTypeNamed(scope, left); ok {
+		if key, ok := FindTypeNamed(scope, left); ok {
 			best, found = key, true
 		}
 

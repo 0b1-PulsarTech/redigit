@@ -15,7 +15,7 @@ func TestGroupByFile(t *testing.T) {
 		{Key: entities.DeclKey{File: "a.go", Name: "C"}},
 	}
 
-	got := groupByFile(decls)
+	got := GroupByFile(decls)
 
 	if len(got["a.go"]) != 2 {
 		t.Fatalf("groupByFile()[a.go] has %d entries, want 2", len(got["a.go"]))
@@ -51,7 +51,7 @@ func TestFindDecl(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, found := findDecl(decls, testCase.file, testCase.kind, testCase.key)
+			_, found := FindDecl(decls, testCase.file, testCase.kind, testCase.key)
 			if found != testCase.want {
 				t.Fatalf("findDecl() found = %v, want %v", found, testCase.want)
 			}
@@ -81,7 +81,7 @@ func TestFindTypeNamed(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, found := findTypeNamed(decls, testCase.key)
+			_, found := FindTypeNamed(decls, testCase.key)
 			if found != testCase.want {
 				t.Fatalf("findTypeNamed() found = %v, want %v", found, testCase.want)
 			}

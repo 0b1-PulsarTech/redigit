@@ -83,7 +83,7 @@ func loadSQLModel(snap entities.Snapshot, decls []entities.Decl) (sqlModel, erro
 	model := sqlModel{
 		tables:     map[string]*sqlTable{},
 		extensions: map[string]entities.DeclKey{},
-		decls:      groupByFile(decls),
+		decls:      GroupByFile(decls),
 	}
 
 	if err := model.readMigrations(snap); err != nil {
@@ -102,7 +102,7 @@ func loadSQLModel(snap entities.Snapshot, decls []entities.Decl) (sqlModel, erro
 
 func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
 	for _, file := range migrationFiles(snap.Files) {
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ func isDBGenOutput(snap entities.Snapshot, file string) bool {
 		return false
 	}
 
-	source, err := readSource(snap, file)
+	source, err := ReadSource(snap, file)
 
 	return err == nil && genmark.IsSqlcOutput(source)
 }
@@ -239,7 +239,7 @@ func (model *sqlModel) readQueries(snap entities.Snapshot) error {
 	generated := model.generatedByName(snap)
 
 	for _, file := range queryFiles(snap.Files) {
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			return err
 		}

@@ -35,7 +35,7 @@ func (embedRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := groupByFile(decls)
+	byFile := GroupByFile(decls)
 
 	var edges []entities.Edge
 
@@ -44,7 +44,7 @@ func (embedRule) Edges(
 			continue
 		}
 
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil || !bytes.Contains(source, []byte(embedDirective)) {
 			continue
 		}

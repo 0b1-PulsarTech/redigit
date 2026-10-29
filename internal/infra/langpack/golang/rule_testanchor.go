@@ -40,7 +40,7 @@ func (testAnchorRule) Anchors(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
-	byFile := groupByFile(decls)
+	byFile := GroupByFile(decls)
 	byUnit := groupByUnit(decls)
 	sources := map[string][]byte{}
 

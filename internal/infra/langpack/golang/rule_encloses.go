@@ -28,7 +28,7 @@ func (enclosesRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := groupByFile(decls)
+	byFile := GroupByFile(decls)
 
 	var edges []entities.Edge
 
@@ -67,7 +67,7 @@ func enclosesInFile(
 	file string,
 	types map[string]entities.DeclKey,
 ) ([]entities.Edge, error) {
-	source, err := readSource(snap, file)
+	source, err := ReadSource(snap, file)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func funcEncloses(
 		return nil
 	}
 
-	funcKey, ok := findDecl(fileDecls, file, entities.KindFunc, d.Name.Name)
+	funcKey, ok := FindDecl(fileDecls, file, entities.KindFunc, d.Name.Name)
 	if !ok {
 		return nil
 	}
@@ -182,7 +182,7 @@ func valueEncloses(
 				continue
 			}
 
-			if valueKey, found := findDecl(fileDecls, file, entities.KindValue, name.Name); found {
+			if valueKey, found := FindDecl(fileDecls, file, entities.KindValue, name.Name); found {
 				edges = append(edges, entities.Edge{
 					Dependent: valueKey,
 					Provider:  typeKey,

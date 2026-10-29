@@ -56,7 +56,7 @@ func BuildConstraints(snap entities.Snapshot) ([]BuildTag, error) {
 	var out []BuildTag
 
 	for _, file := range snap.Files {
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}

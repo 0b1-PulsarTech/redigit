@@ -25,7 +25,7 @@ func TestReadSource(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := readSource(entities.Snapshot{Root: root}, testCase.path)
+			_, err := ReadSource(entities.Snapshot{Root: root}, testCase.path)
 			if (err != nil) != testCase.wantErr {
 				t.Fatalf("readSource() error = %v, wantErr %v", err, testCase.wantErr)
 			}
@@ -53,7 +53,7 @@ func TestSliceSpan(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := sliceSpan(source, testCase.span); got != testCase.want {
+			if got := SliceSpan(source, testCase.span); got != testCase.want {
 				t.Fatalf("sliceSpan() = %q, want %q", got, testCase.want)
 			}
 		})

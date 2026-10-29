@@ -30,7 +30,7 @@ func (routePathRule) Anchors(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
-	read := func(file string) ([]byte, error) { return readSource(snap, file) }
+	read := func(file string) ([]byte, error) { return ReadSource(snap, file) }
 
 	groups := routes.Find(read, decls)
 	if len(groups) == 0 {

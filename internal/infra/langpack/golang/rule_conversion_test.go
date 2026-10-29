@@ -72,7 +72,7 @@ func TestReturnedConcreteTypes(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := returnedConcreteTypes(testCase.text, interfaces)
+			got := ReturnedConcreteTypes(testCase.text, interfaces)
 
 			if len(got) != len(testCase.want) {
 				t.Fatalf("returnedConcreteTypes() = %v, want %v", got, testCase.want)

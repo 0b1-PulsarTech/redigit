@@ -193,7 +193,7 @@ func identsOf(snap entities.Snapshot, file string) map[string]bool {
 		return nil
 	}
 
-	source, err := readSource(snap, file)
+	source, err := ReadSource(snap, file)
 	if err != nil {
 		return nil
 	}

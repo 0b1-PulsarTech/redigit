@@ -22,7 +22,7 @@ func (goverterRule) Edges(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	byFile := groupByFile(decls)
+	byFile := GroupByFile(decls)
 
 	var edges []entities.Edge
 
@@ -64,14 +64,14 @@ func directiveDecls(
 			continue
 		}
 
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, d := range candidates {
 			if d.Key.Kind == entities.KindType &&
-				strings.Contains(sliceSpan(source, d.Span), "goverter:") {
+				strings.Contains(SliceSpan(source, d.Span), "goverter:") {
 				providers = append(providers, d.Key)
 			}
 		}

@@ -116,7 +116,7 @@ func mentionedTypes(
 ) []string {
 	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := readSource(snap, decl.Key.File)
+		read, err := ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -125,12 +125,12 @@ func mentionedTypes(
 		sources[decl.Key.File] = source
 	}
 
-	text := sliceSpan(source, decl.Span)
+	text := SliceSpan(source, decl.Span)
 	if text == "" {
 		return nil
 	}
 
-	node := parseDeclaration(text)
+	node := ParseDeclaration(text)
 	if node == nil {
 		return nil
 	}

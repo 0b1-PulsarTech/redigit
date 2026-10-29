@@ -88,7 +88,7 @@ func convertedTypes(
 
 	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := readSource(snap, decl.Key.File)
+		read, err := ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
@@ -97,10 +97,10 @@ func convertedTypes(
 		sources[decl.Key.File] = source
 	}
 
-	text := sliceSpan(source, decl.Span)
+	text := SliceSpan(source, decl.Span)
 	if text == "" || !strings.Contains(text, "return") {
 		return nil
 	}
 
-	return returnedConcreteTypes(text, interfaces)
+	return ReturnedConcreteTypes(text, interfaces)
 }

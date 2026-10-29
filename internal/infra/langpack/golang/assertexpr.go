@@ -46,7 +46,7 @@ func parseAssertion(body string) (string, bool) {
 				continue
 			}
 
-			if name, found := concreteTypeIn(value.Values[0]); found {
+			if name, found := ConcreteTypeIn(value.Values[0]); found {
 				return name, true
 			}
 		}

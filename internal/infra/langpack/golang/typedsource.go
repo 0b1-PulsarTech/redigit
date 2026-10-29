@@ -194,7 +194,7 @@ func modulesOf(snap entities.Snapshot) ([]module, error) {
 			continue
 		}
 
-		source, err := readSource(snap, file)
+		source, err := ReadSource(snap, file)
 		if err != nil {
 			return nil, err
 		}
