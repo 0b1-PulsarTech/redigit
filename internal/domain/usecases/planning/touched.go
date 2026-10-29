@@ -2,6 +2,7 @@ package planning
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -12,7 +13,7 @@ import (
 func touched(
 	graph entities.Graph,
 	subjects map[entities.DeclKey][]entities.DeclKey,
-	own Ownership,
+	own owners.Ownership,
 	ready, fresh map[entities.DeclKey]bool,
 ) map[entities.DeclKey]bool {
 	out := map[entities.DeclKey]bool{}

@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"cmp"
@@ -14,9 +14,9 @@ import (
 // feature is part of that feature and is born with it; one reached by many is
 // infrastructure and has to be born before all of them.
 type Ownership struct {
-	Owner map[entities.DeclKey]FeatureID
+	Owner map[entities.DeclKey]reach.FeatureID
 	Reach map[entities.DeclKey]int
-	Order []FeatureID
+	Order []reach.FeatureID
 	// Deferred is the wiring and its tests: owned only once the features are
 	// in build order, by the last one they need.
 	Deferred reach.Wiring
@@ -32,12 +32,12 @@ type Ownership struct {
 	packages map[entities.UnitID][]entities.DeclKey
 	// Group is the product a feature belongs to, named by the module-root
 	// feature it serves, so the features of one product are ordered together.
-	Group map[FeatureID]FeatureID
+	Group map[reach.FeatureID]reach.FeatureID
 	// Waits is the module roots a feature should come after.
-	Waits map[FeatureID]map[FeatureID]bool
+	Waits map[reach.FeatureID]map[reach.FeatureID]bool
 	// Cost is how many declarations a feature needs in all, its own and the
 	// shared ones, so the smallest working feature can come first.
-	Cost map[FeatureID]int
+	Cost map[reach.FeatureID]int
 }
 
 // Assign walks back from every entry point and counts, per declaration, how
@@ -45,10 +45,10 @@ type Ownership struct {
 // package to the instant the source history happened to create it.
 func Assign(graph entities.Graph) Ownership {
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{},
+		Owner: map[entities.DeclKey]reach.FeatureID{},
 		Reach: map[entities.DeclKey]int{},
-		Group: map[FeatureID]FeatureID{},
-		Cost:  map[FeatureID]int{},
+		Group: map[reach.FeatureID]reach.FeatureID{},
+		Cost:  map[reach.FeatureID]int{},
 		Roots: reach.CodeWiring(graph, entities.FindWiring(graph)),
 		Loose: reach.LooseLines(graph),
 	}
@@ -99,7 +99,7 @@ func Assign(graph entities.Graph) Ownership {
 
 	own.packages = sharedPackages(graph, own)
 
-	slices.SortFunc(own.Order, func(a, b FeatureID) int { return cmp.Compare(a, b) })
+	slices.SortFunc(own.Order, func(a, b reach.FeatureID) int { return cmp.Compare(a, b) })
 
 	return own
 }
@@ -117,9 +117,9 @@ func shareUnreached(graph entities.Graph, own Ownership) {
 	}
 }
 
-func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[FeatureID]bool) {
+func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[reach.FeatureID]bool) {
 	for _, members := range reach.AtomGroups(graph) {
-		union := map[FeatureID]bool{}
+		union := map[reach.FeatureID]bool{}
 
 		for _, key := range members {
 			for feature := range reachedBy[key] {
@@ -140,7 +140,7 @@ func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[Feature
 // soleOwner is deliberately not a threshold. A declaration reached by two
 // features belongs to neither: picking one of them would be a guess, and a
 // guess here is what puts a declaration hundreds of commits from its use.
-func soleOwner(features map[FeatureID]bool) FeatureID {
+func soleOwner(features map[reach.FeatureID]bool) reach.FeatureID {
 	if len(features) != 1 {
 		return reach.SharedFeature
 	}

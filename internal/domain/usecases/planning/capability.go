@@ -7,6 +7,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/birth"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -23,8 +24,8 @@ type Capabilities map[entities.DeclKey]FeatureID
 // map names belongs to exactly one slice, so nothing is shared and nothing is
 // unreached; a declaration the map does not name stays SharedFeature, which is
 // where the unreached already went.
-func ownershipFrom(capabilities Capabilities, graph entities.Graph) Ownership {
-	own := Ownership{
+func ownershipFrom(capabilities Capabilities, graph entities.Graph) owners.Ownership {
+	own := owners.Ownership{
 		Owner: make(map[entities.DeclKey]FeatureID, graph.Len()),
 		Reach: make(map[entities.DeclKey]int, graph.Len()),
 	}
@@ -60,7 +61,7 @@ func ownershipFrom(capabilities Capabilities, graph entities.Graph) Ownership {
 func (p Planner) emitByCapability(
 	graph entities.Graph,
 	order entities.Ordering,
-	own Ownership,
+	own owners.Ownership,
 ) entities.Plan {
 	atoms := make(map[entities.DeclKey]string, graph.Len())
 	keys := make([]entities.DeclKey, 0, graph.Len())

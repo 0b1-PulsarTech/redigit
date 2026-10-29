@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"testing"
@@ -80,7 +80,7 @@ func TestShareDependenciesMovesAnAtomWhole(t *testing.T) {
 	)
 
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			wired.Key: reach.SharedFeature, gen.Key: "a", sibling.Key: "a",
 		},
 		Reach: map[entities.DeclKey]int{},

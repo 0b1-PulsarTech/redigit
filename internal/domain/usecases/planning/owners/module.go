@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"strings"

@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"slices"
@@ -17,7 +17,7 @@ func TestAssign(t *testing.T) {
 	testCases := []struct {
 		name      string
 		decl      entities.Decl
-		wantOwner FeatureID
+		wantOwner reach.FeatureID
 		wantReach int
 	}{
 		{"reached by both features, so owned by neither", named["kernel"], reach.SharedFeature, 2},

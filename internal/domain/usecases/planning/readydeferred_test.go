@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -23,7 +24,7 @@ func TestReadyDeferredIgnoresAnInterfaceATypeOnlyFills(t *testing.T) {
 		},
 		nil,
 	)
-	own := Ownership{
+	own := owners.Ownership{
 		Owner:    map[entities.DeclKey]FeatureID{subject.Key: "a", port.Key: "b"},
 		Deferred: reach.Wiring{double.Key: true},
 		Roots:    reach.Wiring{},

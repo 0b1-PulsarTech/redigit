@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"testing"
@@ -24,10 +24,10 @@ func TestReadsRootsCountsOnlyWhatAFeatureReadsDirectly(t *testing.T) {
 		},
 		nil,
 	)
-	owner := map[entities.DeclKey]FeatureID{
+	owner := map[entities.DeclKey]reach.FeatureID{
 		port.Key: "crm", handler.Key: "routes", shared.Key: reach.SharedFeature,
 	}
-	roots := map[string]FeatureID{"crm": "crm", "kernel": "kernel"}
+	roots := map[string]reach.FeatureID{"crm": "crm", "kernel": "kernel"}
 
 	got := readsRoots(graph, owner, roots)
 

@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -12,10 +12,10 @@ import (
 // wait is a preference: modules that read each other are built anyway.
 func readsRoots(
 	graph entities.Graph,
-	owner map[entities.DeclKey]FeatureID,
-	rootOf map[string]FeatureID,
-) map[FeatureID]map[FeatureID]bool {
-	reads := map[FeatureID]map[FeatureID]bool{}
+	owner map[entities.DeclKey]reach.FeatureID,
+	rootOf map[string]reach.FeatureID,
+) map[reach.FeatureID]map[reach.FeatureID]bool {
+	reads := map[reach.FeatureID]map[reach.FeatureID]bool{}
 
 	for _, edge := range graph.Edges() {
 		feature := owner[edge.Dependent]
@@ -35,7 +35,7 @@ func readsRoots(
 		}
 
 		if reads[feature] == nil {
-			reads[feature] = map[FeatureID]bool{}
+			reads[feature] = map[reach.FeatureID]bool{}
 		}
 
 		reads[feature][root] = true
@@ -46,7 +46,7 @@ func readsRoots(
 
 // ProductOf is the root of the product a feature serves; a feature serving none
 // is its own.
-func ProductOf(group map[FeatureID]FeatureID, feature FeatureID) FeatureID {
+func ProductOf(group map[reach.FeatureID]reach.FeatureID, feature reach.FeatureID) reach.FeatureID {
 	if root, found := group[feature]; found {
 		return root
 	}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -85,7 +86,7 @@ func TestFeatureNeeds(t *testing.T) {
 	t.Parallel()
 
 	graph, _, _ := twoFeatures()
-	own := Assign(graph)
+	own := owners.Assign(graph)
 	needs := featureNeeds(graph, own)
 
 	// The lead slice is one feature end to end, so it needs nothing from
@@ -107,7 +108,7 @@ func TestEarliest(t *testing.T) {
 	t.Parallel()
 
 	graph, order, _ := twoFeatures()
-	own := Assign(graph)
+	own := owners.Assign(graph)
 	at := earliest(own, order)
 
 	if got := at["lead/api"]; got != 1 {
@@ -141,7 +142,7 @@ func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 		nil,
 	)
 
-	own := Assign(graph)
+	own := owners.Assign(graph)
 
 	_, cyclic := sortFeatures(
 		own.Order,
@@ -210,7 +211,7 @@ func TestFeatureNeedsBehindADeferred(t *testing.T) {
 				testCase.edges,
 				nil,
 			)
-			got := featureNeeds(graph, Ownership{Owner: owner, Deferred: testCase.deferred})
+			got := featureNeeds(graph, owners.Ownership{Owner: owner, Deferred: testCase.deferred})
 
 			if got["lead/api"]["bill/api"] != testCase.want {
 				t.Fatalf("featureNeeds() lead/api -> bill/api = %v, want %v",

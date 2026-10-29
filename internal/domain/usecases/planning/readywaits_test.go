@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -67,7 +68,7 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 				query.Key:   reach.SharedFeature,
 				counted.Key: reach.SharedFeature, feature.Key: "a",
 			}
-			own := Ownership{
+			own := owners.Ownership{
 				Owner:    owner,
 				Reach:    testCase.reach,
 				Deferred: reach.Wiring{suite.Key: true},

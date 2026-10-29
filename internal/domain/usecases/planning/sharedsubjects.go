@@ -2,6 +2,7 @@ package planning
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -12,7 +13,7 @@ import (
 // commits behind the code it tests.
 func sharedSubjects(
 	graph entities.Graph,
-	own Ownership,
+	own owners.Ownership,
 ) map[entities.DeclKey][]entities.DeclKey {
 	out := map[entities.DeclKey][]entities.DeclKey{}
 

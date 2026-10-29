@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -13,7 +14,7 @@ import (
 // needs only shared code is ready at the first feature and drags that code in.
 func readyDeferred(
 	graph entities.Graph,
-	own Ownership,
+	own owners.Ownership,
 	born map[entities.DeclKey]bool,
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
@@ -69,7 +70,7 @@ func readyDeferred(
 		}
 	}
 
-	return SortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
+	return owners.SortedKeys(anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready))
 }
 
 func waitsOn(
@@ -106,7 +107,7 @@ func atomMembers(
 // the others in with everything they need.
 func atomWaits(
 	members []entities.DeclKey,
-	own Ownership,
+	own owners.Ownership,
 	born, ready map[entities.DeclKey]bool,
 ) bool {
 	for _, member := range members {
@@ -120,7 +121,7 @@ func atomWaits(
 
 // usedBeyondWiring is whether a shared declaration has a consumer that is not
 // itself wiring or a test, a consumer some feature will be built for.
-func usedBeyondWiring(graph entities.Graph, own Ownership, key entities.DeclKey) bool {
+func usedBeyondWiring(graph entities.Graph, own owners.Ownership, key entities.DeclKey) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
 		if !found || entities.IsTestSide(consumer) || entities.IsStructural(edge.Reason) {

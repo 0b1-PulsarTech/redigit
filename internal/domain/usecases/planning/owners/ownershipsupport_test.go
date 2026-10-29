@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"slices"
@@ -22,7 +22,7 @@ func TestAssignBuildsNoFeatureForCodeOnlyTestsRead(t *testing.T) {
 
 	own := Assign(graph)
 
-	if want := []FeatureID{"lead"}; !slices.Equal(own.Order, want) {
+	if want := []reach.FeatureID{"lead"}; !slices.Equal(own.Order, want) {
 		t.Errorf("order = %v, want %v: test support is no feature to build", own.Order, want)
 	}
 

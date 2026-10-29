@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"

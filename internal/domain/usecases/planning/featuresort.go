@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 )
 
 // featureRules decides the order of the features: what must precede what, where
@@ -60,7 +61,7 @@ func sortFeatures(
 	rules featureRules,
 ) (sorted []FeatureID, cyclic []FeatureID) {
 	needs, waits, at, group, cost := rules.needs, rules.waits, rules.at, rules.group, rules.cost
-	product := func(feature FeatureID) FeatureID { return ProductOf(group, feature) }
+	product := func(feature FeatureID) FeatureID { return owners.ProductOf(group, feature) }
 
 	readers := productReaders(waits, product)
 	pending := slices.Clone(features)

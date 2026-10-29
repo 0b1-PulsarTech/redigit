@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 		nil,
 	)
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			repo.Key: reach.SharedFeature, build.Key: "wire/di", elsewhere.Key: "wire/di",
 			plain.Key: "wire/di", checkTest.Key: "wire/di",
 		},
@@ -36,7 +36,7 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 	testCases := []struct {
 		name string
 		decl entities.Decl
-		want FeatureID
+		want reach.FeatureID
 	}{
 		{"a constructor of a shared type is shared with it", build, reach.SharedFeature},
 		{"a function of another package keeps its feature", elsewhere, "wire/di"},

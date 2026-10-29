@@ -1,10 +1,11 @@
-package planning
+package owners
 
 import (
 	"cmp"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // kinReach is the most features that may read a declaration for it to say
@@ -17,10 +18,10 @@ const kinReach = 12
 // contract they alone read. A shared declaration ties its readers with weight
 // 1/(readers-1); a feature joins the root it is tied to most, else stands alone.
 func joinProducts(
-	reachedBy map[entities.DeclKey]map[FeatureID]bool,
-	roots map[FeatureID]bool,
-) map[FeatureID]FeatureID {
-	tie := map[FeatureID]map[FeatureID]float64{}
+	reachedBy map[entities.DeclKey]map[reach.FeatureID]bool,
+	roots map[reach.FeatureID]bool,
+) map[reach.FeatureID]reach.FeatureID {
+	tie := map[reach.FeatureID]map[reach.FeatureID]float64{}
 
 	for _, features := range reachedBy {
 		if len(features) < 2 || len(features) > kinReach {
@@ -36,7 +37,7 @@ func joinProducts(
 				}
 
 				if tie[feature] == nil {
-					tie[feature] = map[FeatureID]float64{}
+					tie[feature] = map[reach.FeatureID]float64{}
 				}
 
 				tie[feature][root] += weight
@@ -44,7 +45,7 @@ func joinProducts(
 		}
 	}
 
-	out := map[FeatureID]FeatureID{}
+	out := map[reach.FeatureID]reach.FeatureID{}
 
 	for feature, ties := range tie {
 		if roots[feature] {
@@ -59,13 +60,13 @@ func joinProducts(
 
 // strongest is the root with the largest tie; the name settles an equal one so
 // a plan is the same on every run.
-func strongest(ties map[FeatureID]float64) FeatureID {
-	candidates := make([]FeatureID, 0, len(ties))
+func strongest(ties map[reach.FeatureID]float64) reach.FeatureID {
+	candidates := make([]reach.FeatureID, 0, len(ties))
 	for root := range ties {
 		candidates = append(candidates, root)
 	}
 
-	return slices.MaxFunc(candidates, func(a, b FeatureID) int {
+	return slices.MaxFunc(candidates, func(a, b reach.FeatureID) int {
 		if byTie := cmp.Compare(ties[a], ties[b]); byTie != 0 {
 			return byTie
 		}

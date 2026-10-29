@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -24,7 +25,7 @@ func TestSharedSubjectsDropsWhatOnlyAFeatureReads(t *testing.T) {
 		},
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := owners.Ownership{Owner: map[entities.DeclKey]FeatureID{
 		test.Key:     reach.SharedFeature,
 		entries.Key:  reach.SharedFeature,
 		declares.Key: "webrouters",
@@ -53,7 +54,7 @@ func TestReadyDeferredDoesNotWaitForASubjectOnlyAFeatureReads(t *testing.T) {
 		},
 	)
 
-	own := Ownership{
+	own := owners.Ownership{
 		Owner: map[entities.DeclKey]FeatureID{
 			test.Key: reach.SharedFeature, entries.Key: reach.SharedFeature, declares.Key: "webrouters",
 		},

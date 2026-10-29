@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"testing"
@@ -61,7 +61,7 @@ func TestDeferLibraryEntries(t *testing.T) {
 	free := decl("lib/a.go", "A", "lib")
 	owned := decl("lib/b.go", "B", "lib")
 	own := Ownership{
-		Owner:    map[entities.DeclKey]FeatureID{free.Key: reach.SharedFeature, owned.Key: "f"},
+		Owner:    map[entities.DeclKey]reach.FeatureID{free.Key: reach.SharedFeature, owned.Key: "f"},
 		Deferred: reach.Wiring{},
 		Loose:    reach.Wiring{},
 	}

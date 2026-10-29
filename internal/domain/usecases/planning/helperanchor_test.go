@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 )
 
 func TestAnchorHelpersKeepsAHelperOnlyWithAChosenReader(t *testing.T) {
@@ -23,7 +24,7 @@ func TestAnchorHelpersKeepsAHelperOnlyWithAChosenReader(t *testing.T) {
 		},
 		nil,
 	)
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{}}
+	own := owners.Ownership{Owner: map[entities.DeclKey]FeatureID{}}
 	pool := map[entities.DeclKey]bool{
 		prod.Key: true, chosenTest.Key: true, read.Key: true, unread.Key: true, nested.Key: true,
 	}

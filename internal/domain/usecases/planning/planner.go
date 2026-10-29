@@ -5,6 +5,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/testplace"
 )
 
@@ -65,7 +66,7 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 
 	graph, order = testplace.AnchorTests(graph, order)
 	p.sizes = generatedSizes(graph)
-	own := Assign(graph)
+	own := owners.Assign(graph)
 
 	// No entry point means no declaration is unconsumed, which only happens
 	// when a cycle spans the whole graph. Emitting one flat layer commit

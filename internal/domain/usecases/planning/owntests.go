@@ -2,6 +2,7 @@ package planning
 
 import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -10,7 +11,7 @@ import (
 // it. One that needs a ready root waits for that root's turn.
 func ownTests(
 	graph entities.Graph,
-	own Ownership,
+	own owners.Ownership,
 	born, fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := reach.TestSubjects(graph)
@@ -38,5 +39,5 @@ func ownTests(
 		}
 	}
 
-	return SortedKeys(taken)
+	return owners.SortedKeys(taken)
 }

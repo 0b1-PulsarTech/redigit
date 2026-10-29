@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -30,7 +31,7 @@ func TestOwnTests(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{
+	own := owners.Ownership{
 		Owner: map[entities.DeclKey]FeatureID{
 			code.Key: "a", later.Key: "b", root.Key: reach.SharedFeature,
 			testCode.Key: reach.SharedFeature, testLater.Key: reach.SharedFeature, testRoot.Key: reach.SharedFeature,

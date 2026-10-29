@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"slices"
@@ -27,7 +27,7 @@ func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
 	)
 
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			plain.Key: reach.SharedFeature, sibling.Key: reach.SharedFeature, generated.Key: reach.SharedFeature,
 			table.Key: reach.SharedFeature, owned.Key: "f", held.Key: reach.SharedFeature,
 		},

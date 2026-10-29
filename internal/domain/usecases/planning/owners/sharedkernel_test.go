@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"cmp"
@@ -22,7 +22,7 @@ func TestUnbornProvidersClosesTransitivelyOverTheSharedKernel(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key: "a",
 		event.Key:  reach.SharedFeature,
 		reason.Key: reach.SharedFeature,
@@ -56,7 +56,7 @@ func TestUnbornProvidersPullsAnAtomSiblingAlong(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key: "a",
 		typeA.Key:  reach.SharedFeature,
 		typeB.Key:  reach.SharedFeature,
@@ -86,7 +86,7 @@ func TestUnbornProvidersPullsAnAnchoredTestAlong(t *testing.T) {
 		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key:    "a",
 		event.Key:     reach.SharedFeature,
 		eventTest.Key: reach.SharedFeature,
@@ -117,7 +117,7 @@ func TestUnbornProvidersLeavesAnAnchoredTestBehindWhenItsOwnNeedIsNotReady(t *te
 		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key:    "a",
 		event.Key:     reach.SharedFeature,
 		late.Key:      "b",
@@ -148,7 +148,7 @@ func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 	)
 
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{member.Key: "a", event.Key: reach.SharedFeature},
+		Owner: map[entities.DeclKey]reach.FeatureID{member.Key: "a", event.Key: reach.SharedFeature},
 	}
 	born := map[entities.DeclKey]bool{event.Key: true}
 
@@ -177,7 +177,7 @@ func TestUnbornProvidersBringsOnlyTheLibraryDeclarationsAConsumerNeeds(t *testin
 	)
 
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			member.Key: "app", manifest.Key: reach.SharedFeature,
 			used.Key: reach.SharedFeature, unused.Key: reach.SharedFeature,
 		},
@@ -209,7 +209,7 @@ func TestUnbornProvidersLeavesATestBehindWhoseSharedSupportNeedsAFeature(t *test
 		[]entities.Anchor{{Decl: eventTest.Key, To: event.Key, Reason: entities.ReasonTestOf}},
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key:    "a",
 		event.Key:     reach.SharedFeature,
 		late.Key:      "b",
@@ -245,7 +245,7 @@ func TestUnbornProvidersIgnoresAGeneratedByEdgeIntoATest(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key:  "a",
 		mock.Key:    reach.SharedFeature,
 		support.Key: reach.SharedFeature,
@@ -278,7 +278,7 @@ func TestUnbornProvidersBringsWhatAWalkedStatementReadsFromAFeature(t *testing.T
 	)
 
 	own := Ownership{
-		Owner: map[entities.DeclKey]FeatureID{
+		Owner: map[entities.DeclKey]reach.FeatureID{
 			member.Key: "a",
 			stmt.Key:   reach.SharedFeature,
 			health.Key: "w",
@@ -315,7 +315,7 @@ func TestUnbornProvidersDoesNotFollowAnInterfaceATypeOnlyFills(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{Owner: map[entities.DeclKey]FeatureID{
+	own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
 		member.Key: "a",
 		impl.Key:   reach.SharedFeature,
 		method.Key: reach.SharedFeature,

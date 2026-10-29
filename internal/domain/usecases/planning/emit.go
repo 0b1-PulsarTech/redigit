@@ -4,12 +4,13 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 )
 
 func (p Planner) emit(
 	graph entities.Graph,
 	order entities.Ordering,
-	own Ownership,
+	own owners.Ownership,
 	features []FeatureID,
 ) entities.Plan {
 	byFeature := groupByFeature(graph, own)
@@ -26,7 +27,7 @@ func (p Planner) emit(
 		// explains, and the declarations in it are read for the first time
 		// hundreds of commits later.
 		fresh := map[entities.DeclKey]bool{}
-		shared, late := splitLate(graph, UnbornProviders(graph, own, members, born), members)
+		shared, late := splitLate(graph, owners.UnbornProviders(graph, own, members, born), members)
 
 		if len(shared) > 0 {
 			plan.Commits = append(
@@ -39,8 +40,8 @@ func (p Planner) emit(
 				})...,
 			)
 
-			MarkBorn(born, shared)
-			MarkBorn(fresh, shared)
+			owners.MarkBorn(born, shared)
+			owners.MarkBorn(fresh, shared)
 		}
 
 		// A deferred statement walked in ahead of its feature took the
@@ -51,8 +52,8 @@ func (p Planner) emit(
 
 		members = append(members, late...)
 
-		MarkBorn(born, members)
-		MarkBorn(fresh, members)
+		owners.MarkBorn(born, members)
+		owners.MarkBorn(fresh, members)
 
 		// A test is born with the code it exercises when the feature completes
 		// that code, so the suite and its subject are read together.
@@ -68,7 +69,7 @@ func (p Planner) emit(
 			})...,
 		)
 
-		MarkBorn(born, owned)
+		owners.MarkBorn(born, owned)
 
 		plan.Commits = append(
 			plan.Commits,
@@ -83,7 +84,7 @@ func (p Planner) emit(
 	return plan
 }
 
-func groupByFeature(graph entities.Graph, own Ownership) map[FeatureID][]entities.DeclKey {
+func groupByFeature(graph entities.Graph, own owners.Ownership) map[FeatureID][]entities.DeclKey {
 	out := map[FeatureID][]entities.DeclKey{}
 
 	for _, decl := range graph.Decls() {
@@ -106,7 +107,7 @@ type births struct {
 func (p Planner) cutReady(
 	graph entities.Graph,
 	order entities.Ordering,
-	own Ownership,
+	own owners.Ownership,
 	feature FeatureID,
 	seen births,
 ) []entities.PlannedCommit {
@@ -122,9 +123,9 @@ func (p Planner) cutReady(
 			break
 		}
 
-		round := append(UnbornProviders(graph, own, ready, born), ready...)
-		MarkBorn(born, round)
-		MarkBorn(seen.fresh, round)
+		round := append(owners.UnbornProviders(graph, own, ready, born), ready...)
+		owners.MarkBorn(born, round)
+		owners.MarkBorn(seen.fresh, round)
 
 		keys = append(keys, round...)
 	}

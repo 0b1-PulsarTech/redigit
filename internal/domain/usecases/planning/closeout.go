@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -15,7 +16,7 @@ import (
 func (p Planner) sweepLast(
 	graph entities.Graph,
 	order entities.Ordering,
-	own Ownership,
+	own owners.Ownership,
 	features []FeatureID,
 	born map[entities.DeclKey]bool,
 ) []entities.PlannedCommit {
@@ -38,7 +39,7 @@ func (p Planner) closeOut(
 	// Anything no feature reached is still part of the final tree. Emitting it
 	// as a trailing layer commit is honest; dropping it would leave a hole the
 	// tree invariant only catches once every explanation is gone.
-	if rest := Remaining(graph, born); len(rest) > 0 {
+	if rest := owners.Remaining(graph, born); len(rest) > 0 {
 		plan.Commits = append(
 			plan.Commits,
 			p.cut(graph, order, bucket{
@@ -49,7 +50,7 @@ func (p Planner) closeOut(
 			})...,
 		)
 
-		MarkBorn(born, rest)
+		owners.MarkBorn(born, rest)
 	}
 
 	for _, decl := range graph.Decls() {

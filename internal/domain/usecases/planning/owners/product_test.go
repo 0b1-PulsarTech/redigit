@@ -1,4 +1,4 @@
-package planning
+package owners
 
 import (
 	"fmt"
@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-func readers(features ...FeatureID) map[FeatureID]bool {
-	out := map[FeatureID]bool{}
+func readers(features ...reach.FeatureID) map[reach.FeatureID]bool {
+	out := map[reach.FeatureID]bool{}
 	for _, feature := range features {
 		out[feature] = true
 	}
@@ -20,7 +21,7 @@ func readers(features ...FeatureID) map[FeatureID]bool {
 func TestJoinProducts(t *testing.T) {
 	t.Parallel()
 
-	shared := map[entities.DeclKey]map[FeatureID]bool{}
+	shared := map[entities.DeclKey]map[reach.FeatureID]bool{}
 	for index := range kinReach + 1 {
 		shared[entities.DeclKey{File: "kernel.go", Name: fmt.Sprint(index)}] = readers(
 			"crm",
@@ -41,42 +42,42 @@ func TestJoinProducts(t *testing.T) {
 
 	testCases := []struct {
 		name    string
-		reached map[entities.DeclKey]map[FeatureID]bool
-		want    map[FeatureID]FeatureID
+		reached map[entities.DeclKey]map[reach.FeatureID]bool
+		want    map[reach.FeatureID]reach.FeatureID
 	}{
 		{
 			"a port read by a root and two tiers ties them to that root",
-			map[entities.DeclKey]map[FeatureID]bool{
+			map[entities.DeclKey]map[reach.FeatureID]bool{
 				{Name: "Port"}: readers("crm", "routes", "repo"),
 			},
-			map[FeatureID]FeatureID{"routes": "crm", "repo": "crm"},
+			map[reach.FeatureID]reach.FeatureID{"routes": "crm", "repo": "crm"},
 		},
 		{
 			"a feature goes to the root it shares the most with",
-			map[entities.DeclKey]map[FeatureID]bool{
+			map[entities.DeclKey]map[reach.FeatureID]bool{
 				{Name: "A"}: readers("crm", "worker"),
 				{Name: "B"}: readers("chat", "worker"),
 				{Name: "C"}: readers("chat", "worker"),
 			},
-			map[FeatureID]FeatureID{"worker": "chat"},
+			map[reach.FeatureID]reach.FeatureID{"worker": "chat"},
 		},
 		{
 			"an equal tie goes to the first name",
-			map[entities.DeclKey]map[FeatureID]bool{
+			map[entities.DeclKey]map[reach.FeatureID]bool{
 				{Name: "A"}: readers("crm", "worker"),
 				{Name: "B"}: readers("chat", "worker"),
 			},
-			map[FeatureID]FeatureID{"worker": "chat"},
+			map[reach.FeatureID]reach.FeatureID{"worker": "chat"},
 		},
 		{
 			"code read by many features ties nothing",
 			shared,
-			map[FeatureID]FeatureID{},
+			map[reach.FeatureID]reach.FeatureID{},
 		},
 		{
 			"a declaration read by one feature ties nothing",
-			map[entities.DeclKey]map[FeatureID]bool{{Name: "Own"}: readers("routes")},
-			map[FeatureID]FeatureID{},
+			map[entities.DeclKey]map[reach.FeatureID]bool{{Name: "Own"}: readers("routes")},
+			map[reach.FeatureID]reach.FeatureID{},
 		},
 	}
 

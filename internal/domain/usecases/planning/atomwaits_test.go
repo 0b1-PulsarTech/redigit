@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
@@ -27,7 +28,7 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{
+	own := owners.Ownership{
 		Owner: map[entities.DeclKey]FeatureID{
 			code.Key: "a", later.Key: "b",
 			setup.Key: reach.SharedFeature, first.Key: reach.SharedFeature, plain.Key: reach.SharedFeature,
@@ -79,7 +80,7 @@ func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 		nil,
 	)
 
-	own := Ownership{
+	own := owners.Ownership{
 		Owner: map[entities.DeclKey]FeatureID{
 			registration.Key: reach.SharedFeature, feature.Key: "a",
 			both.Key: reach.SharedFeature, onlyWiring.Key: reach.SharedFeature,
