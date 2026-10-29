@@ -64,7 +64,7 @@ func TestTypedConversionRule(t *testing.T) {
 				"use.go":   "package fixture\n\n" + testCase.use,
 			})
 
-			edges, err := typedConversionRule{source: newTypedSource(nil)}.Edges(
+			edges, err := typedConversionRule{source: NewSource(nil)}.Edges(
 				context.Background(), snap, decls,
 			)
 			if err != nil {
@@ -108,7 +108,7 @@ func Narrow(w Wide) Reader { return w }
 `,
 	})
 
-	edges, err := typedConversionRule{source: newTypedSource(nil)}.Edges(
+	edges, err := typedConversionRule{source: NewSource(nil)}.Edges(
 		context.Background(), snap, decls,
 	)
 	if err != nil {
@@ -123,7 +123,7 @@ func Narrow(w Wide) Reader { return w }
 func TestTypedSourceWithoutModuleLoadsNothing(t *testing.T) {
 	t.Parallel()
 
-	facts, err := newTypedSource(nil).Facts(
+	facts, err := NewSource(nil).Facts(
 		context.Background(), entities.Snapshot{Root: t.TempDir()}, nil,
 	)
 	if err != nil {

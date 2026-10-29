@@ -14,7 +14,7 @@ import (
 // between fail: "undefined: enrichCase" in a test file, "repo.GetByID
 // undefined" in another. The checker resolved every identifier of those same
 // files already.
-type typedUseRule struct{ source *typedSource }
+type typedUseRule struct{ source *Source }
 
 func (typedUseRule) Name() string { return "typed-reference" }
 

@@ -15,7 +15,7 @@ import (
 // the type checker's, so it covers every place Go converts silently (argument,
 // assignment, return, literal element, send, type assertion) instead of the few
 // a text rule could name.
-type typedConversionRule struct{ source *typedSource }
+type typedConversionRule struct{ source *Source }
 
 func (typedConversionRule) Name() string { return "typed-conversion" }
 

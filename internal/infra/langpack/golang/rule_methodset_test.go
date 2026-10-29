@@ -90,7 +90,7 @@ type Names struct{ Set[string] }
 			t.Parallel()
 
 			snap, decls := typedFixture(t, testCase.files)
-			rule := methodSetRule{source: newTypedSource(nil)}
+			rule := methodSetRule{source: NewSource(nil)}
 
 			checkAtoms(t, rule, snap, decls, testCase.wantAtom)
 			checkEdges(t, rule, snap, decls, testCase.wantEdges)

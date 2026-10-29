@@ -93,7 +93,7 @@ func (s *factScan) escape(dependent entities.DeclKey, value types.Type) {
 		return
 	}
 
-	s.facts.Escaped = append(s.facts.Escaped, requirement{
+	s.facts.Escaped = append(s.facts.Escaped, Requirement{
 		Dependent: dependent,
 		Owner:     owner,
 		Methods:   methods,
@@ -121,7 +121,7 @@ func belongsTo(dependent, owner entities.DeclKey) bool {
 // tree holds for them. A value that is itself an interface, a type parameter or
 // untyped demands nothing: only a concrete type owns methods to wait for.
 func (s *factScan) require(
-	into *[]requirement,
+	into *[]Requirement,
 	dependent entities.DeclKey,
 	value types.Type,
 	iface *types.Interface,
@@ -149,7 +149,7 @@ func (s *factScan) require(
 		return
 	}
 
-	*into = append(*into, requirement{
+	*into = append(*into, Requirement{
 		Dependent: dependent,
 		Owner:     s.ownerOf(value),
 		Methods:   methods,

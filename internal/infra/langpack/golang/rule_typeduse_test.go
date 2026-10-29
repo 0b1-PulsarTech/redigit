@@ -53,7 +53,7 @@ func runEnrichCase(t *testing.T, c enrichCase) { t.Log(c.name) }
 `,
 	})
 
-	edges, err := typedUseRule{source: newTypedSource(nil)}.Edges(context.Background(), snap, decls)
+	edges, err := typedUseRule{source: NewSource(nil)}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}

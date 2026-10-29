@@ -34,6 +34,6 @@ func (s *factScan) uses() {
 			continue
 		}
 
-		s.facts.Uses = append(s.facts.Uses, use{Dependent: dependent, Provider: provider})
+		s.facts.Uses = append(s.facts.Uses, Use{Dependent: dependent, Provider: provider})
 	}
 }

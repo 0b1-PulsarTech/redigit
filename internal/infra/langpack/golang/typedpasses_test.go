@@ -70,12 +70,12 @@ func NewVerifier() int { return NewGateway() }
 		"verifier_dev.go": "//go:build dev\n\npackage fixture\n\nfunc NewVerifier() int { return 0 }\n",
 	})
 
-	facts, err := newTypedSource([]string{"dev"}).Facts(context.Background(), snap, decls)
+	facts, err := NewSource([]string{"dev"}).Facts(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Facts() error = %v", err)
 	}
 
-	want := use{
+	want := Use{
 		Dependent: declKey("verifier_prod.go", entities.KindFunc, "NewVerifier"),
 		Provider:  declKey("verifier.go", entities.KindFunc, "NewGateway"),
 	}

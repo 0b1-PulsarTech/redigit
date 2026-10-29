@@ -17,7 +17,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// typedSource type-checks the tree a snapshot describes, once, for every rule
+// Source type-checks the tree a snapshot describes, once, for every rule
 // that needs an answer a reference query cannot give: which methods a generic
 // constraint forces on a type, and which methods a concrete value must have
 // where an interface is expected. Enumerating the syntaxes that hand a type to
@@ -31,7 +31,7 @@ import (
 // indexes one snapshot; the packages are kept, because the same facts are asked
 // again for a different set of declarations once a function is cut into
 // statements, and each statement is a dependent of its own.
-type typedSource struct {
+type Source struct {
 	tags []string
 
 	once   sync.Once
@@ -39,26 +39,26 @@ type typedSource struct {
 	err    error
 
 	guard sync.Mutex
-	facts map[uint64]typedFacts
+	facts map[uint64]Facts
 }
 
-func newTypedSource(tags []string) *typedSource {
-	return &typedSource{tags: tags, facts: map[uint64]typedFacts{}}
+func NewSource(tags []string) *Source {
+	return &Source{tags: tags, facts: map[uint64]Facts{}}
 }
 
 // Facts returns what the type checker says about the snapshot's tree, with each
 // reference attributed to the declaration among decls that holds it.
-func (s *typedSource) Facts(
+func (s *Source) Facts(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
-) (typedFacts, error) {
+) (Facts, error) {
 	s.once.Do(func() {
 		s.loaded, s.err = s.check(ctx, snap)
 	})
 
 	if s.err != nil {
-		return typedFacts{}, s.err
+		return Facts{}, s.err
 	}
 
 	s.guard.Lock()
@@ -71,7 +71,7 @@ func (s *typedSource) Facts(
 
 	locator := newDeclLocator(decls)
 
-	var facts typedFacts
+	var facts Facts
 
 	for _, pkgs := range s.loaded {
 		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
@@ -94,7 +94,7 @@ func shapeOf(decls []entities.Decl) uint64 {
 	return hash.Sum64()
 }
 
-func (s *typedSource) check(
+func (s *Source) check(
 	ctx context.Context,
 	snap entities.Snapshot,
 ) ([][]*packages.Package, error) {

@@ -70,7 +70,7 @@ type RulePack struct {
 // language server answers about. The tree is loaded on the first question and
 // shared by every rule that asks.
 func NewRulePack(tags []string) RulePack {
-	source := newTypedSource(tags)
+	source := NewSource(tags)
 
 	return RulePack{rules: append(slices.Clone(rules),
 		methodSetRule{source: source},

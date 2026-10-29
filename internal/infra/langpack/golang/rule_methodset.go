@@ -18,7 +18,7 @@ import (
 //
 // When the instantiation is in some OTHER declaration, the methods are plain
 // edges: that declaration reads them, the type does not need them to exist.
-type methodSetRule struct{ source *typedSource }
+type methodSetRule struct{ source *Source }
 
 func (methodSetRule) Name() string { return "method-set" }
 
@@ -84,7 +84,7 @@ func (r methodSetRule) Atoms(
 
 // methodEdges turns a requirement into one edge per method, dropping a method
 // that is the dependent itself: a declaration does not wait for itself.
-func methodEdges(need requirement, reason entities.EdgeReason) []entities.Edge {
+func methodEdges(need Requirement, reason entities.EdgeReason) []entities.Edge {
 	edges := make([]entities.Edge, 0, len(need.Methods))
 
 	for _, method := range need.Methods {

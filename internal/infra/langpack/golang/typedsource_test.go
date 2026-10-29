@@ -58,7 +58,7 @@ func TestTypedSourceAttributesUsesToTheDeclarationsAsked(t *testing.T) {
 		"a.go": "package fixture\n\nfunc One() {}\n\nfunc Run() {\n\tOne()\n}\n",
 	})
 
-	source := newTypedSource(nil)
+	source := NewSource(nil)
 
 	whole, err := source.Facts(context.Background(), snap, decls)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestTypedSourceAttributesUsesToTheDeclarationsAsked(t *testing.T) {
 	statement := declKey("a.go", entities.KindStmt, "Run#0")
 	one := declKey("a.go", entities.KindFunc, "One")
 
-	if !slices.Contains(whole.Uses, use{Dependent: run, Provider: one}) {
+	if !slices.Contains(whole.Uses, Use{Dependent: run, Provider: one}) {
 		t.Fatalf("Uses = %v, want Run to use One", whole.Uses)
 	}
 
@@ -98,8 +98,8 @@ func TestTypedSourceAttributesUsesToTheDeclarationsAsked(t *testing.T) {
 		t.Fatalf("Facts() error = %v", err)
 	}
 
-	if !slices.Contains(got.Uses, use{Dependent: statement, Provider: one}) ||
-		slices.Contains(got.Uses, use{Dependent: run, Provider: one}) {
+	if !slices.Contains(got.Uses, Use{Dependent: statement, Provider: one}) ||
+		slices.Contains(got.Uses, Use{Dependent: run, Provider: one}) {
 		t.Fatalf("Uses = %v, want the statement to use One and the head not", got.Uses)
 	}
 }

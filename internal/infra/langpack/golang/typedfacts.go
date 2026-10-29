@@ -11,34 +11,34 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// requirement says that Dependent compiles only once Methods exist. Owner is
+// Requirement says that Dependent compiles only once Methods exist. Owner is
 // the declaration of the type those methods hang off, so a rule can tell a type
 // that needs its own methods from one that needs another type's.
-type requirement struct {
+type Requirement struct {
 	Dependent entities.DeclKey
 	Owner     entities.DeclKey
 	Methods   []entities.DeclKey
 }
 
-// typedFacts is what the type checker proved about the tree.
-type typedFacts struct {
+// Facts is what the type checker proved about the tree.
+type Facts struct {
 	// Forced are the methods a generic type parameter's constraint demands of
 	// the type argument at an instantiation.
-	Forced []requirement
+	Forced []Requirement
 	// Converted are the methods of a concrete value that an interface it is
 	// handed to demands.
-	Converted []requirement
+	Converted []Requirement
 	// Escaped are the methods of a concrete value that an interface it is
 	// handed to can reach without any type naming them.
-	Escaped []requirement
+	Escaped []Requirement
 	// Uses are the declarations each declaration names, whichever way: a call,
 	// a type, a value, a method reached through a selector.
-	Uses []use
+	Uses []Use
 }
 
 // merged is the facts of two passes together.
-func (f typedFacts) merged(other typedFacts) typedFacts {
-	return typedFacts{
+func (f Facts) merged(other Facts) Facts {
+	return Facts{
 		Forced:    append(f.Forced, other.Forced...),
 		Converted: append(f.Converted, other.Converted...),
 		Escaped:   append(f.Escaped, other.Escaped...),
@@ -46,12 +46,12 @@ func (f typedFacts) merged(other typedFacts) typedFacts {
 	}
 }
 
-// use says Dependent names Provider somewhere in its text.
-type use struct {
+// Use says Dependent names Provider somewhere in its text.
+type Use struct {
 	Dependent, Provider entities.DeclKey
 }
 
-func collectFacts(pkgs []*packages.Package, root string, locator declLocator) typedFacts {
+func collectFacts(pkgs []*packages.Package, root string, locator declLocator) Facts {
 	scan := &factScan{where: newPositions(root, locator), dynamic: dynamicNames(pkgs)}
 
 	for _, pkg := range pkgs {
@@ -75,12 +75,12 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) ty
 // sorted makes the facts independent of map iteration order: the checker keeps
 // its instances in a map, and an order that changed between runs would change
 // the plan between runs.
-func (f typedFacts) sorted() typedFacts {
+func (f Facts) sorted() Facts {
 	slices.SortStableFunc(f.Forced, compareRequirements)
 	slices.SortStableFunc(f.Converted, compareRequirements)
 	slices.SortStableFunc(f.Escaped, compareRequirements)
 
-	slices.SortFunc(f.Uses, func(a, b use) int {
+	slices.SortFunc(f.Uses, func(a, b Use) int {
 		return cmp.Or(
 			cmp.Compare(a.Dependent.String(), b.Dependent.String()),
 			cmp.Compare(a.Provider.String(), b.Provider.String()),
@@ -92,7 +92,7 @@ func (f typedFacts) sorted() typedFacts {
 	return f
 }
 
-func compareRequirements(a, b requirement) int {
+func compareRequirements(a, b Requirement) int {
 	return cmp.Or(
 		cmp.Compare(a.Dependent.String(), b.Dependent.String()),
 		cmp.Compare(a.Owner.String(), b.Owner.String()),
@@ -103,7 +103,7 @@ func compareRequirements(a, b requirement) int {
 type factScan struct {
 	where   positions
 	pkg     *packages.Package
-	facts   typedFacts
+	facts   Facts
 	dynamic map[string]bool
 }
 
