@@ -4,11 +4,14 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
 // TestStart runs the real Start against a throwaway git repository holding
@@ -157,5 +160,39 @@ func TestSnapshotRootIsTheMaterialisedRevision(t *testing.T) {
 
 	if _, err := os.Stat(root); err != nil {
 		t.Fatalf("Snapshot().Root %q does not exist: %v", root, err)
+	}
+}
+
+func TestStartRefusesAnUnmatchedGlobBeforeCheckout(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFixtureModule(t, dir)
+	initFixtureRepo(t, dir)
+
+	configPath := "/etc/redigit.json"
+
+	pipeline, err := Start(t.Context(), Config{
+		Repo:          dir,
+		Rev:           "HEAD",
+		ServerCommand: "gopls",
+		ServerArgs:    []string{"-mode=stdio"},
+		Rules:         []rules.Rule{globRule{[]string{"*.rs"}}},
+		ConfigPath:    configPath,
+	})
+	if pipeline != nil {
+		_ = pipeline.Close(context.WithoutCancel(t.Context()))
+	}
+
+	if !errors.Is(err, rules.ErrUnmatchedGlob) {
+		t.Fatalf("Start() err = %v, want ErrUnmatchedGlob", err)
+	}
+
+	if !strings.Contains(err.Error(), configPath) {
+		t.Fatalf("Start() err = %q, want the config file path", err)
+	}
+
+	if got := fixtureWorktreeCount(t, dir); got != 1 {
+		t.Fatalf("worktree count = %d, want 1 (the repo's own): a checkout was made", got)
 	}
 }

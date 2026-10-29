@@ -112,7 +112,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, fmt.Errorf("resolve repository path: %w", err)
 	}
 
-	opened, err := openRevision(ctx, root, cfg.Rev)
+	opened, err := openRevision(ctx, root, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +198,8 @@ type revision struct {
 	checkout *gitstore.Checkout
 }
 
-func openRevision(ctx context.Context, root, rev string) (revision, error) {
-	reader := gitstore.NewReader(root, rev)
+func openRevision(ctx context.Context, root string, cfg Config) (revision, error) {
+	reader := gitstore.NewReader(root, cfg.Rev)
 
 	snapshot, err := reader.Snapshot(ctx)
 	if err != nil {
@@ -208,10 +208,18 @@ func openRevision(ctx context.Context, root, rev string) (revision, error) {
 		return revision{}, fmt.Errorf("read snapshot: %w", err)
 	}
 
+	// Before the checkout and the language server: a rule naming nothing in
+	// the tree is a config mistake, and starting gopls costs about 40 s.
+	if err = validateRules(cfg, snapshot); err != nil {
+		release(ctx, readerCloser{reader: reader})
+
+		return revision{}, err
+	}
+
 	// The language server reads a working tree, so the revision has to exist
 	// as one. Pointing it at the repository's own checkout would answer about
 	// whatever is checked out there instead, and answer confidently.
-	checkout, err := gitstore.NewCheckout(ctx, root, rev)
+	checkout, err := gitstore.NewCheckout(ctx, root, cfg.Rev)
 	if err != nil {
 		release(ctx, readerCloser{reader: reader})
 
@@ -420,26 +428,26 @@ func specificLanguages(
 ) []indexing.Language {
 	return []indexing.Language{
 		{
-			Name:       "go",
+			Name:       goLanguage,
 			Extensions: []string{".go"},
 			Syntax:     golang.NewSyntax(),
 			Rules:      golang.NewRulePack(tags),
 			Resolved:   true,
 		},
 		{
-			Name:       "dart",
+			Name:       dartLanguage,
 			Extensions: []string{".dart"},
 			Syntax:     dart.NewSyntax(tree.files, tree.reader),
 			Rules:      dart.NewRulePack(),
 		},
 		{
-			Name:       "web",
+			Name:       webLanguage,
 			Extensions: web.Extensions(),
 			Syntax:     web.NewSyntax(tree.files, tree.reader),
 			Rules:      web.NewRulePack(tree.virtual),
 		},
 		{
-			Name:       "config",
+			Name:       configLanguage,
 			Extensions: configExtensions(),
 			Syntax:     configSyntax,
 			Rules:      config.NewRulePack(),
@@ -455,7 +463,7 @@ func specificLanguages(
 // in silence and a plan built from this run can never reproduce it.
 func opaqueLanguage(configSyntax config.Syntax) indexing.Language {
 	return indexing.Language{
-		Name:       "opaque",
+		Name:       opaqueName,
 		Extensions: []string{indexing.AnyExtension},
 		Syntax:     configSyntax,
 	}

@@ -1,8 +1,15 @@
 package bootstrap
 
 import (
+	"encoding/json"
+	"errors"
+	"maps"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
+	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
 // TestDefaults pins the values a run starts from before flags narrow it. The
@@ -52,5 +59,268 @@ func TestDefaults(t *testing.T) {
 
 	if got.BuildTags != nil {
 		t.Fatalf("BuildTags = %v, want nil", got.BuildTags)
+	}
+}
+
+func TestSettingsMatchThePacks(t *testing.T) {
+	t.Parallel()
+
+	withSettings := map[string]bool{}
+	for _, entry := range settings() {
+		withSettings[entry.language] = true
+	}
+
+	packsWithoutSettings := []string{dartLanguage, configLanguage}
+
+	packs := make([]string, 0, 4)
+	for _, lang := range specificLanguages(config.Syntax{}, finalTree{}, nil) {
+		packs = append(packs, lang.Name)
+	}
+
+	for _, name := range packs {
+		if withSettings[name] == slices.Contains(packsWithoutSettings, name) {
+			t.Fatalf("pack %q: want it in exactly one of settings() and packsWithoutSettings", name)
+		}
+	}
+
+	for name := range withSettings {
+		if !slices.Contains(packs, name) {
+			t.Fatalf("settings() names %q, which is no pack", name)
+		}
+	}
+
+	if withSettings[opaqueName] || slices.Contains(packs, opaqueName) {
+		t.Fatalf("the catch-all %q must not take settings", opaqueName)
+	}
+}
+
+func TestSettingsTableIsComplete(t *testing.T) {
+	t.Parallel()
+
+	seen := map[string]bool{}
+
+	for _, entry := range settings() {
+		id := entry.language + "." + entry.key
+
+		if entry.language == "" || entry.key == "" || entry.flag == "" || entry.apply == nil {
+			t.Fatalf("setting %q: language, key, flag and apply must all be set", id)
+		}
+
+		if seen[id] {
+			t.Fatalf("setting %q is listed twice", id)
+		}
+
+		seen[id] = true
+	}
+}
+
+func TestSettingsDecode(t *testing.T) {
+	t.Parallel()
+
+	testCases := settingCases()
+
+	covered := map[string]bool{}
+
+	for _, testCase := range testCases {
+		covered[testCase.language+"."+testCase.key] = true
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := loadAndApply(t, testCase.content, testCase.prior, testCase.explicit)
+
+			if !slices.Equal(got.BuildTags, testCase.wantTags) {
+				t.Fatalf("BuildTags = %q, want %q", got.BuildTags, testCase.wantTags)
+			}
+
+			if !maps.Equal(got.Virtual, testCase.wantVirtuals) {
+				t.Fatalf("Virtual = %v, want %v", got.Virtual, testCase.wantVirtuals)
+			}
+		})
+	}
+
+	for _, entry := range settings() {
+		if id := entry.language + "." + entry.key; !covered[id] {
+			t.Fatalf("setting %q has no decoded-JSON case in TestSettingsDecode", id)
+		}
+	}
+}
+
+func TestApplyConfigFileFillsWhatFlagsLeftAlone(t *testing.T) {
+	t.Parallel()
+
+	content := `{"languages":{"go":{"tags":["integration"]},` +
+		`"web":{"virtual":{"virtual:a":"from-file"}}}}`
+
+	got := loadAndApply(t, content, Config{}, nil)
+
+	if !slices.Equal(got.BuildTags, []string{"integration"}) ||
+		!maps.Equal(got.Virtual, map[string]string{"virtual:a": "from-file"}) {
+		t.Fatalf("got tags %q virtual %v", got.BuildTags, got.Virtual)
+	}
+}
+
+func TestApplyConfigFileRefusesWhatLoadWouldHave(t *testing.T) {
+	t.Parallel()
+
+	languages := map[string]map[string]json.RawMessage{
+		"go": {"tags": json.RawMessage(`null`)},
+	}
+	file := ConfigFile{Path: "x.json", File: rules.File{Languages: languages}}
+
+	_, err := ApplyConfigFile(Config{}, file, func(string) bool { return false })
+
+	want := "config file x.json: languages.go.tags: expected an array of strings"
+	if !errors.Is(err, ErrConfig) || err == nil || err.Error() != want {
+		t.Fatalf("ApplyConfigFile() err = %v, want %q", err, want)
+	}
+}
+
+func TestSplitTags(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		tags string
+		want []string
+	}{
+		{"empty string yields none", "", nil},
+		{"whitespace only yields none", "   ", nil},
+		{"one tag", "a", []string{"a"}},
+		{"two tags", "a,b", []string{"a", "b"}},
+		{"blank entries between commas are dropped", "a,,b", []string{"a", "b"}},
+		{"surrounding whitespace is trimmed", " a , b ", []string{"a", "b"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := SplitTags(testCase.tags)
+
+			if len(got) != len(testCase.want) {
+				t.Fatalf("SplitTags(%q) = %v, want %v", testCase.tags, got, testCase.want)
+			}
+
+			for idx, tag := range testCase.want {
+				if got[idx] != tag {
+					t.Fatalf("SplitTags(%q) = %v, want %v", testCase.tags, got, testCase.want)
+				}
+			}
+		})
+	}
+}
+
+func loadAndApply(t testing.TB, content string, prior Config, explicit map[string]bool) Config {
+	t.Helper()
+
+	file, err := LoadConfigFile(writeConfigFile(t, content))
+	if err != nil {
+		t.Fatalf("LoadConfigFile() = %v", err)
+	}
+
+	got, err := ApplyConfigFile(prior, file, func(name string) bool { return explicit[name] })
+	if err != nil {
+		t.Fatalf("ApplyConfigFile() = %v", err)
+	}
+
+	return got
+}
+
+type settingCase struct {
+	name         string
+	language     string
+	key          string
+	content      string
+	explicit     map[string]bool
+	prior        Config
+	wantTags     []string
+	wantVirtuals map[string]string
+}
+
+func settingCases() []settingCase {
+	return []settingCase{
+		{
+			name: "go tags reach BuildTags", language: goLanguage, key: "tags",
+			content:  `{"languages":{"go":{"tags":["integration"]}}}`,
+			wantTags: []string{"integration"},
+		},
+		{
+			name: "a padded tag is trimmed", language: goLanguage, key: "tags",
+			content:  `{"languages":{"go":{"tags":[" integration "]}}}`,
+			wantTags: []string{"integration"},
+		},
+		{
+			name: "an empty tag is dropped", language: goLanguage, key: "tags",
+			content:  `{"languages":{"go":{"tags":["a","","  ","b"]}}}`,
+			wantTags: []string{"a", "b"},
+		},
+		{
+			name: "a comma splits as it does on the command line", language: goLanguage,
+			key: "tags", content: `{"languages":{"go":{"tags":["a,b"]}}}`,
+			wantTags: []string{"a", "b"},
+		},
+		{
+			name: "only blanks leave no tags", language: goLanguage, key: "tags",
+			content: `{"languages":{"go":{"tags":["", " "]}}}`,
+		},
+		{
+			name: "an explicit tags flag wins, even when empty", language: goLanguage,
+			key: "tags", content: `{"languages":{"go":{"tags":["integration"]}}}`,
+			explicit: map[string]bool{"tags": true},
+		},
+		{
+			name: "web virtual reaches Virtual", language: webLanguage, key: "virtual",
+			content:      `{"languages":{"web":{"virtual":{"virtual:a":"a.dart"}}}}`,
+			wantVirtuals: map[string]string{"virtual:a": "a.dart"},
+		},
+		{
+			name: "an explicit virtual flag replaces the whole file map", language: webLanguage,
+			key:          "virtual",
+			content:      `{"languages":{"web":{"virtual":{"virtual:a":"from-file"}}}}`,
+			explicit:     map[string]bool{"virtual": true},
+			prior:        Config{Virtual: map[string]string{"virtual:a": "from-flag"}},
+			wantVirtuals: map[string]string{"virtual:a": "from-flag"},
+		},
+	}
+}
+
+func TestAddVirtual(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		prior   map[string]string
+		id      string
+		path    string
+		want    map[string]string
+		wantErr error
+	}{
+		{"a pair", map[string]string{}, "a", "x", map[string]string{"a": "x"}, nil},
+		{"trimmed", map[string]string{}, " a ", " x ", map[string]string{"a": "x"}, nil},
+		{"an empty id", map[string]string{}, "", "x", map[string]string{}, ErrVirtual},
+		{"a blank path", map[string]string{}, "a", "  ", map[string]string{}, ErrVirtual},
+		{
+			"an id already listed",
+			map[string]string{"a": "x"},
+			" a", "y",
+			map[string]string{"a": "x"},
+			ErrDuplicateVirtual,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := AddVirtual(testCase.prior, testCase.id, testCase.path)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("AddVirtual() err = %v, want %v", err, testCase.wantErr)
+			}
+
+			if !maps.Equal(testCase.prior, testCase.want) {
+				t.Fatalf("virtual = %v, want %v", testCase.prior, testCase.want)
+			}
+		})
 	}
 }
