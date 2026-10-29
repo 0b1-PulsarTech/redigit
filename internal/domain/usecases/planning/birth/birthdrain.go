@@ -10,11 +10,27 @@ type link struct {
 	soft                bool
 }
 
+func drainAllLinks(
+	nodes []entities.DeclKey,
+	links []link,
+	groupOf func(entities.DeclKey) reach.FeatureID,
+) (emitted, stuck []entities.DeclKey) {
+	return drainLinks(nodes, links, groupOf, func(link) bool { return true })
+}
+
+func drainHardLinks(
+	nodes []entities.DeclKey,
+	links []link,
+	groupOf func(entities.DeclKey) reach.FeatureID,
+) (emitted, stuck []entities.DeclKey) {
+	return drainLinks(nodes, links, groupOf, func(wait link) bool { return !wait.soft })
+}
+
 func drainLinks(
 	nodes []entities.DeclKey,
 	links []link,
 	groupOf func(entities.DeclKey) reach.FeatureID,
-	hardOnly bool,
+	keeps func(link) bool,
 ) (emitted, stuck []entities.DeclKey) {
 	inside := make(map[entities.DeclKey]bool, len(nodes))
 	for _, node := range nodes {
@@ -25,7 +41,7 @@ func drainLinks(
 	pending := make(map[entities.DeclKey]int, len(nodes))
 
 	for _, wait := range links {
-		if !inside[wait.provider] || !inside[wait.dependent] || hardOnly && wait.soft {
+		if !inside[wait.provider] || !inside[wait.dependent] || !keeps(wait) {
 			continue
 		}
 

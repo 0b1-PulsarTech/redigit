@@ -79,13 +79,13 @@ func byDependency(
 		}
 	}
 
-	ordered, stuck := drainLinks(nodes.leaders, links, groupOf, false)
+	ordered, stuck := drainAllLinks(nodes.leaders, links, groupOf)
 
 	// A cycle that runs through a soft edge is not a cycle the code has: the
 	// generator directive a mock is written from sits in the file that uses the
 	// mock, and the mock is read by the code beside the directive.
 	if len(stuck) > 0 {
-		more, rest := drainLinks(stuck, links, groupOf, true)
+		more, rest := drainHardLinks(stuck, links, groupOf)
 		ordered = append(ordered, more...)
 		stuck = rest
 	}
