@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // bucket is one group of declarations headed for commits of their own.
@@ -21,7 +22,7 @@ func (p Planner) cut(
 ) []entities.PlannedCommit {
 	keys := sortForBirth(graph, order, in.keys, nil)
 	keys = gatherDocuments(graph, placeTests(graph, keys))
-	lastOf := cycleExtent(graph, keys, AtomExtent(graph, keys))
+	lastOf := cycleExtent(graph, keys, reach.AtomExtent(graph, keys))
 
 	var (
 		start    int

@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // splitLate parts what the shared commit would bring into what it can carry
@@ -20,7 +21,7 @@ func splitLate(
 		waiting[key] = true
 	}
 
-	atoms := AtomGroups(graph)
+	atoms := reach.AtomGroups(graph)
 
 	for changed := true; changed; {
 		changed = false

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
@@ -27,10 +28,10 @@ func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
 
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			plain.Key: SharedFeature, sibling.Key: SharedFeature, generated.Key: SharedFeature,
-			table.Key: SharedFeature, owned.Key: "f", held.Key: SharedFeature,
+			plain.Key: reach.SharedFeature, sibling.Key: reach.SharedFeature, generated.Key: reach.SharedFeature,
+			table.Key: reach.SharedFeature, owned.Key: "f", held.Key: reach.SharedFeature,
 		},
-		deferred: Wiring{held.Key: true},
+		deferred: reach.Wiring{held.Key: true},
 	}
 
 	got := sharedPackages(graph, own)["lib"]

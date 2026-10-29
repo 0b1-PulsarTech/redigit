@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // readyDeferred is the deferred declarations that can be born now: none of what
@@ -17,7 +18,7 @@ func readyDeferred(
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := sharedSubjects(graph, own)
-	atoms := AtomGroups(graph)
+	atoms := reach.AtomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
 	for key := range own.deferred {
@@ -40,7 +41,7 @@ func readyDeferred(
 			return false
 		case own.deferred[provider]:
 			return !ready[provider]
-		case own.owner[provider] != SharedFeature:
+		case own.owner[provider] != reach.SharedFeature:
 			return true
 		case own.reach[provider] == 0:
 			return false
@@ -137,5 +138,5 @@ func usedBeyondWiring(graph entities.Graph, own ownership, key entities.DeclKey)
 func isManifestKey(graph entities.Graph, key entities.DeclKey) bool {
 	decl, found := graph.Decl(key)
 
-	return found && IsManifestLine(graph, decl)
+	return found && reach.IsManifestLine(graph, decl)
 }

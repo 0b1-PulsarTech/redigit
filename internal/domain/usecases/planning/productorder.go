@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // readsRoots is, per feature, the module roots whose code it reads directly: the
 // roots it should wait for, so a module does not open as a stray file inside
@@ -16,7 +19,7 @@ func readsRoots(
 
 	for _, edge := range graph.Edges() {
 		feature := owner[edge.Dependent]
-		if feature == SharedFeature || entities.IsStructural(edge.Reason) ||
+		if feature == reach.SharedFeature || entities.IsStructural(edge.Reason) ||
 			entities.FillsInterface(graph, edge) {
 			continue
 		}

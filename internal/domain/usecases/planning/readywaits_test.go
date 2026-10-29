@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
@@ -40,19 +41,19 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 		{
 			"a require nothing but the suite imports",
 			map[entities.DeclKey]int{require.Key: 1, indirect.Key: 1, query.Key: 0, counted.Key: 1},
-			map[entities.DeclKey]FeatureID{counted.Key: SharedFeature},
+			map[entities.DeclKey]FeatureID{counted.Key: reach.SharedFeature},
 			true,
 		},
 		{
 			"a query no built feature reaches",
 			map[entities.DeclKey]int{require.Key: 0, query.Key: 0, counted.Key: 1},
-			map[entities.DeclKey]FeatureID{counted.Key: SharedFeature},
+			map[entities.DeclKey]FeatureID{counted.Key: reach.SharedFeature},
 			true,
 		},
 		{
 			"shared code a feature also reads still waits for its feature",
 			map[entities.DeclKey]int{require.Key: 0, query.Key: 2, counted.Key: 1},
-			map[entities.DeclKey]FeatureID{counted.Key: SharedFeature},
+			map[entities.DeclKey]FeatureID{counted.Key: reach.SharedFeature},
 			false,
 		},
 	}
@@ -62,15 +63,15 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 			t.Parallel()
 
 			owner := map[entities.DeclKey]FeatureID{
-				suite.Key: SharedFeature, require.Key: SharedFeature, indirect.Key: SharedFeature,
-				query.Key:   SharedFeature,
-				counted.Key: SharedFeature, feature.Key: "a",
+				suite.Key: reach.SharedFeature, require.Key: reach.SharedFeature, indirect.Key: reach.SharedFeature,
+				query.Key:   reach.SharedFeature,
+				counted.Key: reach.SharedFeature, feature.Key: "a",
 			}
 			own := ownership{
 				owner:    owner,
 				reach:    testCase.reach,
-				deferred: Wiring{suite.Key: true},
-				roots:    Wiring{},
+				deferred: reach.Wiring{suite.Key: true},
+				roots:    reach.Wiring{},
 			}
 			born := map[entities.DeclKey]bool{counted.Key: true}
 			fresh := map[entities.DeclKey]bool{counted.Key: true}

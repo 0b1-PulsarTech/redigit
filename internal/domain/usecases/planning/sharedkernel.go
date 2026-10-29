@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func unbornProviders(
@@ -21,9 +22,9 @@ func unbornProviders(
 	}
 
 	index := sharedIndex{
-		atoms:    AtomGroups(graph),
+		atoms:    reach.AtomGroups(graph),
 		testsOf:  testAnchors(graph),
-		subjects: TestSubjects(graph),
+		subjects: reach.TestSubjects(graph),
 		walked:   wanted,
 		own:      own,
 	}
@@ -85,7 +86,7 @@ func (index sharedIndex) siblingsOf(
 	foreign := index.takesForeign(own, current)
 
 	for _, edge := range graph.Needs(current) {
-		if (foreign || own.owner[edge.Provider] == SharedFeature) &&
+		if (foreign || own.owner[edge.Provider] == reach.SharedFeature) &&
 			!driftsToTest(graph, edge) && !entities.FillsInterface(graph, edge) {
 			out = append(out, edge.Provider)
 		}
@@ -102,7 +103,7 @@ func (index sharedIndex) siblingsOf(
 	// early is safe only once its own needs are already met (born, or shared
 	// and walked by this same closure).
 	for _, test := range index.testsOf[current] {
-		if own.owner[test] == SharedFeature && index.safeToPull(graph, test, born) {
+		if own.owner[test] == reach.SharedFeature && index.safeToPull(graph, test, born) {
 			out = append(out, test)
 		}
 	}
@@ -118,7 +119,7 @@ func (index sharedIndex) packageOf(
 	current entities.DeclKey,
 ) []entities.DeclKey {
 	decl, found := graph.Decl(current)
-	if !found || index.own.owner[current] != SharedFeature {
+	if !found || index.own.owner[current] != reach.SharedFeature {
 		return nil
 	}
 

@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // entryWalk is what walking back from every entry point finds.
 type entryWalk struct {
@@ -25,7 +28,7 @@ func walkEntries(graph entities.Graph, own ownership, entries []entities.Decl) e
 	}
 
 	for _, entry := range entries {
-		feature := FeatureOf(entry)
+		feature := reach.FeatureOf(entry)
 
 		if !own.support[entry.Key] && !walk.built[feature] {
 			walk.built[feature] = true
@@ -41,7 +44,7 @@ func walkEntries(graph entities.Graph, own ownership, entries []entities.Decl) e
 			}
 		}
 
-		for key := range ReachFrom(graph, entry.Key) {
+		for key := range reach.ReachFrom(graph, entry.Key) {
 			if walk.reachedBy[key] == nil {
 				walk.reachedBy[key] = map[FeatureID]bool{}
 			}

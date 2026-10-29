@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // moduleDir is the directory of the manifest that makes a declaration's unit a
@@ -29,7 +30,7 @@ func moduleDir(graph entities.Graph, decl entities.Decl) string {
 // isHead reports whether an entry point is plugged into the wiring: a handler,
 // a sink, a worker. An unconsumed declaration nothing registers is dead code or
 // a program of its own, and says nothing about the module it sits in.
-func isHead(graph entities.Graph, entry entities.Decl, roots Wiring) bool {
+func isHead(graph entities.Graph, entry entities.Decl, roots reach.Wiring) bool {
 	for _, edge := range graph.Consumers(entry.Key) {
 		if roots[edge.Dependent] {
 			return true
@@ -56,7 +57,7 @@ func shareLibraries(graph entities.Graph, own ownership, heads map[string]bool) 
 			continue
 		}
 
-		own.owner[decl.Key] = SharedFeature
+		own.owner[decl.Key] = reach.SharedFeature
 	}
 }
 
@@ -88,7 +89,7 @@ func readFromOutside(graph entities.Graph) map[string]bool {
 func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 	dir := decl.Unit.Dir()
 	if dir == "" {
-		dir = ParentDir(decl.Key.File)
+		dir = reach.ParentDir(decl.Key.File)
 	}
 
 	return dir == moduleDir(graph, decl)
@@ -100,7 +101,7 @@ func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 // to the last commit; deferred, each is born right after what it names.
 func deferLibraryEntries(own ownership, entries []entities.Decl) {
 	for _, entry := range entries {
-		if own.owner[entry.Key] != SharedFeature || own.deferred[entry.Key] {
+		if own.owner[entry.Key] != reach.SharedFeature || own.deferred[entry.Key] {
 			continue
 		}
 
@@ -116,7 +117,7 @@ func sharedPackages(graph entities.Graph, own ownership) map[entities.UnitID][]e
 	out := map[entities.UnitID][]entities.DeclKey{}
 
 	for _, decl := range graph.Decls() {
-		if own.owner[decl.Key] != SharedFeature || own.deferred[decl.Key] ||
+		if own.owner[decl.Key] != reach.SharedFeature || own.deferred[decl.Key] ||
 			entities.IsTestSide(decl) || decl.Generated || decl.Key.Kind == entities.KindOther ||
 			feedsData(graph, decl.Key) {
 			continue

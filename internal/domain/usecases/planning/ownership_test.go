@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestAssign(t *testing.T) {
@@ -19,7 +20,7 @@ func TestAssign(t *testing.T) {
 		wantOwner FeatureID
 		wantReach int
 	}{
-		{"reached by both features, so owned by neither", named["kernel"], SharedFeature, 2},
+		{"reached by both features, so owned by neither", named["kernel"], reach.SharedFeature, 2},
 		{
 			"a use case reached only through its handler travels with that slice",
 			named["leadUse"],
@@ -68,7 +69,7 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 			t.Fatalf("%s was dropped instead of marked shared", key)
 		}
 
-		if got := own.owner[key]; got != SharedFeature {
+		if got := own.owner[key]; got != reach.SharedFeature {
 			t.Fatalf("%s owner = %q, want the shared bucket", key, got)
 		}
 	}
@@ -82,7 +83,7 @@ func TestAssignHasNoSharingThreshold(t *testing.T) {
 
 	graph, _, named := twoFeatures()
 
-	if got := assign(graph).owner[named["kernel"].Key]; got != SharedFeature {
+	if got := assign(graph).owner[named["kernel"].Key]; got != reach.SharedFeature {
 		t.Fatalf("owner = %q, want the shared bucket", got)
 	}
 }
@@ -112,11 +113,11 @@ func TestAssignMergesAnAtomIntoOneOwner(t *testing.T) {
 			nil,
 		))
 
-		if got := own.owner[typeA.Key]; got != SharedFeature {
+		if got := own.owner[typeA.Key]; got != reach.SharedFeature {
 			t.Fatalf("TypeA owner = %q, want the shared bucket", got)
 		}
 
-		if got := own.owner[typeB.Key]; got != SharedFeature {
+		if got := own.owner[typeB.Key]; got != reach.SharedFeature {
 			t.Fatalf("TypeB owner = %q, want the shared bucket", got)
 		}
 	})

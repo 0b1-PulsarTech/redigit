@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestShareDependenciesPullsWhatASharedDeclarationNeeds(t *testing.T) {
@@ -32,13 +33,13 @@ func TestShareDependenciesPullsWhatASharedDeclarationNeeds(t *testing.T) {
 	))
 
 	for _, key := range []entities.DeclKey{converterA.Key, converterB.Key, helper.Key, deeper.Key} {
-		if got := own.owner[key]; got != SharedFeature {
+		if got := own.owner[key]; got != reach.SharedFeature {
 			t.Errorf("%s owner = %q, want the shared bucket", key, got)
 		}
 	}
 
 	for _, key := range []entities.DeclKey{entryA.Key, entryB.Key} {
-		if got := own.owner[key]; got == SharedFeature {
+		if got := own.owner[key]; got == reach.SharedFeature {
 			t.Errorf("%s owner = shared, want its own feature: only providers are pulled", key)
 		}
 	}
@@ -80,7 +81,7 @@ func TestShareDependenciesMovesAnAtomWhole(t *testing.T) {
 
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			wired.Key: SharedFeature, gen.Key: "a", sibling.Key: "a",
+			wired.Key: reach.SharedFeature, gen.Key: "a", sibling.Key: "a",
 		},
 		reach: map[entities.DeclKey]int{},
 	}
@@ -88,7 +89,7 @@ func TestShareDependenciesMovesAnAtomWhole(t *testing.T) {
 	shareDependencies(graph, own)
 
 	for _, key := range []entities.DeclKey{gen.Key, sibling.Key} {
-		if got := own.owner[key]; got != SharedFeature {
+		if got := own.owner[key]; got != reach.SharedFeature {
 			t.Errorf("%s owner = %q, want the shared bucket: an atom is not split", key, got)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func sized(file, name string, lines int) entities.Decl {
@@ -163,7 +164,7 @@ func cutters() []cutter {
 					bucket{
 						keys:    keys,
 						shape:   entities.ShapeLayer,
-						feature: SharedFeature,
+						feature: reach.SharedFeature,
 						reason:  "test",
 					},
 				)

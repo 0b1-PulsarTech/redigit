@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
@@ -24,10 +25,10 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 	)
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			repo.Key: SharedFeature, build.Key: "wire/di", elsewhere.Key: "wire/di",
+			repo.Key: reach.SharedFeature, build.Key: "wire/di", elsewhere.Key: "wire/di",
 			plain.Key: "wire/di", checkTest.Key: "wire/di",
 		},
-		deferred: Wiring{},
+		deferred: reach.Wiring{},
 	}
 
 	shareCompanions(graph, own)
@@ -37,7 +38,7 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 		decl entities.Decl
 		want FeatureID
 	}{
-		{"a constructor of a shared type is shared with it", build, SharedFeature},
+		{"a constructor of a shared type is shared with it", build, reach.SharedFeature},
 		{"a function of another package keeps its feature", elsewhere, "wire/di"},
 		{"a function that builds no type keeps its feature", plain, "wire/di"},
 		{"a test-side declaration keeps its feature", checkTest, "wire/di"},

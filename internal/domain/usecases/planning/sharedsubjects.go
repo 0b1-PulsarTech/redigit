@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // sharedSubjects is, per test, the subjects it waits for: those born outside a
 // feature. A test is anchored to every declaration of the file it exercises,
@@ -13,9 +16,9 @@ func sharedSubjects(
 ) map[entities.DeclKey][]entities.DeclKey {
 	out := map[entities.DeclKey][]entities.DeclKey{}
 
-	for test, subjects := range TestSubjects(graph) {
+	for test, subjects := range reach.TestSubjects(graph) {
 		for _, subject := range subjects {
-			if own.owner[subject] == SharedFeature {
+			if own.owner[subject] == reach.SharedFeature {
 				out[test] = append(out[test], subject)
 			}
 		}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func decl(file, name string, unit entities.UnitID) entities.Decl {
@@ -175,7 +176,7 @@ func TestPlannerVerticalCommitCrossesDirectories(t *testing.T) {
 
 		dirs := map[string]bool{}
 		for _, key := range commit.Decls {
-			dirs[ParentDir(key.File)] = true
+			dirs[reach.ParentDir(key.File)] = true
 		}
 
 		widest = max(widest, len(dirs))

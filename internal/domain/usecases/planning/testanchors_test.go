@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestAnchorTests(t *testing.T) {
@@ -26,7 +27,7 @@ func TestAnchorTests(t *testing.T) {
 	)
 
 	anchored, _ := anchorTests(graph, entities.Ordering{})
-	got := TestSubjects(anchored)
+	got := reach.TestSubjects(anchored)
 
 	testCases := []struct {
 		name string
@@ -136,7 +137,7 @@ func TestAnchorTestsWaitsForTheEarliestOfATwin(t *testing.T) {
 	}}
 
 	anchored, raised := anchorTests(graph, order)
-	got := TestSubjects(anchored)[helper.Key]
+	got := reach.TestSubjects(anchored)[helper.Key]
 
 	if !slices.Equal(got, []entities.DeclKey{early.Key}) {
 		t.Fatalf("subjects = %v, want only %v", got, early.Key)

@@ -1,4 +1,4 @@
-package planning
+package reach
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 

@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // shareCompanions makes a function that builds or reads a shared type, in the
 // package of that type, shared with it. A constructor is read only by the code
@@ -8,7 +11,7 @@ import "github.com/wrapped-owls/redigit/internal/domain/entities"
 // shared kernel without it: every test of the type waited for that feature.
 func shareCompanions(graph entities.Graph, own ownership) {
 	for _, decl := range graph.Decls() {
-		if decl.Key.Kind != entities.KindFunc || own.owner[decl.Key] == SharedFeature ||
+		if decl.Key.Kind != entities.KindFunc || own.owner[decl.Key] == reach.SharedFeature ||
 			entities.IsTestSide(decl) {
 			continue
 		}
@@ -16,9 +19,9 @@ func shareCompanions(graph entities.Graph, own ownership) {
 		for _, edge := range graph.Needs(decl.Key) {
 			provider, found := graph.Decl(edge.Provider)
 			if found && provider.Key.Kind == entities.KindType && provider.Unit == decl.Unit &&
-				own.owner[provider.Key] == SharedFeature && !own.deferred[provider.Key] &&
+				own.owner[provider.Key] == reach.SharedFeature && !own.deferred[provider.Key] &&
 				!entities.IsStructural(edge.Reason) {
-				own.owner[decl.Key] = SharedFeature
+				own.owner[decl.Key] = reach.SharedFeature
 
 				break
 			}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // anchorTests gives every test-side declaration the subject its file is about,
@@ -24,7 +25,7 @@ func anchorTests(
 ) (entities.Graph, entities.Ordering) {
 	decls := graph.Decls()
 	index := newSubjectIndex(decls, order)
-	own := TestSubjects(graph)
+	own := reach.TestSubjects(graph)
 	anchors := append([]entities.Anchor(nil), graph.Anchors()...)
 
 	inFile := map[string]map[entities.DeclKey]bool{}

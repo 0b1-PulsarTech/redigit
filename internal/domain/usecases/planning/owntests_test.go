@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestOwnTests(t *testing.T) {
@@ -31,16 +32,16 @@ func TestOwnTests(t *testing.T) {
 
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			code.Key: "a", later.Key: "b", root.Key: SharedFeature,
-			testCode.Key: SharedFeature, testLater.Key: SharedFeature, testRoot.Key: SharedFeature,
+			code.Key: "a", later.Key: "b", root.Key: reach.SharedFeature,
+			testCode.Key: reach.SharedFeature, testLater.Key: reach.SharedFeature, testRoot.Key: reach.SharedFeature,
 		},
-		deferred: Wiring{
+		deferred: reach.Wiring{
 			root.Key:      true,
 			testCode.Key:  true,
 			testLater.Key: true,
 			testRoot.Key:  true,
 		},
-		roots: Wiring{root.Key: true},
+		roots: reach.Wiring{root.Key: true},
 	}
 
 	born := map[entities.DeclKey]bool{code.Key: true}

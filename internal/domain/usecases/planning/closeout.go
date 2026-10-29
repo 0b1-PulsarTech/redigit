@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // sweepLast births what is ready once the last feature is built. Nothing is
@@ -43,7 +44,7 @@ func (p Planner) closeOut(
 			p.cut(graph, order, bucket{
 				keys:    rest,
 				shape:   entities.ShapeLayer,
-				feature: SharedFeature,
+				feature: reach.SharedFeature,
 				reason:  "reached by no entry point",
 			})...,
 		)

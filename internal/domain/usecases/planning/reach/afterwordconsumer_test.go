@@ -1,14 +1,10 @@
-package planning
+package reach
 
 import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
-
-func edgeOf(dependent, provider entities.Decl, reason entities.EdgeReason) entities.Edge {
-	return entities.Edge{Dependent: dependent.Key, Provider: provider.Key, Reason: reason}
-}
 
 func TestHasProductionConsumerIgnoresAnAfterword(t *testing.T) {
 	t.Parallel()

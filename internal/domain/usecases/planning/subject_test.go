@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestDraftSubject(t *testing.T) {
@@ -34,7 +35,7 @@ func TestDraftSubject(t *testing.T) {
 		{
 			"a layer commit is not a feature and does not claim to be",
 			entities.ShapeLayer,
-			SharedFeature,
+			reach.SharedFeature,
 			keys,
 			[]string{"chore(shared)"},
 			"chore",

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func inModule(dependent, manifest entities.Decl) entities.Edge {
@@ -40,7 +41,7 @@ func TestAssignSharesALibraryWhole(t *testing.T) {
 	own := assign(graph)
 
 	for _, member := range []entities.Decl{first, second} {
-		if got := own.owner[member.Key]; got != SharedFeature {
+		if got := own.owner[member.Key]; got != reach.SharedFeature {
 			t.Fatalf(
 				"%s owner = %q, want the shared bucket: a library has no capability",
 				member.Key,
@@ -60,9 +61,9 @@ func TestDeferLibraryEntries(t *testing.T) {
 	free := decl("lib/a.go", "A", "lib")
 	owned := decl("lib/b.go", "B", "lib")
 	own := ownership{
-		owner:    map[entities.DeclKey]FeatureID{free.Key: SharedFeature, owned.Key: "f"},
-		deferred: Wiring{},
-		loose:    Wiring{},
+		owner:    map[entities.DeclKey]FeatureID{free.Key: reach.SharedFeature, owned.Key: "f"},
+		deferred: reach.Wiring{},
+		loose:    reach.Wiring{},
 	}
 
 	deferLibraryEntries(own, []entities.Decl{free, owned})

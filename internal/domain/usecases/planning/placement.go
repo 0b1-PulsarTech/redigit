@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // placement is the moves placeTests has decided so far: after[at] are the
 // declarations to land right behind keys[at].
@@ -31,8 +34,8 @@ func newPlacement(graph entities.Graph, keys []entities.DeclKey) *placement {
 	return &placement{
 		graph:    graph,
 		index:    index,
-		subjects: TestSubjects(graph),
-		lastOf:   AtomExtent(graph, keys),
+		subjects: reach.TestSubjects(graph),
+		lastOf:   reach.AtomExtent(graph, keys),
 		after:    map[int][]entities.DeclKey{},
 		moved:    map[entities.DeclKey]bool{},
 		slot:     map[entities.DeclKey]int{},

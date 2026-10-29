@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // sortForBirth orders declarations as commits must carry them: by settled
@@ -27,7 +28,7 @@ func sortForBirth(
 	})
 
 	out := make([]entities.DeclKey, 0, len(sorted))
-	subjects := TestSubjects(graph)
+	subjects := reach.TestSubjects(graph)
 
 	for start := 0; start < len(sorted); {
 		end := start + 1

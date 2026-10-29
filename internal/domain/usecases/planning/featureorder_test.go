@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestSortFeatures(t *testing.T) {
@@ -96,7 +97,7 @@ func TestFeatureNeeds(t *testing.T) {
 	// An edge into the shared kernel is not a feature dependency; the kernel is
 	// emitted as a layer before whoever needs it.
 	for from, targets := range needs {
-		if _, shared := targets[SharedFeature]; shared {
+		if _, shared := targets[reach.SharedFeature]; shared {
 			t.Fatalf("%q records a dependency on the shared bucket", from)
 		}
 	}
@@ -169,27 +170,27 @@ func TestFeatureNeedsBehindADeferred(t *testing.T) {
 	owner := map[entities.DeclKey]FeatureID{
 		reader.Key:   "lead/api",
 		bill.Key:     "bill/api",
-		registry.Key: SharedFeature,
-		hop.Key:      SharedFeature,
-		plain.Key:    SharedFeature,
+		registry.Key: reach.SharedFeature,
+		hop.Key:      reach.SharedFeature,
+		plain.Key:    reach.SharedFeature,
 	}
 
 	testCases := []struct {
 		name     string
 		edges    []entities.Edge
-		deferred Wiring
+		deferred reach.Wiring
 		want     bool
 	}{
 		{
 			"a feature reaching a deferred declaration waits for the features behind it",
 			[]entities.Edge{needs(reader, registry), needs(registry, bill)},
-			Wiring{registry.Key: true},
+			reach.Wiring{registry.Key: true},
 			true,
 		},
 		{
 			"through a chain of deferred declarations",
 			[]entities.Edge{needs(reader, registry), needs(registry, hop), needs(hop, bill)},
-			Wiring{registry.Key: true, hop.Key: true},
+			reach.Wiring{registry.Key: true, hop.Key: true},
 			true,
 		},
 		{

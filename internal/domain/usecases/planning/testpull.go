@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // safeToPull is whether a test can be born with the shared kernel: everything it
 // needs, and everything the shared tests it needs themselves need, is born or
@@ -32,7 +35,7 @@ func (index sharedIndex) safeToPull(
 			switch {
 			case isSoft(edge.Reason) || seen[provider] || born[provider]:
 				continue
-			case index.own.owner[provider] != SharedFeature:
+			case index.own.owner[provider] != reach.SharedFeature:
 				return false
 			}
 

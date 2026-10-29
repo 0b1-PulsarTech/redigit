@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestAssignBuildsNoFeatureForCodeOnlyTestsRead(t *testing.T) {
@@ -25,7 +26,7 @@ func TestAssignBuildsNoFeatureForCodeOnlyTestsRead(t *testing.T) {
 		t.Errorf("order = %v, want %v: test support is no feature to build", own.order, want)
 	}
 
-	if got := own.owner[checker.Key]; got != SharedFeature {
+	if got := own.owner[checker.Key]; got != reach.SharedFeature {
 		t.Errorf("owner of the checker = %q, want it shared", got)
 	}
 

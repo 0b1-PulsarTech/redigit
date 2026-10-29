@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // touched keeps the ready declarations that need something fresh, directly or
 // through another ready declaration. A manifest line does not count: every test
@@ -24,10 +27,10 @@ func touched(
 
 			needed := needsFresh(graph, subjects, key, fresh, out)
 			if own.loose[key] {
-				needed = needed || TiedToFresh(graph, key, fresh, out)
+				needed = needed || reach.TiedToFresh(graph, key, fresh, out)
 			}
 
-			if !needed && IsAfterwordBase(graph, key) {
+			if !needed && reach.IsAfterwordBase(graph, key) {
 				needed = consumedBy(graph, key, out)
 			}
 

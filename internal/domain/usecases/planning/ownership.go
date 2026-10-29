@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 // ownership is which feature each declaration belongs to, and how many features
@@ -17,14 +18,14 @@ type ownership struct {
 	order []FeatureID
 	// deferred is the wiring and its tests: owned only once the features are
 	// in build order, by the last one they need.
-	deferred Wiring
-	roots    Wiring
+	deferred reach.Wiring
+	roots    reach.Wiring
 	// support is the code only other packages' tests read; it is deferred and
 	// born with the first test that needs it.
-	support Wiring
+	support reach.Wiring
 	// loose is what nothing reads, deferred and born once what it names exists:
 	// the manifest lines and the entries of a library.
-	loose Wiring
+	loose reach.Wiring
 	// packages is, per unit, the shared declarations of production code that no
 	// test and no deferral holds back.
 	packages map[entities.UnitID][]entities.DeclKey
@@ -47,14 +48,14 @@ func assign(graph entities.Graph) ownership {
 		reach: map[entities.DeclKey]int{},
 		group: map[FeatureID]FeatureID{},
 		cost:  map[FeatureID]int{},
-		roots: CodeWiring(graph, entities.FindWiring(graph)),
-		loose: LooseLines(graph),
+		roots: reach.CodeWiring(graph, entities.FindWiring(graph)),
+		loose: reach.LooseLines(graph),
 	}
 
 	own.support = testSupport(graph)
-	own.deferred = DeferTests(graph, own.roots, own.support)
+	own.deferred = reach.DeferTests(graph, own.roots, own.support)
 
-	entries := EntryPoints(graph, own.roots)
+	entries := reach.EntryPoints(graph, own.roots)
 	walk := walkEntries(graph, own, entries)
 
 	unionAtoms(graph, walk.reachedBy)
@@ -74,7 +75,7 @@ func assign(graph entities.Graph) ownership {
 
 		// The code only test support reaches has no feature to be built in.
 		if !walk.built[own.owner[key]] {
-			own.owner[key] = SharedFeature
+			own.owner[key] = reach.SharedFeature
 		}
 	}
 
@@ -88,7 +89,7 @@ func assign(graph entities.Graph) ownership {
 	// What is deferred is born when it is ready, not with a feature that
 	// happens to own part of what it needs.
 	for key := range own.deferred {
-		own.owner[key] = SharedFeature
+		own.owner[key] = reach.SharedFeature
 	}
 
 	shareCompanions(graph, own)
@@ -110,13 +111,13 @@ func shareUnreached(graph entities.Graph, own ownership) {
 	for _, decl := range graph.Decls() {
 		if _, found := own.reach[decl.Key]; !found {
 			own.reach[decl.Key] = 0
-			own.owner[decl.Key] = SharedFeature
+			own.owner[decl.Key] = reach.SharedFeature
 		}
 	}
 }
 
 func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[FeatureID]bool) {
-	for _, members := range AtomGroups(graph) {
+	for _, members := range reach.AtomGroups(graph) {
 		union := map[FeatureID]bool{}
 
 		for _, key := range members {
@@ -140,12 +141,12 @@ func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[Feature
 // guess here is what puts a declaration hundreds of commits from its use.
 func soleOwner(features map[FeatureID]bool) FeatureID {
 	if len(features) != 1 {
-		return SharedFeature
+		return reach.SharedFeature
 	}
 
 	for feature := range features {
 		return feature
 	}
 
-	return SharedFeature
+	return reach.SharedFeature
 }

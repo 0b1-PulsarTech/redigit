@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
+
+type FeatureID = reach.FeatureID
 
 // Capabilities is a caller-supplied answer to which slice each declaration
 // belongs to, replacing the reachability walk. Reachability asks "what does
@@ -30,13 +33,13 @@ func ownershipFrom(capabilities Capabilities, graph entities.Graph) ownership {
 	for _, decl := range graph.Decls() {
 		feature, named := capabilities[decl.Key]
 		if !named {
-			feature = SharedFeature
+			feature = reach.SharedFeature
 		}
 
 		own.owner[decl.Key] = feature
 		own.reach[decl.Key] = 1
 
-		if feature != SharedFeature && !seen[feature] {
+		if feature != reach.SharedFeature && !seen[feature] {
 			seen[feature] = true
 
 			own.order = append(own.order, feature)

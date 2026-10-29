@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestReadsRootsCountsOnlyWhatAFeatureReadsDirectly(t *testing.T) {
@@ -24,7 +25,7 @@ func TestReadsRootsCountsOnlyWhatAFeatureReadsDirectly(t *testing.T) {
 		nil,
 	)
 	owner := map[entities.DeclKey]FeatureID{
-		port.Key: "crm", handler.Key: "routes", shared.Key: SharedFeature,
+		port.Key: "crm", handler.Key: "routes", shared.Key: reach.SharedFeature,
 	}
 	roots := map[string]FeatureID{"crm": "crm", "kernel": "kernel"}
 
@@ -34,7 +35,7 @@ func TestReadsRootsCountsOnlyWhatAFeatureReadsDirectly(t *testing.T) {
 		t.Fatalf("readsRoots() = %v, want routes to wait for crm and kernel", got)
 	}
 
-	if len(got[SharedFeature]) != 0 {
+	if len(got[reach.SharedFeature]) != 0 {
 		t.Fatalf("readsRoots() = %v, want the shared kernel to wait for nothing", got)
 	}
 }

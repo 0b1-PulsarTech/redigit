@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
 func TestUnbornProvidersClosesTransitivelyOverTheSharedKernel(t *testing.T) {
@@ -23,8 +24,8 @@ func TestUnbornProvidersClosesTransitivelyOverTheSharedKernel(t *testing.T) {
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key: "a",
-		event.Key:  SharedFeature,
-		reason.Key: SharedFeature,
+		event.Key:  reach.SharedFeature,
+		reason.Key: reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -57,8 +58,8 @@ func TestUnbornProvidersPullsAnAtomSiblingAlong(t *testing.T) {
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key: "a",
-		typeA.Key:  SharedFeature,
-		typeB.Key:  SharedFeature,
+		typeA.Key:  reach.SharedFeature,
+		typeB.Key:  reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -87,8 +88,8 @@ func TestUnbornProvidersPullsAnAnchoredTestAlong(t *testing.T) {
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key:    "a",
-		event.Key:     SharedFeature,
-		eventTest.Key: SharedFeature,
+		event.Key:     reach.SharedFeature,
+		eventTest.Key: reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -118,9 +119,9 @@ func TestUnbornProvidersLeavesAnAnchoredTestBehindWhenItsOwnNeedIsNotReady(t *te
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key:    "a",
-		event.Key:     SharedFeature,
+		event.Key:     reach.SharedFeature,
 		late.Key:      "b",
-		eventTest.Key: SharedFeature,
+		eventTest.Key: reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -147,7 +148,7 @@ func TestUnbornProvidersSkipsWhatIsAlreadyBorn(t *testing.T) {
 	)
 
 	own := ownership{
-		owner: map[entities.DeclKey]FeatureID{member.Key: "a", event.Key: SharedFeature},
+		owner: map[entities.DeclKey]FeatureID{member.Key: "a", event.Key: reach.SharedFeature},
 	}
 	born := map[entities.DeclKey]bool{event.Key: true}
 
@@ -177,8 +178,8 @@ func TestUnbornProvidersBringsOnlyTheLibraryDeclarationsAConsumerNeeds(t *testin
 
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
-			member.Key: "app", manifest.Key: SharedFeature,
-			used.Key: SharedFeature, unused.Key: SharedFeature,
+			member.Key: "app", manifest.Key: reach.SharedFeature,
+			used.Key: reach.SharedFeature, unused.Key: reach.SharedFeature,
 		},
 	}
 
@@ -210,10 +211,10 @@ func TestUnbornProvidersLeavesATestBehindWhoseSharedSupportNeedsAFeature(t *test
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key:    "a",
-		event.Key:     SharedFeature,
+		event.Key:     reach.SharedFeature,
 		late.Key:      "b",
-		support.Key:   SharedFeature,
-		eventTest.Key: SharedFeature,
+		support.Key:   reach.SharedFeature,
+		eventTest.Key: reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -246,8 +247,8 @@ func TestUnbornProvidersIgnoresAGeneratedByEdgeIntoATest(t *testing.T) {
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key:  "a",
-		mock.Key:    SharedFeature,
-		support.Key: SharedFeature,
+		mock.Key:    reach.SharedFeature,
+		support.Key: reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -279,11 +280,11 @@ func TestUnbornProvidersBringsWhatAWalkedStatementReadsFromAFeature(t *testing.T
 	own := ownership{
 		owner: map[entities.DeclKey]FeatureID{
 			member.Key: "a",
-			stmt.Key:   SharedFeature,
+			stmt.Key:   reach.SharedFeature,
 			health.Key: "w",
 			status.Key: "w",
 		},
-		roots: Wiring{stmt.Key: true},
+		roots: reach.Wiring{stmt.Key: true},
 	}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})
@@ -316,9 +317,9 @@ func TestUnbornProvidersDoesNotFollowAnInterfaceATypeOnlyFills(t *testing.T) {
 
 	own := ownership{owner: map[entities.DeclKey]FeatureID{
 		member.Key: "a",
-		impl.Key:   SharedFeature,
-		method.Key: SharedFeature,
-		iface.Key:  SharedFeature,
+		impl.Key:   reach.SharedFeature,
+		method.Key: reach.SharedFeature,
+		iface.Key:  reach.SharedFeature,
 	}}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})

@@ -1,6 +1,9 @@
 package planning
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+)
 
 // featureNeeds is which features have to be built before which. A feature needs
 // another when any declaration it owns waits on a declaration the other owns.
@@ -9,7 +12,7 @@ func featureNeeds(graph entities.Graph, own ownership) map[FeatureID]map[Feature
 	behind := map[entities.DeclKey]map[FeatureID]bool{}
 
 	add := func(from, to FeatureID) {
-		if from == SharedFeature || to == SharedFeature || from == to {
+		if from == reach.SharedFeature || to == reach.SharedFeature || from == to {
 			return
 		}
 
@@ -27,7 +30,7 @@ func featureNeeds(graph entities.Graph, own ownership) map[FeatureID]map[Feature
 		// What a deferred declaration needs is not shared by construction: it
 		// was shared by being deferred. A feature reaching it is built after
 		// the features it waits for.
-		if own.deferred[edge.Provider] && from != SharedFeature {
+		if own.deferred[edge.Provider] && from != reach.SharedFeature {
 			for feature := range featuresBehind(graph, own, edge.Provider, behind) {
 				add(from, feature)
 			}
@@ -64,7 +67,7 @@ func featuresBehind(
 
 			seen[edge.Provider] = true
 
-			if owner := own.owner[edge.Provider]; owner != SharedFeature {
+			if owner := own.owner[edge.Provider]; owner != reach.SharedFeature {
 				out[owner] = true
 
 				continue
