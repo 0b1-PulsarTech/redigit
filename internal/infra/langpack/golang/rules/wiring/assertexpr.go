@@ -12,6 +12,7 @@ import (
 func receiverOfAssertion(text string) (string, bool) {
 	body := strings.TrimSpace(text)
 
+	// Try the text as written, then with var prepended: the span has the keyword and doc, the name has neither.
 	name, found := parseAssertion(body)
 	if found {
 		return name, true

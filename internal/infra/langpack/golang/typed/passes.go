@@ -24,6 +24,8 @@ func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]lo
 		return nil, fmt.Errorf("hidden passes: %w", err)
 	}
 
+	// A file hidden by the run tags is never type-checked, so what it reads lands after it; one extra
+	// load per tag set shows it, limited to packages holding a hidden file.
 	byTags := map[string]*loadPass{}
 
 	for _, file := range hidden {

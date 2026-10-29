@@ -22,6 +22,8 @@ func DropConstruction(snap entities.Snapshot, edges []entities.Edge) []entities.
 		structural := edge.Reason == entities.ReasonImplements ||
 			edge.Reason == entities.ReasonMethodSet
 
+		// Generated code calls no method and waits on no consumer; New/WithTx name Queries, bound to
+		// interfaces elsewhere, so without this every closure held every table.
 		if structural && isGenerated(edge.Dependent.File) {
 			continue
 		}

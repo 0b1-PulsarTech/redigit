@@ -95,6 +95,7 @@ func bestSubject(scope []entities.Decl, tokens []string) (entities.DeclKey, bool
 
 	found := false
 
+	// Either side matching overwrites the best, so the last (most specific) match wins.
 	for cut := 1; cut < len(tokens); cut++ {
 		left := strings.Join(tokens[:cut], "")
 		right := strings.Join(tokens[cut:], "")

@@ -38,6 +38,7 @@ func ReturnedConcreteTypes(text string, interfaces map[string]bool) []string {
 }
 
 func ParseFunc(text string) *ast.FuncDecl {
+	// No "func" prefix check: the span carries the doc comment, so most constructors would be skipped.
 	file, err := parser.ParseFile(
 		token.NewFileSet(), "fn.go", "package p\n"+strings.TrimSpace(text)+"\n",
 		parser.SkipObjectResolution,
@@ -89,6 +90,7 @@ func typeName(expr ast.Expr) (string, bool) {
 }
 
 func ConcreteTypeIn(expr ast.Expr) (string, bool) {
+	// Handles (*T)(nil), T(nil), T{} and &T{}, generic T[P] included.
 	switch node := expr.(type) {
 	case *ast.UnaryExpr:
 		if node.Op == token.AND {
@@ -110,6 +112,7 @@ func ConcreteTypeIn(expr ast.Expr) (string, bool) {
 }
 
 func localTypeName(expr ast.Expr) (string, bool) {
+	// Unwrap first: "(*other.Thing)(nil)" hides its qualifier, and only a local type has methods here.
 	switch node := expr.(type) {
 	case *ast.Ident:
 		return node.Name, true

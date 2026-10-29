@@ -24,6 +24,7 @@ func (rule Escaped) Edges(
 
 	var edges []entities.Edge
 
+	// Error, Unwrap, Is, As and StatusCode are called at run time even through any/error, so wait for them.
 	for _, need := range facts.Escaped {
 		edges = append(edges, methodEdges(need, entities.ReasonImplements)...)
 	}

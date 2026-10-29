@@ -143,6 +143,7 @@ func mentionedTypes(
 }
 
 func declares(key entities.DeclKey, typeName string) bool {
+	// The type and its methods are the wait itself; waiting on them makes a clique.
 	switch key.Kind {
 	case entities.KindType:
 		return key.Name == typeName

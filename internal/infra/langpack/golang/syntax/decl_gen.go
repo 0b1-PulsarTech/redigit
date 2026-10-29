@@ -14,6 +14,7 @@ func buildGenDecl(
 	unit entities.UnitID,
 	decl *ast.GenDecl,
 ) []entities.Decl {
+	// Identity is one key per name, but the rendering unit is the whole iota group.
 	switch decl.Tok {
 	case token.IMPORT:
 		return nil
@@ -194,6 +195,7 @@ func ValueName(fset *token.FileSet, source []byte, vs *ast.ValueSpec, name *ast.
 		return name.Name
 	}
 
+	// Blank names are told apart by type plus value: every "var _ Iface = (*T)(nil)" shares one Iface.
 	text := ""
 
 	if vs.Type != nil {

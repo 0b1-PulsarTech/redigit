@@ -67,6 +67,8 @@ func wholeFile(
 	file *ast.File,
 ) entities.Decl {
 	return entities.Decl{
+		// A file with no declarations would vanish from the rebuilt tree; this stands for the whole file.
+		// The name is deliberately not a legal Go identifier, so it never collides with a real declaration.
 		Key:      entities.DeclKey{File: path, Kind: entities.KindOther, Name: FileDeclName},
 		Unit:     unit,
 		Span:     entities.Span{Start: 0, End: len(source)},
@@ -140,6 +142,7 @@ func receiverName(recv *ast.FieldList) string {
 		return ""
 	}
 
+	// Strip pointer and generics: otherwise two types that implement Error() collapse into one decl.
 	expr := recv.List[0].Type
 	if star, ok := expr.(*ast.StarExpr); ok {
 		expr = star.X
@@ -204,6 +207,7 @@ func locationOf(
 	return entities.Location{
 		File: path,
 		Line: position.Line - 1,
+		// token Column counts bytes while LSP Char counts UTF-16 units.
 		Char: utf16Units(source[start:position.Offset]),
 	}
 }

@@ -19,10 +19,8 @@ func Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, 
 		keepSet[syntax.Ident{Kind: key.Kind, Name: key.Name}] = true
 	}
 
-	// A file that declares nothing is carried by one declaration standing for
-	// the whole of it, so keeping that one means keeping the file verbatim.
-	// Filtering it through the printer instead would drop its imports, which
-	// are the only thing it holds.
+	// A file that declares nothing is carried by one declaration standing for it,
+	// so keeping that keeps the file verbatim: the printer would drop its imports.
 	if keepSet[syntax.Ident{Kind: entities.KindOther, Name: syntax.FileDeclName}] {
 		return source, nil
 	}
@@ -36,6 +34,7 @@ func Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, 
 
 	fset := token.NewFileSet()
 
+	// Object resolution stays on: usedIdents needs it to tell a local binding from an import.
 	file, err := parser.ParseFile(
 		fset,
 		"",
@@ -46,6 +45,7 @@ func Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, 
 		return nil, fmt.Errorf("parse source for render: %w", err)
 	}
 
+	// CommentMap keeps each comment with its node, so a dropped declaration takes its comments along.
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
 
 	var kept, importDecls []ast.Decl

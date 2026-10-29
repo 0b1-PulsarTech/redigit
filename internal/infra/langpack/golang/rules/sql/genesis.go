@@ -32,6 +32,7 @@ func genesisOf(snap entities.Snapshot, model sqlModel) (sqlGenesis, bool) {
 		}
 
 		genesis := sqlGenesis{table: table, query: query}
+		// The first table needs the whole schema tooling set in one commit, or the tools reject the tree.
 		genesis.members = slices.Concat(
 			model.dbInit, infra, query.generated, []entities.DeclKey{query.block},
 			configKeys(snap), checksumKeys(snap), model.moduleKeys(snap),

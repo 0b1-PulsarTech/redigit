@@ -100,6 +100,7 @@ func finishGenDecl(gen *ast.GenDecl, specs []ast.Spec) []ast.Decl {
 
 func resetSpacingIfSafe(specs []ast.Spec) {
 	for _, spec := range specs {
+		// NoPos beside a positioned doc comment inverts the printer ordering, so leave such a group alone.
 		if syntax.SpecDoc(spec) != nil {
 			return
 		}

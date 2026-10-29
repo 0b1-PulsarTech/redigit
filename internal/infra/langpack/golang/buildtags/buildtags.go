@@ -143,6 +143,8 @@ func Hidden(tags []BuildTag, satisfied []string) ([]BuildTag, error) {
 			return nil, fmt.Errorf("parse constraint %q in %s: %w", tag.Constraint, tag.File, err)
 		}
 
+		// Behind a constraint is not hidden: a //go:build linux file read on Linux would bury the
+		// integration-tagged files that are really missing.
 		if !expr.Eval(func(name string) bool { return known[name] }) {
 			out = append(out, tag)
 		}

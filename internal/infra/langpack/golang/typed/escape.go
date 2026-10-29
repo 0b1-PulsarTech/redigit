@@ -21,6 +21,7 @@ var protocolMethods = map[string]bool{
 }
 
 func dynamicNames(pkgs []*packages.Package) map[string]bool {
+	// Dynamic methods stay reachable through an interface: stdlib protocols plus the tree's own.
 	names := map[string]bool{}
 
 	for name := range protocolMethods {

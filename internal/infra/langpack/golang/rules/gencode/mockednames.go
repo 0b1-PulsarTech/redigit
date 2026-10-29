@@ -8,6 +8,7 @@ import (
 var mockTypePattern = regexp.MustCompile(`(?m)^type Mock(\w+) struct`)
 
 func mockedNamesIn(source []byte) []string {
+	// Read names from the text: a generated file is one declaration, so its Mock types are not decls.
 	matches := mockTypePattern.FindAllSubmatch(source, -1)
 
 	out := make([]string, 0, len(matches))

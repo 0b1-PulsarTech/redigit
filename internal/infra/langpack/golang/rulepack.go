@@ -42,6 +42,7 @@ type (
 )
 
 var rules = []rule{
+	// This slice is the only discovery mechanism; there is no init() registration.
 	gencode.Goverter{},
 	gencode.Mockgen{},
 	gencode.Generate{},
@@ -63,6 +64,7 @@ type RulePack struct {
 }
 
 func NewRulePack(tags []string) RulePack {
+	// Loaded lazily once, under the run tags, and shared by the four type-check rules.
 	source := typed.NewSource(tags)
 
 	return RulePack{rules: append(slices.Clone(rules),
@@ -104,6 +106,7 @@ func goScope(decls []entities.Decl) []entities.Decl {
 	out := make([]entities.Decl, 0, len(decls))
 
 	for _, decl := range decls {
+		// Drop non-Go declarations: a rule that parses its file fails the whole run.
 		if path.Ext(decl.Key.File) == ".go" || decl.Key.Kind == entities.KindOther {
 			out = append(out, decl)
 		}

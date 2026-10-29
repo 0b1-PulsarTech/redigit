@@ -21,6 +21,7 @@ func builtTypes(
 
 	var out []string
 
+	// Only keyed field values and call args count; counting every construction would bind most types.
 	collect := func(expr ast.Expr) {
 		if name, built := declsource.ConcreteTypeIn(expr); built && !seen[name] {
 			seen[name] = true

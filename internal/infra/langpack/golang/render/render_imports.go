@@ -17,6 +17,7 @@ func usedIdents(decls []ast.Decl) map[string]bool {
 				return true
 			}
 
+			// A resolved Obj is a local binding, not a package; counting it keeps an import Go rejects as unused.
 			if ident, ok := sel.X.(*ast.Ident); ok && ident.Obj == nil {
 				used[ident.Name] = true
 			}
@@ -69,6 +70,7 @@ func closeGroupGaps(fset *token.FileSet, original, kept []ast.Spec) {
 		}
 	}
 
+	// Regroup per blank-line block: detaching every position merges the blocks and the printer sorts them.
 	keptSet := make(map[ast.Spec]bool, len(kept))
 	for _, spec := range kept {
 		keptSet[spec] = true
@@ -140,6 +142,8 @@ func importLocalName(spec *ast.ImportSpec) string {
 		path = spec.Path.Value
 	}
 
+	// The name is a guess from the path; skip /vN (math/rand/v2 is rand) or the import is
+	// pruned and the output does not compile.
 	if slash := strings.LastIndexByte(path, '/'); slash >= 0 {
 		last := path[slash+1:]
 		if isMajorVersion(last) {

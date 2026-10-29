@@ -37,6 +37,7 @@ func (source *Source) Facts(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (Facts, error) {
+	// Loading once is sound only because one run indexes one snapshot.
 	source.once.Do(func() {
 		source.loaded, source.err = source.check(ctx, snap)
 	})
@@ -53,6 +54,7 @@ func (source *Source) Facts(
 		return known, nil
 	}
 
+	// Packages stay loaded: the same facts are asked again per statement, each one a dependent.
 	locator := newDeclLocator(decls)
 
 	var facts Facts

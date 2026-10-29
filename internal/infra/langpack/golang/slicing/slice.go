@@ -69,6 +69,7 @@ func Slice(
 
 	cut := bodyCut{fset: fset, fn: fn, decl: decl, stmts: decl.Body.List}
 
+	// A registration table that grows one element per feature is cut by element.
 	if elements, _ := syntax.ReturnedElements(decl.Body); len(elements) >= syntax.MinGroup {
 		cut.elements = elements
 
@@ -106,12 +107,14 @@ func cuttable(body *ast.BlockStmt) bool {
 		return false
 	}
 
+	// An early return leaves what follows unreachable only when all of it is present.
 	for _, stmt := range body.List[:len(body.List)-1] {
 		if _, isReturn := stmt.(*ast.ReturnStmt); isReturn {
 			return false
 		}
 	}
 
+	// A label or goto ties statements together by position, so such a body is not cut.
 	tied := false
 
 	ast.Inspect(body, func(node ast.Node) bool {

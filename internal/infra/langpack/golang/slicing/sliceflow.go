@@ -172,6 +172,7 @@ func (flow bodyFlow) joinDeclarations(groups groups) {
 }
 
 func (flow bodyFlow) joinReader(groups groups, declaration int, obj types.Object) {
+	// A declaration is born with the first statement that reads it: Go refuses an unused local.
 	first := -1
 
 	for index := declaration + 1; index < len(flow.reads); index++ {

@@ -45,6 +45,7 @@ func (Embed) Edges(
 
 		for _, use := range embedUses(file, source) {
 			for _, pattern := range use.patterns {
+				// One matching file builds, so the first by name is the provider; the rest may arrive later.
 				provider, found := firstMatch(snap.Files, byFile, path.Dir(file), pattern)
 				if !found {
 					continue
