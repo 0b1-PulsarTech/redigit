@@ -11,6 +11,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/gencode"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/tests"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/wiring"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
@@ -42,12 +43,12 @@ var rules = []rule{
 	Atoms{},
 	Migration{},
 	tests.Anchor{},
-	Encloses{},
-	Assertion{},
-	Conversion{},
-	Bound{},
+	wiring.Encloses{},
+	wiring.Assertion{},
+	wiring.Conversion{},
+	wiring.Bound{},
 	buildtags.Rule{},
-	Embed{},
+	wiring.Embed{},
 	tests.RoutePath{},
 }
 

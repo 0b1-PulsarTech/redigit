@@ -1,10 +1,11 @@
-package golang
+package wiring
 
 import (
 	"context"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 // go refuses a //go:embed pattern that matches nothing, so the embedding file
@@ -63,7 +64,7 @@ func TestEmbedRuleMakesTheEmbeddingDeclarationWaitForItsData(t *testing.T) {
 			t.Parallel()
 
 			root := t.TempDir()
-			writeFile(t, root, embedGo, testCase.source)
+			testkit.WriteFile(t, root, embedGo, testCase.source)
 
 			paths := []string{embedGo}
 
@@ -71,7 +72,7 @@ func TestEmbedRuleMakesTheEmbeddingDeclarationWaitForItsData(t *testing.T) {
 
 			for name := range testCase.files {
 				rel := "database/migrations/" + name
-				writeFile(t, root, rel, testCase.files[name])
+				testkit.WriteFile(t, root, rel, testCase.files[name])
 
 				paths = append(paths, rel)
 				data = append(data, entities.Decl{
@@ -79,7 +80,7 @@ func TestEmbedRuleMakesTheEmbeddingDeclarationWaitForItsData(t *testing.T) {
 				})
 			}
 
-			decls := append(declareAll(t, NewSyntax(), root, []string{embedGo}), data...)
+			decls := append(testkit.DeclareAll(t, root, []string{embedGo}), data...)
 			snap := entities.Snapshot{Root: root, Files: paths}
 
 			edges, err := Embed{}.Edges(context.Background(), snap, decls)

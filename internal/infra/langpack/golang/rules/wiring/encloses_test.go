@@ -1,10 +1,11 @@
-package golang
+package wiring
 
 import (
 	"context"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestEnclosesRuleValueTypedWithSameFileType(t *testing.T) {
@@ -12,7 +13,7 @@ func TestEnclosesRuleValueTypedWithSameFileType(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "weekday.go", `package sample
+	testkit.WriteFile(t, root, "weekday.go", `package sample
 
 type Weekday int
 
@@ -23,9 +24,8 @@ const (
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{"weekday.go"})
+	decls := testkit.DeclareAll(t, root, []string{"weekday.go"})
 
 	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
@@ -48,7 +48,7 @@ func TestEnclosesRuleConstructorWithSoleResultType(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "repo.go", `package sample
+	testkit.WriteFile(t, root, "repo.go", `package sample
 
 type Repo struct{}
 
@@ -58,9 +58,8 @@ func NewWithErr() (*Repo, error) { return nil, nil }
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{"repo.go"})
+	decls := testkit.DeclareAll(t, root, []string{"repo.go"})
 
 	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
@@ -87,7 +86,7 @@ func TestEnclosesRuleUnrelatedTypeNoEdge(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "misc.go", `package sample
+	testkit.WriteFile(t, root, "misc.go", `package sample
 
 type Repo struct{}
 
@@ -97,9 +96,8 @@ func Helper() int { return 1 }
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{"misc.go"})
+	decls := testkit.DeclareAll(t, root, []string{"misc.go"})
 
 	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
@@ -116,7 +114,7 @@ func TestEnclosesRuleBlankIdentifierSkipped(t *testing.T) {
 
 	root := t.TempDir()
 
-	writeFile(t, root, "assert.go", `package sample
+	testkit.WriteFile(t, root, "assert.go", `package sample
 
 import "io"
 
@@ -126,9 +124,8 @@ var _ io.Reader = (*Reader)(nil)
 `)
 
 	snap := entities.Snapshot{Root: root}
-	syntax := NewSyntax()
 
-	decls := declareAll(t, syntax, root, []string{"assert.go"})
+	decls := testkit.DeclareAll(t, root, []string{"assert.go"})
 
 	edges, err := Encloses{}.Edges(context.Background(), snap, decls)
 	if err != nil {
