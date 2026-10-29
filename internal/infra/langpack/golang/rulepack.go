@@ -17,10 +17,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
-// rule is one independently testable edge source. RulePack is a Composite
-// over a compile-time slice of these, the shape go/analysis and
-// golangci-lint register their analyzers in: no init() side effects, one
-// entry appended per rule.
 type rule interface {
 	Name() string
 	Edges(
@@ -35,8 +31,6 @@ type rule interface {
 	) ([]entities.Anchor, error)
 }
 
-// rules is the compile-time registry. Registering a rule here is what makes
-// it run; nothing else discovers a rule implicitly.
 var rules = []rule{
 	gencode.Goverter{},
 	gencode.Mockgen{},
@@ -54,9 +48,6 @@ var rules = []rule{
 	tests.RoutePath{},
 }
 
-// atomRule is the optional second output of a rule: declarations that must be
-// born in one commit, because each needs the other to compile and an edge
-// either way would be a cycle.
 type atomRule interface {
 	Atoms(
 		ctx context.Context,
@@ -65,16 +56,10 @@ type atomRule interface {
 	) (map[entities.DeclKey]string, error)
 }
 
-// RulePack implements indexing.RulePack for Go by fanning out to every
-// registered rule and unioning what each finds.
 type RulePack struct {
 	rules []rule
 }
 
-// NewRulePack builds the Go rule pack. The build tags are those the run reads
-// the tree under: the rules that ask the type checker check the same files the
-// language server answers about. The tree is loaded on the first question and
-// shared by every rule that asks.
 func NewRulePack(tags []string) RulePack {
 	source := typed.NewSource(tags)
 
@@ -101,8 +86,6 @@ func (p RulePack) Edges(
 	return collectEdges(ctx, snap, goScope(decls), p.rules)
 }
 
-// FilterEdges drops the structural edges the sqlc output would otherwise
-// carry, whichever side found them.
 func (p RulePack) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
 	return sql.DropConstruction(snap, edges)
 }
@@ -115,10 +98,6 @@ func (p RulePack) Anchors(
 	return collectAnchors(ctx, snap, goScope(decls), p.rules)
 }
 
-// goScope keeps what the Go rules may read: Go declarations, and the chunks
-// of the files a build needs (go.mod, query files), which are all KindOther.
-// A declaration another language pack read is not Go source, and a rule that
-// parses its file fails the whole run.
 func goScope(decls []entities.Decl) []entities.Decl {
 	out := make([]entities.Decl, 0, len(decls))
 
@@ -131,9 +110,6 @@ func goScope(decls []entities.Decl) []entities.Decl {
 	return out
 }
 
-// Atoms unions the groups every rule that makes them names. A declaration two
-// rules would put in different groups keeps the first, which is a loss of
-// co-location and never of a dependency.
 func (p RulePack) Atoms(
 	ctx context.Context,
 	snap entities.Snapshot,

@@ -5,18 +5,12 @@ import (
 	"strconv"
 )
 
-// MinGroup is the fewest pieces that make an atom.
 const MinGroup = 2
 
-// StmtName is the name of the index-th statement of the function named fn.
 func StmtName(fn string, index int) string {
 	return fn + "#" + strconv.Itoa(index)
 }
 
-// ReturnedElements are the pieces of a body that is one return of a list: the
-// elements of a composite literal, or the arguments of slices.Concat. Each can
-// be left out and the rest still compiles, and a list that grows one element
-// per feature is a registration table. The second result writes a new list.
 func ReturnedElements(body *ast.BlockStmt) ([]ast.Expr, func([]ast.Expr)) {
 	if len(body.List) != 1 {
 		return nil, nil

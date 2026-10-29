@@ -98,9 +98,6 @@ func (m *MockReader) Read() error { return nil }
 	})
 }
 
-// TestMockgenRuleRelativeDotDotHeader is the named trap: a "Source:" header
-// that climbs out of the mock's own directory with ".." must be normalized
-// (path.Clean after joining), or the mock is left with no anchor at all.
 func TestMockgenRuleRelativeDotDotHeader(t *testing.T) {
 	t.Parallel()
 

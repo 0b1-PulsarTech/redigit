@@ -9,9 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
-// A function cut into statements is a different set of declarations, and a use
-// belongs to the statement that writes it. Answering from the first set would
-// leave every use on the function that no longer holds a body.
 func TestTypedSourceAttributesUsesToTheDeclarationsAsked(t *testing.T) {
 	t.Parallel()
 

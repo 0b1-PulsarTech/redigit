@@ -10,8 +10,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// declLocator answers which declaration encloses an offset of a file, the way
-// the indexer reads a language server's locations back as declarations.
 type declLocator struct {
 	byFile map[string][]entities.Decl
 }
@@ -43,9 +41,6 @@ func (l declLocator) enclosing(file string, offset int) (entities.DeclKey, bool)
 	return group[index].Key, true
 }
 
-// positions turns token positions into the repo-relative declaration they fall
-// in. A position outside the tree (a dependency, a generated cache file) is no
-// declaration of this run.
 type positions struct {
 	root    string
 	locator declLocator
@@ -60,9 +55,6 @@ func newPositions(root string, locator declLocator) positions {
 	return positions{root: root, locator: locator, rel: map[string]string{}}
 }
 
-// relative maps an absolute file name to its repo-relative path, or "" outside
-// the tree. Symlinks are resolved on both sides, because the go command reports
-// the resolved path and the snapshot root need not be one.
 func (p positions) relative(name string) string {
 	if cached, known := p.rel[name]; known {
 		return cached

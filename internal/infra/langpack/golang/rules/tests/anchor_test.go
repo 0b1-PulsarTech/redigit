@@ -9,11 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
-// TestTestAnchorRuleLastMatchNotFirst is the named trap: TestFSStorePutGet
-// names the type FS and the methods Put and Get. Taking the longest-matching
-// candidate FIRST anchors the test to the type FS, born long before the
-// methods it actually exercises, and reports a defect where the test was
-// correctly waiting. The rule must take the LAST match along the walk - Get.
 func TestTestAnchorRuleLastMatchNotFirst(t *testing.T) {
 	t.Parallel()
 

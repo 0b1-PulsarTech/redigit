@@ -7,15 +7,6 @@ import (
 	"strings"
 )
 
-// usedIdents collects every selector prefix ("pkg" in "pkg.Symbol") the kept
-// declarations reach through the file scope. A prefix the parser resolved to a
-// local object (a parameter, a range variable, a := binding) is that local,
-// not the package: counting it keeps an import nothing uses, and Go rejects
-// an unused import. This needs the file parsed WITH object resolution.
-//
-// simplification: resolution is per file and syntactic, so a package-level
-// declaration sharing a package's name is also treated as a local. Go already
-// rejects that file, so it cannot occur in a tree that builds.
 func usedIdents(decls []ast.Decl) map[string]bool {
 	used := map[string]bool{}
 
@@ -37,9 +28,6 @@ func usedIdents(decls []ast.Decl) map[string]bool {
 	return used
 }
 
-// filterImports keeps every import the kept declarations reach by selector,
-// plus every blank (_) and dot (.) import: neither can be reached by a
-// selector, so both are always kept.
 func filterImports(
 	fset *token.FileSet,
 	importDecls []ast.Decl,
@@ -74,11 +62,6 @@ func filterImports(
 	return out
 }
 
-// closeGroupGaps moves the surviving specs of each blank-line separated group
-// onto the lines the group's first specs held. A dropped sibling then leaves
-// no stray blank line, and the groups (standard library, then the rest) stay
-// apart: detaching every position instead merges the block, and the printer
-// sorts the merged block into one run.
 func closeGroupGaps(fset *token.FileSet, original, kept []ast.Spec) {
 	for _, spec := range kept {
 		if is, ok := spec.(*ast.ImportSpec); !ok || is.Doc != nil || is.Comment != nil {
@@ -147,21 +130,6 @@ func importIsUsed(spec *ast.ImportSpec, used map[string]bool) bool {
 	return used[importLocalName(spec)]
 }
 
-// importLocalName reports the identifier code in this file uses to reach the
-// import: its alias, or the last segment of its path.
-//
-// A trailing major-version element is NOT that identifier: "math/rand/v2" is
-// reached as rand and "github.com/golang-jwt/jwt/v5" as jwt. Taking the last
-// segment blindly yields v2 and v5, matches nothing the code writes, and the
-// import is pruned as unused - which produces a file that does not compile,
-// found only by rendering a real repository whose dependencies carry versions.
-//
-// simplification: the local name is still a GUESS from the path. A package
-// whose name differs from its final element and carries no alias
-// ("gopkg.in/yaml.v3" is handled below, but "example.com/go-thing" declaring
-// package thing is not) would still be pruned. Resolving it properly needs the
-// imported package's own name, which means loading it; the upgrade path is to
-// ask the resolver, which already has that information loaded.
 func importLocalName(spec *ast.ImportSpec) string {
 	if spec.Name != nil {
 		return spec.Name.Name
@@ -193,8 +161,6 @@ func importLocalName(spec *ast.ImportSpec) string {
 	return path
 }
 
-// isMajorVersion reports the "v2", "v5" form a module path uses for its major
-// version. "v" alone is not one, and neither is "v2beta".
 func isMajorVersion(part string) bool {
 	if len(part) < 2 || part[0] != 'v' {
 		return false

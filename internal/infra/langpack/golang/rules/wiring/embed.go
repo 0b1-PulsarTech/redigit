@@ -15,13 +15,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Embed makes a //go:embed declaration wait for a file its pattern matches.
-// The pattern is a string no reference query reads, and go refuses one that
-// matches nothing ("pattern *.sql: no matching files found"), so an embedding
-// file born before its data broke every tree in between.
-//
-// One matching file is enough to build, so the first by name is the provider:
-// the rest of the data may arrive later without breaking anything.
 type Embed struct{}
 
 func (Embed) Name() string { return "embed" }
@@ -79,14 +72,11 @@ func (Embed) Anchors(
 	return nil, nil
 }
 
-// embedUse is one //go:embed line: where it sits and the patterns it names.
 type embedUse struct {
 	offset   int
 	patterns []string
 }
 
-// embedUses reads the directives out of file's comments. A file that does not
-// parse names none: one missing edge orders one declaration by history alone.
 func embedUses(file string, source []byte) []embedUse {
 	fset := token.NewFileSet()
 
@@ -114,8 +104,6 @@ func embedUses(file string, source []byte) []embedUse {
 	return uses
 }
 
-// splitPatterns separates a directive's arguments the way go does: a pattern
-// is a bare word, or a quoted string when it holds a space.
 func splitPatterns(args string) []string {
 	var out []string
 
@@ -138,9 +126,6 @@ func splitPatterns(args string) []string {
 	return out
 }
 
-// embedders are the declarations the directive belongs to: the one whose span
-// holds it. A directive no declaration holds belongs to the whole file, which
-// is the safe side to err on.
 func embedders(fileDecls []entities.Decl, offset int) []entities.Decl {
 	var holding []entities.Decl
 
@@ -157,10 +142,6 @@ func embedders(fileDecls []entities.Decl, offset int) []entities.Decl {
 	return holding
 }
 
-// firstMatch is the first file, by name, under dir that pattern matches and
-// that holds a declaration. A pattern naming a directory matches everything
-// beneath it, minus names starting with "." or "_" unless the pattern says
-// "all:" - the same rule go applies.
 func firstMatch(
 	files []string,
 	byFile map[string][]entities.Decl,
@@ -189,8 +170,6 @@ func relativeTo(dir, file string) (string, bool) {
 	return strings.CutPrefix(file, dir+"/")
 }
 
-// embedMatches reports whether rel is, or sits under a directory that is,
-// matched by pattern.
 func embedMatches(pattern, rel string, includeHidden bool) bool {
 	parts := strings.Split(rel, "/")
 

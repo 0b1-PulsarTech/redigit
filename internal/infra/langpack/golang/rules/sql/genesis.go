@@ -14,20 +14,12 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
-// sqlGenesis is the first table with everything the schema tools need to read
-// the tree at all: a migration with no ORM schema beside it, or generated code
-// with no query and no configuration, is a tree they reject. The first table
-// is born with one query, the generated package root, the sqlc configuration,
-// the migration checksum and the ORM helpers; every later table is an addition.
 type sqlGenesis struct {
 	table   *sqlTable
 	query   *sqlQuery
 	members []entities.DeclKey
 }
 
-// genesisOf picks the first table that can stand alone - no foreign key, no
-// ORM type or helper of another table - and has a query reading only it. The
-// order of the migration files breaks ties, so the choice does not move.
 func genesisOf(snap entities.Snapshot, model sqlModel) (sqlGenesis, bool) {
 	infra, heavy := model.ormInfra(snap)
 
@@ -51,7 +43,6 @@ func genesisOf(snap entities.Snapshot, model sqlModel) (sqlGenesis, bool) {
 	return sqlGenesis{}, false
 }
 
-// queryReading is the first query whose only table is name.
 func (model sqlModel) queryReading(name string) (*sqlQuery, bool) {
 	for _, query := range model.queries {
 		if len(query.tables) == 1 && query.tables[0] == name {
@@ -62,8 +53,6 @@ func (model sqlModel) queryReading(name string) (*sqlQuery, bool) {
 	return nil, false
 }
 
-// standsAlone reports whether the table's ORM file names nothing that belongs
-// to another table: not another table's type, not a helper that does.
 func (model sqlModel) standsAlone(
 	snap entities.Snapshot,
 	table *sqlTable,
@@ -90,10 +79,6 @@ func (model sqlModel) standsAlone(
 	return true
 }
 
-// ormInfra splits what sits under the ORM schema directory besides the
-// tables: the helpers a table cannot be written without, and the helpers that
-// reach for a table and so wait for it. It returns the declarations of the
-// first kind and the top-level names of the second.
 func (model sqlModel) ormInfra(snap entities.Snapshot) ([]entities.DeclKey, map[string]bool) {
 	if model.ormDir == "" {
 		return nil, nil
@@ -142,8 +127,6 @@ func (model sqlModel) ormInfra(snap entities.Snapshot) ([]entities.DeclKey, map[
 	return infra, names
 }
 
-// heavyHelpers are the helper files that name a table's type, or name a
-// helper that does: a fixed point, because a mixin can lean on another mixin.
 func heavyHelpers(
 	model sqlModel,
 	helpers map[string]map[string]bool,
@@ -188,8 +171,6 @@ func namesAny(
 	return false
 }
 
-// identsOf is every identifier a Go file mentions; a file that is not Go, or
-// does not parse, mentions none.
 func identsOf(snap entities.Snapshot, file string) map[string]bool {
 	if !strings.HasSuffix(file, ".go") {
 		return nil
@@ -218,8 +199,6 @@ func identsOf(snap entities.Snapshot, file string) map[string]bool {
 	return idents
 }
 
-// configKeys are the sqlc configuration files that sit at or above a query
-// file: the file that tells sqlc where the queries and the schema are.
 func configKeys(snap entities.Snapshot) []entities.DeclKey {
 	var keys []entities.DeclKey
 
@@ -235,9 +214,6 @@ func configKeys(snap entities.Snapshot) []entities.DeclKey {
 	return keys
 }
 
-// moduleKeys are the go.mod and go.sum of the module that holds the ORM schema
-// and of the one that holds the sqlc configuration: a tree where either
-// module exists before the first migration is a tree the schema tools reject.
 func (model sqlModel) moduleKeys(snap entities.Snapshot) []entities.DeclKey {
 	dirs := map[string]bool{model.ormDir: model.ormDir != ""}
 
@@ -258,8 +234,6 @@ func (model sqlModel) moduleKeys(snap entities.Snapshot) []entities.DeclKey {
 	return keys
 }
 
-// checksumKeys are the atlas.sum files beside the migrations: a directory of
-// migrations is not one the tool reads without it.
 func checksumKeys(snap entities.Snapshot) []entities.DeclKey {
 	var keys []entities.DeclKey
 
@@ -272,7 +246,6 @@ func checksumKeys(snap entities.Snapshot) []entities.DeclKey {
 	return keys
 }
 
-// holdsAny reports whether one of files sits in dir or beneath it.
 func holdsAny(dir string, files []string) bool {
 	return slices.ContainsFunc(files, func(file string) bool {
 		return dir == "." || strings.HasPrefix(file, dir+"/")

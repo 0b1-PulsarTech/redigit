@@ -152,8 +152,6 @@ func TestConversionRuleTiesAConstructorToTheMethods(t *testing.T) {
 	}
 }
 
-// With no interface in the graph the rule has nothing to gate on, and must
-// not wait on every construction in the repository.
 func TestConversionRuleIsSilentWithNoInterface(t *testing.T) {
 	t.Parallel()
 

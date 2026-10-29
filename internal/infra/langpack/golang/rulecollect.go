@@ -7,9 +7,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// collectEdges and collectAnchors take the registry as a parameter, rather
-// than reading the package var directly, so a test can exercise the
-// wrapped-error path with a stub rule instead of mutating global state.
 func collectEdges(
 	ctx context.Context,
 	snap entities.Snapshot,

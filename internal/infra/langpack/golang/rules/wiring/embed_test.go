@@ -8,9 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
-// go refuses a //go:embed pattern that matches nothing, so the embedding file
-// born before its data broke every tree in between: 1,000 of them on a real
-// repository, where the migrations were embedded by a glob.
 func TestEmbedRuleMakesTheEmbeddingDeclarationWaitForItsData(t *testing.T) {
 	t.Parallel()
 
@@ -93,8 +90,6 @@ func TestEmbedRuleMakesTheEmbeddingDeclarationWaitForItsData(t *testing.T) {
 	}
 }
 
-// Only the declaration carrying the directive waits: a sibling in the same
-// file reads no data and has no reason to.
 func assertEmbedEdges(t *testing.T, edges []entities.Edge, wantFile string) {
 	t.Helper()
 

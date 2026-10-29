@@ -9,10 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Bound ties every declaration that MENTIONS an interface-bound concrete
-// type to that type's methods; boundTypes says what binds one. Enumerating the
-// syntaxes that hand T to an interface does not converge - four rounds found
-// four - because the right question needs a type checker this layer lacks.
 type Bound struct{}
 
 func (Bound) Name() string { return "interface-bound" }
@@ -68,10 +64,6 @@ func (Bound) Anchors(
 	return nil, nil
 }
 
-// boundTypes are the concrete types something in their package may hand to an
-// interface. Every declaration naming one waits for its whole method set:
-// coarse, but delaying is safe, and a method-less type is never bound. Handing
-// counts too - "Handover: noopFlowRunHandover{}" is named by no assertion.
 func boundTypes(
 	decls []entities.Decl,
 	snap entities.Snapshot,
@@ -107,9 +99,6 @@ func boundTypes(
 	return out
 }
 
-// mentionedTypes reports the identifiers a declaration names, from its parsed
-// text rather than its bytes: a name inside a comment or a string is not a
-// mention, and matching text would tie a wait to prose.
 func mentionedTypes(
 	decl entities.Decl,
 	snap entities.Snapshot,
@@ -153,11 +142,6 @@ func mentionedTypes(
 	return out
 }
 
-// declares reports whether key IS the named type or one of its methods, which
-// is what the wait is FOR and cannot be what waits.
-//
-// Without this they form a clique - a cycle crossing files, 0 of them into 33
-// on a real repository - and "type T struct{}" needs no method anyway.
 func declares(key entities.DeclKey, typeName string) bool {
 	switch key.Kind {
 	case entities.KindType:

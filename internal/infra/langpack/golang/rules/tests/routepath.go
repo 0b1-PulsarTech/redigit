@@ -9,11 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/routes"
 )
 
-// RoutePath anchors a test that names a URL path to the declarations that
-// register the route group serving it. An end-to-end suite talks HTTP, so no
-// reference ties it to the handler it drives, and with only the helpers it
-// imports to wait for it was born hundreds of commits before the route it
-// calls existed. See routes.Groups for what a group is and which one wins.
 type RoutePath struct{}
 
 func (RoutePath) Name() string { return "route-path" }

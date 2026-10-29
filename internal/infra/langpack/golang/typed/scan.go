@@ -11,16 +11,12 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// Requirement says that Dependent compiles only once Methods exist. Owner is
-// the declaration of the type those methods hang off, so a rule can tell a type
-// that needs its own methods from one that needs another type's.
 type Requirement struct {
 	Dependent entities.DeclKey
 	Owner     entities.DeclKey
 	Methods   []entities.DeclKey
 }
 
-// Facts is what the type checker proved about the tree.
 type Facts struct {
 	// Forced are the methods a generic type parameter's constraint demands of
 	// the type argument at an instantiation.
@@ -36,7 +32,6 @@ type Facts struct {
 	Uses []Use
 }
 
-// merged is the facts of two passes together.
 func (f Facts) merged(other Facts) Facts {
 	return Facts{
 		Forced:    append(f.Forced, other.Forced...),
@@ -46,7 +41,6 @@ func (f Facts) merged(other Facts) Facts {
 	}
 }
 
-// Use says Dependent names Provider somewhere in its text.
 type Use struct {
 	Dependent, Provider entities.DeclKey
 }
@@ -72,9 +66,6 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) Fa
 	return scan.facts
 }
 
-// sorted makes the facts independent of map iteration order: the checker keeps
-// its instances in a map, and an order that changed between runs would change
-// the plan between runs.
 func (f Facts) sorted() Facts {
 	slices.SortStableFunc(f.Forced, compareRequirements)
 	slices.SortStableFunc(f.Converted, compareRequirements)
@@ -99,7 +90,6 @@ func compareRequirements(a, b Requirement) int {
 	)
 }
 
-// factScan is the working state of one collectFacts call.
 type factScan struct {
 	where   positions
 	pkg     *packages.Package
@@ -107,10 +97,6 @@ type factScan struct {
 	dynamic map[string]bool
 }
 
-// instances reads every generic instantiation of the package. A type argument
-// must satisfy its parameter's constraint, and a constraint that names methods
-// demands them of the argument: that is the check go makes, so the methods are
-// asked of the checker rather than guessed from the argument's shape.
 func (s *factScan) instances() {
 	checked := s.pkg.TypesInfo
 
@@ -136,8 +122,6 @@ func (s *factScan) instances() {
 	}
 }
 
-// typeParamsOf is the type parameter list of a generic type or function, nil
-// for anything else.
 func typeParamsOf(generic types.Object) *types.TypeParamList {
 	switch obj := generic.(type) {
 	case *types.TypeName:

@@ -8,12 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// Migration orders the statements of a migration against what they build
-// on: a statement after the table it adds to, a foreign key after the table
-// it points at, a statement after the extension whose type or function it
-// names, a table after the ORM type it was generated from. Placed by
-// file, 9 of 12 migrations landed ahead of their own source, one by 735
-// commits, and the 12 files arrived in a single commit at the end.
 type Migration struct{}
 
 func (Migration) Name() string { return "migration" }
@@ -37,9 +31,6 @@ func (Migration) Edges(
 	return append(edges, model.genesisEdges(snap, decls)...), nil
 }
 
-// tableEdges are the table's own: its later statements wait for the CREATE
-// TABLE, the CREATE TABLE for its ORM type, and a statement holding a foreign
-// key for the CREATE TABLE of the table it references.
 func (model sqlModel) tableEdges(table *sqlTable) []entities.Edge {
 	create, created := table.create()
 	if !created {
@@ -74,8 +65,6 @@ func (model sqlModel) tableEdges(table *sqlTable) []entities.Edge {
 	return edges
 }
 
-// genesisEdges keep the Go files that embed or apply a migration directory
-// behind the first table: the directory must not exist before it does.
 func (model sqlModel) genesisEdges(
 	snap entities.Snapshot,
 	decls []entities.Decl,

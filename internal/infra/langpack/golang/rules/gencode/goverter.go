@@ -9,11 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Goverter links a generated converter_gen.go to the sibling *conv.go
-// interface, carrying a "goverter:" directive, that goverter read to produce
-// it. Neither file names the other: the link exists only because both live
-// in the same directory and one runs a generator whose directive lives in
-// the other.
 type Goverter struct{}
 
 func (Goverter) Name() string { return "goverter" }
@@ -51,8 +46,6 @@ func (Goverter) Edges(
 	return edges, nil
 }
 
-// directiveDecls returns the type declarations in dir's *conv.go siblings
-// whose own span carries a "goverter:" directive.
 func directiveDecls(
 	snap entities.Snapshot,
 	byFile map[string][]entities.Decl,

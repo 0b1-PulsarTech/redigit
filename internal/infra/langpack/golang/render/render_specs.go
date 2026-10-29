@@ -41,8 +41,6 @@ func filterGenDecl(
 	return filterValueSpecs(fset, source, d, keepSet)
 }
 
-// filterSpecs keeps the specs whose identifier (from identOf) is in keepSet,
-// dropping the whole GenDecl when none survive.
 func filterSpecs(
 	d *ast.GenDecl,
 	keepSet map[syntax.Ident]bool,
@@ -60,11 +58,6 @@ func filterSpecs(
 	return finishGenDecl(d, specs)
 }
 
-// filterValueSpecs keeps a const/var spec when any of its bound names is
-// kept. A spec binding several names (var a, b = f()) survives as a whole:
-// Go cannot drop one name out of a shared initializer. A blank identifier is
-// looked up the same disambiguated way Declarations built its key, or every
-// blank spec in the group would match the first keepSet entry.
 func filterValueSpecs(
 	fset *token.FileSet,
 	source []byte,
@@ -105,15 +98,6 @@ func finishGenDecl(d *ast.GenDecl, specs []ast.Spec) []ast.Decl {
 	return []ast.Decl{d}
 }
 
-// resetSpacingIfSafe clears the spacing a dropped sibling would otherwise
-// leave as a stray blank line, by detaching each surviving spec's own
-// position from the source it was parsed at. It is skipped whenever any spec
-// in the group carries its own doc comment: go/printer places a *ast.File's
-// comments by comparing their source position against the surrounding code,
-// and a spec repositioned to NoPos while its comment keeps its real position
-// inverts that order. Left alone, the stray blank line is still valid,
-// gofmt-idempotent output - gofmt preserves an existing blank line rather
-// than judging it accidental.
 func resetSpacingIfSafe(specs []ast.Spec) {
 	for _, spec := range specs {
 		if syntax.SpecDoc(spec) != nil {

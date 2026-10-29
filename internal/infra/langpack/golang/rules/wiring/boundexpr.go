@@ -7,10 +7,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// builtTypes reports the local types a declaration HANDS somewhere: a keyed
-// struct field's value, or a call argument - the positions an interface is
-// expected in, whose declared type lives elsewhere. Only those two: counting
-// every construction would bind most types, and "x := T{}" converts nothing.
 func builtTypes(
 	decl entities.Decl,
 	snap entities.Snapshot,
@@ -49,7 +45,6 @@ func builtTypes(
 	return out
 }
 
-// declarationOf parses a declaration out of its own span, once per file read.
 func declarationOf(
 	decl entities.Decl,
 	snap entities.Snapshot,

@@ -8,8 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// boundTree writes one package file and returns the snapshot plus the span of
-// each declaration, so a test can name declarations without a parser.
 func boundTree(t *testing.T, file string, decls ...string) (entities.Snapshot, []entities.Span) {
 	t.Helper()
 
@@ -39,9 +37,6 @@ func boundDecl(file string, kind entities.DeclKind, name string, span entities.S
 	}
 }
 
-// The form four rounds of enumerating syntax never reached: a constructor
-// whose returned VALUE is the bound type, handed on as an interface by its
-// caller. On a real repository this one type accounted for 176 failing trees.
 func TestBoundRuleTiesAConstructorThatNamesABoundType(t *testing.T) {
 	t.Parallel()
 
@@ -94,8 +89,6 @@ func TestBoundRuleTiesAConstructorThatNamesABoundType(t *testing.T) {
 	}
 }
 
-// A type nothing hands to an interface is not bound: waiting for its methods
-// would delay everything that names an ordinary struct.
 func TestBoundRuleIgnoresATypeNoInterfaceTakes(t *testing.T) {
 	t.Parallel()
 
@@ -128,8 +121,6 @@ func TestBoundRuleIgnoresATypeNoInterfaceTakes(t *testing.T) {
 	}
 }
 
-// A mention inside a comment or a string is not a mention: matching text would
-// tie a wait to prose.
 func TestMentionedTypesReadsCodeNotProse(t *testing.T) {
 	t.Parallel()
 
@@ -154,10 +145,6 @@ func TestMentionedTypesReadsCodeNotProse(t *testing.T) {
 	}
 }
 
-// A method of T mentions T in its own receiver. Making it wait for T's other
-// methods builds a clique, which is a cycle - and one that crosses files
-// whenever the methods do. On a real repository this turned 0 cross-file
-// cycles into 33.
 func TestBoundRuleDoesNotMakeAMethodWaitForItsSiblings(t *testing.T) {
 	t.Parallel()
 
@@ -199,9 +186,6 @@ func TestBoundRuleDoesNotMakeAMethodWaitForItsSiblings(t *testing.T) {
 	}
 }
 
-// The type declaration itself never waits for its methods: "type T struct{}"
-// compiles with none, and making it wait puts the type in a cycle with the
-// methods that name it as their receiver.
 func TestBoundRuleDoesNotMakeATypeWaitForItsOwnMethods(t *testing.T) {
 	t.Parallel()
 
@@ -236,9 +220,6 @@ func TestBoundRuleDoesNotMakeATypeWaitForItsOwnMethods(t *testing.T) {
 	}
 }
 
-// The second largest failure on a real repository had no assertion at all:
-// "Handover: noopFlowRunHandover{}" hands the type to a struct FIELD whose
-// interface type lives in another package this layer cannot resolve.
 func TestBoundRuleBindsATypeHandedToAStructField(t *testing.T) {
 	t.Parallel()
 
@@ -274,8 +255,6 @@ func TestBoundRuleBindsATypeHandedToAStructField(t *testing.T) {
 	t.Fatalf("the builder does not wait for the method of the type it hands over; got %v", edges)
 }
 
-// Building a value and keeping it is not handing it to an interface. Counting
-// every construction would mark most types with methods as bound.
 func TestBoundRuleDoesNotBindAPlainConstruction(t *testing.T) {
 	t.Parallel()
 

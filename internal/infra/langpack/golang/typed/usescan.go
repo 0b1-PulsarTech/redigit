@@ -4,12 +4,6 @@ import (
 	"go/types"
 )
 
-// uses reads every identifier of the package that names a declaration of the
-// tree, from the checker's own resolution of it. A reference query answers the
-// same question per declaration and can refuse; the checker has already
-// answered it for every identifier. Fields are no declaration of their own (the
-// type that holds one is), and a name that resolves inside its own declaration
-// orders nothing.
 func (s *factScan) uses() {
 	for ident, obj := range s.pkg.TypesInfo.Uses {
 		if obj.Pkg() == nil {

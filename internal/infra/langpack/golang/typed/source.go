@@ -17,20 +17,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Source type-checks the tree a snapshot describes, once, for every rule
-// that needs an answer a reference query cannot give: which methods a generic
-// constraint forces on a type, and which methods a concrete value must have
-// where an interface is expected. Enumerating the syntaxes that hand a type to
-// an interface does not converge (four rounds found four), so the question is
-// put to the type checker.
-//
-// Packages of the tree are checked from source, tests included, under the run's
-// build tags; what they import from outside the tree comes from export data.
-// A file the tags hide is checked in a pass of its own, under tags that show it
-// (see hiddenPasses). The first call loads, which is only sound because one run
-// indexes one snapshot; the packages are kept, because the same facts are asked
-// again for a different set of declarations once a function is cut into
-// statements, and each statement is a dependent of its own.
 type Source struct {
 	tags []string
 
@@ -46,8 +32,6 @@ func NewSource(tags []string) *Source {
 	return &Source{tags: tags, facts: map[uint64]Facts{}}
 }
 
-// Facts returns what the type checker says about the snapshot's tree, with each
-// reference attributed to the declaration among decls that holds it.
 func (s *Source) Facts(
 	ctx context.Context,
 	snap entities.Snapshot,
@@ -82,8 +66,6 @@ func (s *Source) Facts(
 	return s.facts[shape], nil
 }
 
-// shapeOf identifies a set of declarations by what attribution reads: each
-// one's key and where it spans.
 func shapeOf(decls []entities.Decl) uint64 {
 	hash := fnv.New64a()
 
@@ -128,7 +110,6 @@ func (s *Source) check(
 	return loaded, nil
 }
 
-// loadPass is one load of the tree: the packages to check, under which tags.
 type loadPass struct {
 	tags     []string
 	patterns []string
@@ -180,8 +161,6 @@ func brokenPackages(pkgs []*packages.Package) int {
 	return broken
 }
 
-// module is a go.mod of the snapshot: the directory it sits in, relative to the
-// root, and the path its packages are imported under.
 type module struct {
 	dir  string
 	path string
@@ -208,8 +187,6 @@ func modulesOf(snap entities.Snapshot) ([]module, error) {
 	return modules, nil
 }
 
-// allPatterns is "<module path>/..." for each module, which is how a workspace
-// of several modules is named to the go command.
 func allPatterns(modules []module) []string {
 	patterns := make([]string, 0, len(modules))
 	for _, found := range modules {

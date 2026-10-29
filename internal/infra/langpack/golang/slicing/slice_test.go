@@ -255,8 +255,6 @@ func TestRenderWritesAFunctionNoStatementNamesWhole(t *testing.T) {
 	}
 }
 
-// A table of registrations grows one element per feature: each element is a
-// piece, and the function is born with the first.
 func TestSliceCutsAReturnedListByElement(t *testing.T) {
 	t.Parallel()
 

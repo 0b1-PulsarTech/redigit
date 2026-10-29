@@ -13,12 +13,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
-// TestRenderRoundTripsRealSource is the validation the renderer cannot be
-// trusted without: rendering a file while keeping EVERY declaration must
-// reproduce it byte for byte. A fixture corpus proves the cases somebody
-// thought of; this walks real code, including the shapes nobody enumerated -
-// build constraints, generate directives, blank-identifier assertions, grouped
-// consts with iota, generics, and external test packages.
 func TestRenderRoundTripsRealSource(t *testing.T) {
 	root := repoRoot(t)
 	ctx := context.Background()

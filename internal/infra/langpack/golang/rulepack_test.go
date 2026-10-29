@@ -89,8 +89,6 @@ func TestFSGet(t *testing.T) {}
 	}
 }
 
-// stubFailingRule proves Edges/Anchors report a failing rule's name in the
-// wrapped error, rather than swallowing which rule broke.
 type stubFailingRule struct{ name string }
 
 func (r stubFailingRule) Name() string { return r.name }
@@ -127,9 +125,6 @@ func TestRulePackWrapsFailingRuleName(t *testing.T) {
 	}
 }
 
-// A pack for another language hands the indexer declarations whose files are
-// not Go. Every Go rule receives them, and one that parses its declarations'
-// files failed the whole run on the first Dart class it met.
 func TestRulePackLeavesOtherLanguagesAlone(t *testing.T) {
 	t.Parallel()
 

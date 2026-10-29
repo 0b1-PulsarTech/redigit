@@ -8,11 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Assertion ties a compile-time interface assertion to the methods that
-// make it hold. "var _ I = (*T)(nil)" names T and no method, so a reference
-// query sees T alone - but the line compiles only once EVERY method I demands
-// exists, and a method with no caller has nothing else pulling it forward.
-// That failed 224 trees with "cannot use (*factEqualsRule)(nil)".
 type Assertion struct{}
 
 func (Assertion) Name() string { return "interface-assertion" }
@@ -57,16 +52,11 @@ func (Assertion) Anchors(
 	return nil, nil
 }
 
-// receiverKey identifies a receiver inside one unit: two packages may both
-// declare a type of the same name, and their methods are not interchangeable.
 type receiverKey struct {
 	unit entities.UnitID
 	name string
 }
 
-// methodsByReceiver groups every method declaration by the type it hangs off.
-// A method's key is "method:Receiver.Name", which is where the receiver comes
-// from without re-reading any source.
 func methodsByReceiver(decls []entities.Decl) map[receiverKey][]entities.DeclKey {
 	out := map[receiverKey][]entities.DeclKey{}
 
@@ -87,11 +77,6 @@ func methodsByReceiver(decls []entities.Decl) map[receiverKey][]entities.DeclKey
 	return out
 }
 
-// assertedType reports the concrete type a declaration asserts, by parsing its
-// own text. Parsing rather than matching a name: an assertion carries type
-// arguments, a pointer or a bare type, a qualified or a local interface. A
-// pattern for the plain forms matched 24 of 40 real ones, and the ones it
-// missed were the failing ones.
 func assertedType(
 	decl entities.Decl,
 	snap entities.Snapshot,

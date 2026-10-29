@@ -6,11 +6,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// Atoms groups what one schema change touches into one commit: a table
-// is its ORM file, its statements and its generated struct; a query is its
-// block and the functions sqlc wrote for it. Neither side compiles or applies
-// alone - a struct with no table, or a table the ORM has no type for, is a
-// tree schemadiff or sqlc rejects.
 type Atoms struct{}
 
 func (Atoms) Name() string { return "sql-atoms" }

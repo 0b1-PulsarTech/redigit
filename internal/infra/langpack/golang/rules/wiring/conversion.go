@@ -8,11 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Conversion ties a function that RETURNS an interface to the methods of
-// the concrete type it returns. "func New() Rule { return &factRule{} }"
-// converts implicitly, so it compiles only once factRule has every method Rule
-// demands, and no reference query sees that. Same requirement as the assertion
-// rule, in the form that failed 416 of 520 trees.
 type Conversion struct{}
 
 func (Conversion) Name() string { return "interface-conversion" }
@@ -59,10 +54,6 @@ func (Conversion) Anchors(
 	return nil, nil
 }
 
-// interfaceNames is every interface the graph knows, by bare name. By name and
-// not by unit: a result type is written qualified and the qualifier is an
-// import alias this layer cannot resolve. A wrong match only ADDS a wait; a
-// missed one leaves the order as it is today.
 func interfaceNames(decls []entities.Decl) map[string]bool {
 	out := map[string]bool{}
 
@@ -75,8 +66,6 @@ func interfaceNames(decls []entities.Decl) map[string]bool {
 	return out
 }
 
-// convertedTypes reports the local types a declaration builds and hands back
-// where an interface is expected.
 func convertedTypes(
 	decl entities.Decl,
 	snap entities.Snapshot,

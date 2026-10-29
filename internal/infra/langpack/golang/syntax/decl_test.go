@@ -388,11 +388,6 @@ func TestReceiverName(t *testing.T) {
 	}
 }
 
-// TestSelectorCountsUTF16Units guards the seam between this package and the
-// language server. token.Position.Column counts BYTES; entities.Location.Char
-// counts UTF-16 code units. They agree on an ASCII line and diverge everywhere
-// else, and a server queried at the wrong column answers about a different
-// symbol without reporting anything amiss.
 func TestSelectorCountsUTF16Units(t *testing.T) {
 	t.Parallel()
 
@@ -469,10 +464,6 @@ func TestSelectorCountsUTF16Units(t *testing.T) {
 	}
 }
 
-// TestInterfaceIsMarked pins the flag that decides which way an implementation
-// edge points. Asking a language server about a concrete type answers with the
-// interfaces it satisfies, and keeping that answer as though the concrete type
-// were the provider makes a stable library depend on whatever implements it.
 func TestInterfaceIsMarked(t *testing.T) {
 	t.Parallel()
 
@@ -525,10 +516,6 @@ type Names []string
 	}
 }
 
-// TestGroupSizeCountsTheBlockNotTheFile pins the structural test that replaces
-// a count of siblings per file. A file holding two enums, or one enum beside a
-// loose constant, gets the per-file count wrong in both directions; only the
-// declaration block says what travels together.
 func TestGroupSizeCountsTheBlockNotTheFile(t *testing.T) {
 	t.Parallel()
 
@@ -590,10 +577,6 @@ var (
 	}
 }
 
-// A generated file is written by its generator in ONE pass, so its
-// declarations must be born together - but they STAY declarations. Collapsing
-// them into one took their names out of the graph, took every reference edge
-// with them, and let a test land 491 positions before the mock it uses.
 func TestDeclarationsMarkAGeneratedFileAsOneAtom(t *testing.T) {
 	t.Parallel()
 
@@ -619,8 +602,6 @@ func TestDeclarationsMarkAGeneratedFileAsOneAtom(t *testing.T) {
 	}
 }
 
-// The same file written by a person is still cut by declaration: a hand-rolled
-// mock is code somebody maintains, and it grows a declaration at a time.
 func TestDeclarationsStillCutAHandWrittenFile(t *testing.T) {
 	t.Parallel()
 
@@ -644,8 +625,6 @@ func TestDeclarationsStillCutAHandWrittenFile(t *testing.T) {
 	}
 }
 
-// A sqlc file belongs to its whole run's atom, which the sqlc rule names. A
-// per-file atom set here would win and keep the run's files apart.
 func TestDeclarationsLeaveASqlcFileToTheSqlcRule(t *testing.T) {
 	t.Parallel()
 

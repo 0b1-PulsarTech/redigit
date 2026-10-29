@@ -7,16 +7,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// buildGenDecl expands a const/var/type declaration into one Decl per bound
-// name. A const group with an iota-implicit spec (no type, no value) still
-// RENDERS whole, because splitting it would change what an untouched constant
-// evaluates to - but every name in it gets its own Decl anyway.
-//
-// Identity and rendering unit are not the same thing. Naming the group after
-// its first constant left every later one with no key at all: nothing asked
-// who referenced them, no birth was ever recorded for them, and a consumer
-// looking one up found nothing and fell back to the file's own birth. That put
-// a constant that appears late at the position where its file was created.
 func buildGenDecl(
 	fset *token.FileSet,
 	source []byte,
@@ -98,8 +88,6 @@ func buildAtomicGroup(
 	return decls
 }
 
-// GroupNames lists every name an atomic group binds, so the renderer can keep
-// the group when a plan names any one of them.
 func GroupNames(decl *ast.GenDecl) []string {
 	var names []string
 
@@ -189,8 +177,6 @@ func buildValueSpecs(
 	return decls
 }
 
-// specStart anchors the span at the doc comment: the spec's own, or the
-// enclosing GenDecl's when the group holds a single, unparenthesized spec.
 func specStart(decl *ast.GenDecl, specDoc *ast.CommentGroup, specPos token.Pos) token.Pos {
 	if specDoc != nil {
 		return specDoc.Pos()
@@ -203,10 +189,6 @@ func specStart(decl *ast.GenDecl, specDoc *ast.CommentGroup, specPos token.Pos) 
 	return specPos
 }
 
-// ValueName disambiguates a blank identifier by appending its declared type
-// and initializer text: every "var _ Iface = (*T)(nil)" in a package shares
-// the same Iface, so the type alone would still collapse them all into one
-// name. The value (the concrete T being asserted) is what tells them apart.
 func ValueName(fset *token.FileSet, source []byte, vs *ast.ValueSpec, name *ast.Ident) string {
 	if name.Name != "_" {
 		return name.Name

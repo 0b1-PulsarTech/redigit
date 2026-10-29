@@ -16,13 +16,9 @@ import (
 )
 
 const (
-	// minStatements is the fewest statements worth cutting a body into.
 	minStatements = 2
 )
 
-// stubImporter gives every import an empty package. The slicer needs only to
-// tell one local from another, and a local is told apart whether or not the
-// packages it talks to can be read.
 type stubImporter struct{}
 
 func (stubImporter) Import(path string) (*types.Package, error) {
@@ -32,9 +28,6 @@ func (stubImporter) Import(path string) (*types.Package, error) {
 	return pkg, nil
 }
 
-// typeLocals resolves the identifiers of one file. Type errors are expected and
-// ignored: every package outside the file is a stub, so most calls into one do
-// not type, and the locals are still resolved.
 func typeLocals(fset *token.FileSet, file *ast.File) *types.Info {
 	info := &types.Info{
 		Defs: map[*ast.Ident]types.Object{},
@@ -53,14 +46,6 @@ func typeLocals(fset *token.FileSet, file *ast.File) *types.Info {
 	return info
 }
 
-// Slice cuts a function into its signature and its top-level statements.
-//
-// What keeps every intermediate state compilable is the dataflow of the body:
-// a statement waits for the one that declares a local it reads and for the one
-// that last wrote it, and a declaration is born with the first statement that
-// reads what it declares, because Go refuses a local that is declared and not
-// used. A function with results is born with its final statement, or it would
-// stop compiling for want of a return.
 func Slice(
 	_ context.Context,
 	fn entities.Decl,
@@ -116,10 +101,6 @@ func findFuncDecl(file *ast.File, key entities.DeclKey) *ast.FuncDecl {
 	return nil
 }
 
-// cuttable is whether the body can lose some of its statements and still
-// compile. A label or a goto ties statements together by position, and a return
-// before the last statement makes what follows unreachable only when all of it
-// is present.
 func cuttable(body *ast.BlockStmt) bool {
 	if len(body.List) < minStatements {
 		return false
@@ -185,8 +166,6 @@ func (cut bodyCut) slice() indexing.Sliced {
 	return out
 }
 
-// atomOf names the group a piece is born with, empty for a piece that stands
-// alone. The head keeps an atom the function already had.
 func (cut bodyCut) atomOf(groups groups, index int) string {
 	root := groups.find(index)
 	if groups.size(root) < syntax.MinGroup {
@@ -211,8 +190,6 @@ func (cut bodyCut) head() entities.Decl {
 	return head
 }
 
-// members are the statements in source order. A statement carries the comments
-// attached to it, and its span never reaches into a neighbour's.
 func (cut bodyCut) members() []entities.Decl {
 	parts := make([]ast.Node, 0, max(len(cut.stmts), len(cut.elements)))
 
@@ -264,9 +241,6 @@ func (cut bodyCut) offset(pos token.Pos) int {
 	return cut.fset.Position(pos).Offset
 }
 
-// edges are what a statement needs from the function it sits in: the
-// signature, the statement that declares a local it touches, and the statement
-// that last wrote a local it reads.
 func (cut bodyCut) edges(flow bodyFlow) []entities.Edge {
 	key := func(index int) entities.DeclKey {
 		return entities.DeclKey{
@@ -301,8 +275,6 @@ func (cut bodyCut) edges(flow bodyFlow) []entities.Edge {
 	return out
 }
 
-// sliceElements cuts a one-return body into its elements. The signature is
-// born with the first, because a function with results needs its return.
 func (cut bodyCut) sliceElements() indexing.Sliced {
 	joined := newGroups(len(cut.elements) + 1)
 	head := len(cut.elements)

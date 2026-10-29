@@ -12,11 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 )
 
-// hiddenPasses is one extra load per tag set that shows the Go files the run's
-// tags hide. A file behind "//go:build !dev" is invisible to a run under "dev",
-// so nothing in it is ever type-checked and what it reads lands after it: the
-// trees between fail with "undefined: NewGatewayVerifier". Each pass covers only
-// the packages holding a hidden file, under the tags that satisfy it.
 func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]loadPass, error) {
 	constrained, err := buildtags.BuildConstraints(snap)
 	if err != nil {
@@ -62,8 +57,6 @@ func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]lo
 	return passes, nil
 }
 
-// packageOfFile is the import path of the package a file belongs to: its
-// directory under the nearest module that holds it.
 func packageOfFile(modules []module, file string) (string, bool) {
 	best := -1
 
@@ -83,10 +76,6 @@ func packageOfFile(modules []module, file string) (string, bool) {
 	return modules[best].path + strings.TrimSuffix(rel, "/"), true
 }
 
-// showingTags is the run's tags changed just enough to satisfy a constraint:
-// every tag the constraint names is tried on and off, so "!dev" is satisfied by
-// dropping dev and "integration && dev" by keeping both. It reports false for a
-// constraint nothing satisfies.
 func showingTags(line string, tags []string) ([]string, bool) {
 	expr, err := constraint.Parse(line)
 	if err != nil {

@@ -12,11 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
-// TestRenderCorpusRoundTrip is the renderer's own validation: rendering with
-// every declaration kept must reproduce the gofmt-normalized source byte for
-// byte. The corpus covers the hazards a naive go/ast.FilterFile hits: a
-// build constraint, a //go:generate directive, blank-identifier assertions,
-// a grouped const block, generics, and an external test package.
 func TestRenderCorpusRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -285,15 +280,6 @@ func TestRenderParseError(t *testing.T) {
 	}
 }
 
-// TestRenderKeepsAVersionedImport pins the defect that survived a 283-file
-// round trip and only surfaced when a real repository was rendered: a module
-// path carrying a major version is reached by the element BEFORE it, so taking
-// the last segment yields "v2" or "v5", matches nothing the code writes, and
-// the import is pruned. Every affected file then fails to compile.
-//
-// This repository's own dependencies happen to carry no version suffix, which
-// is exactly why its corpus test passed while the tool produced six broken
-// files out of 2484.
 func TestRenderKeepsAVersionedImport(t *testing.T) {
 	t.Parallel()
 
@@ -440,8 +426,6 @@ func TestRenderKeepsImportGroupsWhenSiblingsAreDropped(t *testing.T) {
 	}
 }
 
-// TestRenderKeepsAnIotaGroupFromAnyMember pins the other half: naming any one
-// constant of the block renders the whole block.
 func TestRenderKeepsAnIotaGroupFromAnyMember(t *testing.T) {
 	t.Parallel()
 
@@ -483,11 +467,6 @@ const (
 	}
 }
 
-// TestDeclarationlessFileIsCarried pins the case real source found and no
-// fixture had: a file holding a package clause and imports and nothing else.
-// With no declaration to stand for it, the file belongs to no commit, is never
-// written, and vanishes from the rebuilt tree without the tree invariant ever
-// naming it.
 func TestDeclarationlessFileIsCarried(t *testing.T) {
 	t.Parallel()
 
@@ -540,9 +519,6 @@ func TestDeclarationlessFileIsCarried(t *testing.T) {
 	}
 }
 
-// TestDeclarationlessFileRendersEmptyBeforeItIsBorn pins the other half: until
-// its declaration is born, the file is not written at all, rather than being
-// born holding only a package clause.
 func TestDeclarationlessFileRendersEmptyBeforeItIsBorn(t *testing.T) {
 	t.Parallel()
 
@@ -558,9 +534,6 @@ func TestDeclarationlessFileRendersEmptyBeforeItIsBorn(t *testing.T) {
 	}
 }
 
-// Rendering a generated file must reproduce it byte for byte: the generator
-// wrote every byte, and filtering through the printer drops the marker comment
-// that says so.
 func TestRenderReproducesAGeneratedFile(t *testing.T) {
 	t.Parallel()
 

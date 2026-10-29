@@ -6,11 +6,6 @@ import (
 	"go/types"
 )
 
-// conversionVisitor walks one file looking for the places Go converts a value
-// to an interface without a word: an argument, an assignment, a return, an
-// element of a composite literal, a channel send, a type assertion. Each is a
-// pair of (the value's type, the type the place expects), read from the
-// checker's own record of both.
 type conversionVisitor struct {
 	scan *factScan
 	// results is the result list of the function the walk is inside.
@@ -95,9 +90,6 @@ func (v *conversionVisitor) call(call *ast.CallExpr) {
 	}
 }
 
-// paramAt is the type an argument at index is passed as. Past the last
-// parameter of a variadic function it is the element type, unless the call
-// spreads a slice with "...".
 func paramAt(sig *types.Signature, params *types.Tuple, index int, ellipsis token.Pos) types.Type {
 	last := params.Len() - 1
 	if last < 0 {
@@ -164,8 +156,6 @@ func (v *conversionVisitor) returns(stmt *ast.ReturnStmt) {
 	}
 }
 
-// composite reads the elements of a literal against the type each position of
-// the literal's own type expects.
 func (v *conversionVisitor) composite(lit *ast.CompositeLit) {
 	checked := v.scan.pkg.TypesInfo
 
@@ -214,8 +204,6 @@ func (v *conversionVisitor) elements(lit *ast.CompositeLit, key, elem types.Type
 	}
 }
 
-// structElement is the field a literal element initialises and the expression
-// that initialises it, by key when the element has one and by position when not.
 func structElement(shape *types.Struct, index int, elt ast.Expr) (*types.Var, ast.Expr) {
 	pair, isPair := elt.(*ast.KeyValueExpr)
 	if !isPair {
@@ -240,7 +228,6 @@ func structElement(shape *types.Struct, index int, elt ast.Expr) (*types.Var, as
 	return nil, elt
 }
 
-// typeSwitch reads each case type against the interface the switch inspects.
 func (v *conversionVisitor) typeSwitch(stmt *ast.TypeSwitchStmt) {
 	checked := v.scan.pkg.TypesInfo
 

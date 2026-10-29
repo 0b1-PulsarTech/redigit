@@ -11,15 +11,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Encloses keeps a value or constructor with the type it belongs to: a
-// value declaration typed as a type in the same file, or a function whose
-// sole result is a type in the same file, starts where that type starts.
-// Without it, "type Channel string" lands in one commit and the constants
-// enumerating it land, alone, five commits later.
-//
-// The link is read from the declaration's own syntax (a ValueSpec's declared
-// type, a FuncType's single result), not from a reference graph: RulePack
-// gets no Resolver, only the declarations Syntax already found.
 type Encloses struct{}
 
 func (Encloses) Name() string { return "encloses" }
@@ -94,8 +85,6 @@ func enclosesInFile(
 	return edges, nil
 }
 
-// funcEncloses links a receiver-less function to the type it constructs,
-// when it returns exactly that one type.
 func funcEncloses(
 	fileDecls []entities.Decl,
 	file string,
@@ -149,7 +138,6 @@ func singleResultType(d *ast.FuncDecl, types map[string]entities.DeclKey) (entit
 	return key, found
 }
 
-// valueEncloses links a const/var to the type it is declared with.
 func valueEncloses(
 	fileDecls []entities.Decl,
 	file string,

@@ -16,15 +16,8 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 )
 
-// FileDeclName is the name given to the single declaration standing for a file
-// that declares nothing of its own. It is not a legal Go identifier on purpose,
-// so it can never collide with a real declaration.
 const FileDeclName = "<file>"
 
-// Declarations parses source and returns one Decl per top-level declaration.
-// A parenthesized const group where a later spec omits both its type and its
-// value (an iota chain) is kept as one atomic declaration: splitting it would
-// let a later commit change what an untouched constant evaluates to.
 func Declarations(_ context.Context, path string, source []byte) ([]entities.Decl, error) {
 	fset := token.NewFileSet()
 
@@ -66,12 +59,6 @@ func Declarations(_ context.Context, path string, source []byte) ([]entities.Dec
 	return decls, nil
 }
 
-// wholeFile stands in for a file that declares nothing: a package clause and
-// imports, and no more. Real trees hold them - a file that only pins blank
-// imports, a package doc file - and without a declaration to stand for it the
-// file belongs to no commit, is never written, and silently vanishes from the
-// rebuilt tree. Giving it one declaration spanning the whole file makes it a
-// citizen of the ordering like everything else.
 func wholeFile(
 	fset *token.FileSet,
 	path string,
@@ -148,10 +135,6 @@ func buildFuncDecl(
 	}
 }
 
-// ReceiverName returns the base type name of a method receiver, stripping a
-// pointer and any generic type parameters: "*Repo[T]" and "Repo[T]" both name
-// "Repo". Without the receiver, two types that both implement Error()
-// collapse into one declaration.
 func ReceiverName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
@@ -182,9 +165,6 @@ func receiverBase(expr ast.Expr) string {
 	return ""
 }
 
-// isTestName reports whether name is a Test/Benchmark/Fuzz/Example function
-// the go test binary would run: the prefix followed by nothing, or by a rune
-// that is not lowercase.
 func isTestName(name string) bool {
 	for _, prefix := range [...]string{"Test", "Benchmark", "Fuzz", "Example"} {
 		if !strings.HasPrefix(name, prefix) {
@@ -212,12 +192,6 @@ func spanOf(fset *token.FileSet, start, end token.Pos) entities.Span {
 	}
 }
 
-// locationOf reports the 0-based line/char of pos, the position a language
-// server query anchors on.
-// locationOf converts a parser position into the coordinates a language server
-// speaks. token.Position.Column counts BYTES, while entities.Location.Char
-// counts UTF-16 code units, so the two diverge on any line holding a non-ASCII
-// character and the server would be queried about the wrong one.
 func locationOf(
 	fset *token.FileSet,
 	path string,
@@ -234,15 +208,10 @@ func locationOf(
 	}
 }
 
-// utf16Units counts the UTF-16 code units a run of bytes encodes to. An emoji
-// is a surrogate pair there and therefore counts as two.
 func utf16Units(encoded []byte) int {
 	return len(utf16.Encode([]rune(string(encoded))))
 }
 
-// Ident identifies a surviving declaration by kind and name only: Render
-// is handed a source file already scoped to one path, so the DeclKey.File a
-// caller carries is redundant here.
 type Ident struct {
 	Kind entities.DeclKind
 	Name string

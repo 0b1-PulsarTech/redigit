@@ -11,10 +11,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Generate ties a generated file to the declaration carrying the
-// "//go:generate" directive that writes it. Without it a mock was born 195
-// commits before its directive - not merely early: running the generator in
-// that tree finds no directive, so the file is not reproducible there.
 type Generate struct{}
 
 func (Generate) Name() string { return "go-generate" }
@@ -63,10 +59,6 @@ func (Generate) Anchors(
 	return nil, nil
 }
 
-// directiveHolder picks which declaration of the generating file stands for
-// the directive. The directive sits above a declaration but belongs to the
-// file, so the earliest-spanning one is what a caller can name; a file whose
-// declarations all vanished is skipped by the caller before reaching here.
 func directiveHolder(decls []entities.Decl, exclude entities.DeclKey) entities.DeclKey {
 	best := decls[0].Key
 	bestStart := decls[0].Span.Start
@@ -84,8 +76,6 @@ func directiveHolder(decls []entities.Decl, exclude entities.DeclKey) entities.D
 	return best
 }
 
-// generateDestinations reports the repo-relative files the directives in one
-// source write, read from the "-destination=" flag mockgen and its kin take.
 func generateDestinations(dir string, source []byte) []string {
 	if !bytes.Contains(source, []byte("//go:generate")) {
 		return nil

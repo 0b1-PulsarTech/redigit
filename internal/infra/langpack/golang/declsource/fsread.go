@@ -8,10 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// ReadSource reads a repo-relative path against the snapshot's checked-out
-// tree. The rule ports carry no Tree dependency of their own: Snapshot.Root
-// is documented as the final tree on disk, so a Go-specific rule reads the
-// file directly rather than caching it through an unrequested seam.
 func ReadSource(snap entities.Snapshot, relPath string) ([]byte, error) {
 	// gosec flags a variable-built path as traversal-risky; here the variable
 	// is the repo-relative path the same indexing run's Snapshot.Files
@@ -24,8 +20,6 @@ func ReadSource(snap entities.Snapshot, relPath string) ([]byte, error) {
 	return source, nil
 }
 
-// SliceSpan returns the text a Decl's Span covers, bounds-checked against a
-// source that may not be the exact bytes the Span was computed from.
 func SliceSpan(source []byte, span entities.Span) string {
 	if span.Start < 0 || span.End > len(source) || span.Start > span.End {
 		return ""

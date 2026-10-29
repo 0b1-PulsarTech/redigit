@@ -12,9 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// protocolMethods are the methods the standard library calls on a value it
-// holds as an interface or any: errors.Is/As/Unwrap, fmt's verbs, encoding
-// packages and the sort and flag hooks. No call in the tree names them.
 var protocolMethods = map[string]bool{
 	"Error": true, "Unwrap": true, "Is": true, "As": true,
 	"String": true, "GoString": true, "Format": true,
@@ -23,10 +20,6 @@ var protocolMethods = map[string]bool{
 	"Scan": true, "Value": true,
 }
 
-// dynamicNames is every method name a value can be reached by once it sits in
-// an interface: the standard library's protocols plus each method the tree's
-// own interfaces declare, which an errors.As or a type assertion to a
-// duck-typed port (StatusCode) asks of whatever the value is.
 func dynamicNames(pkgs []*packages.Package) map[string]bool {
 	names := map[string]bool{}
 
@@ -56,13 +49,6 @@ func dynamicNames(pkgs []*packages.Package) map[string]bool {
 	return names
 }
 
-// escape records the dynamic methods of a concrete value handed to an
-// interface, whatever that interface lists. Nothing static reaches them from
-// the declaration that hands the value over: "fmt.Errorf format %w has arg
-// problem.MissingBody of wrong type" failed every tree between the commit that
-// wrapped the value and the one that gave the type its Error method. A method
-// of the dependent's own type is left out: siblings of one type do not wait
-// for each other.
 func (s *factScan) escape(dependent entities.DeclKey, value types.Type) {
 	if value == nil || !isConcrete(value) {
 		return
@@ -100,9 +86,6 @@ func (s *factScan) escape(dependent entities.DeclKey, value types.Type) {
 	})
 }
 
-// belongsTo reports whether dependent is the type itself or one of its methods
-// (a method's name is "Type.Method", with a "*" before the type when the
-// receiver is a pointer).
 func belongsTo(dependent, owner entities.DeclKey) bool {
 	if dependent == owner {
 		return true
@@ -117,9 +100,6 @@ func belongsTo(dependent, owner entities.DeclKey) bool {
 	return strings.TrimPrefix(receiver, "*") == owner.Name
 }
 
-// require records the methods iface demands of value, as the declarations the
-// tree holds for them. A value that is itself an interface, a type parameter or
-// untyped demands nothing: only a concrete type owns methods to wait for.
 func (s *factScan) require(
 	into *[]Requirement,
 	dependent entities.DeclKey,
@@ -156,8 +136,6 @@ func (s *factScan) require(
 	})
 }
 
-// ownerOf is the declaration of the named type behind value, zero for a type
-// the tree does not declare.
 func (s *factScan) ownerOf(value types.Type) entities.DeclKey {
 	if pointer, isPointer := value.(*types.Pointer); isPointer {
 		value = pointer.Elem()
@@ -173,7 +151,6 @@ func (s *factScan) ownerOf(value types.Type) entities.DeclKey {
 	return key
 }
 
-// isConcrete reports whether a type owns a method set of its own.
 func isConcrete(value types.Type) bool {
 	if _, isParam := value.(*types.TypeParam); isParam {
 		return false
@@ -186,8 +163,6 @@ func isConcrete(value types.Type) bool {
 	return !types.IsInterface(value)
 }
 
-// convert records a value handed to a place that expects target, when target
-// is an interface: the value must then have the methods target lists.
 func (s *factScan) convert(at token.Pos, value, target types.Type) {
 	if value == nil || target == nil {
 		return

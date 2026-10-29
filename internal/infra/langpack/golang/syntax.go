@@ -10,12 +10,8 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
-// Syntax implements indexing.Syntax and indexing.Slicer for Go source. It
-// composes the declaration reader, the renderer and the statement slicer.
 type Syntax struct{}
 
-// NewSyntax builds the Go syntax adapter. It carries no state: every call is
-// self-contained on the source it is given.
 func NewSyntax() Syntax { return Syntax{} }
 
 var (

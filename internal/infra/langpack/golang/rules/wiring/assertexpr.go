@@ -9,11 +9,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// receiverOfAssertion parses "_ I = (*T)(nil)" and returns T.
-//
-// The text is tried as written first and only then with a "var" prepended: a
-// declaration's span carries the keyword AND its doc comment, while its name
-// carries neither, and prepending unconditionally breaks the commented form.
 func receiverOfAssertion(text string) (string, bool) {
 	body := strings.TrimSpace(text)
 

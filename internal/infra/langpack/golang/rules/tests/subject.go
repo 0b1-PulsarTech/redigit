@@ -8,9 +8,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// testSubject prefers a call the test body actually makes - a fact - over a
-// guess from its name, and tries the name only when the body names none or
-// several.
 func testSubject(
 	d entities.Decl,
 	scope []entities.Decl,
@@ -29,9 +26,6 @@ func testSubject(
 	return bestSubject(scope, camelOrSnakeTokens(prefix))
 }
 
-// calledSubject reports the one package-level function the test body calls
-// directly by name, ignoring anything qualified (an import, a local var's
-// method) or ambiguous (more than one candidate, or none).
 func calledSubject(
 	d entities.Decl,
 	scope []entities.Decl,
@@ -96,10 +90,6 @@ func findFuncNamed(scope []entities.Decl, name string) (entities.DeclKey, bool) 
 	return entities.DeclKey{}, false
 }
 
-// bestSubject walks the token boundaries left to right. At each cut, the
-// growing left side is checked against a type name and the shrinking right
-// side against a bare method name; either match overwrites the previous
-// best, so the last (most specific) match along the walk wins.
 func bestSubject(scope []entities.Decl, tokens []string) (entities.DeclKey, bool) {
 	var best entities.DeclKey
 
@@ -125,9 +115,6 @@ func bestSubject(scope []entities.Decl, tokens []string) (entities.DeclKey, bool
 	return longestBareMatch(scope, tokens)
 }
 
-// longestBareMatch tries the whole token run as a bare declaration name, then
-// each shorter leading run, so a trailing descriptive word ("...Drains",
-// "...ReturnsError") drops off before giving up rather than after.
 func longestBareMatch(scope []entities.Decl, tokens []string) (entities.DeclKey, bool) {
 	for length := len(tokens); length >= 1; length-- {
 		if key, ok := findDeclNamed(scope, strings.Join(tokens[:length], "")); ok {
@@ -138,9 +125,6 @@ func longestBareMatch(scope []entities.Decl, tokens []string) (entities.DeclKey,
 	return entities.DeclKey{}, false
 }
 
-// findDeclNamed looks up a type, function, or value by name alone - the
-// bare-match fallback bestSubject's walk covers a method through, but a
-// plain function or package-level value never had a receiver to split on.
 func findDeclNamed(scope []entities.Decl, name string) (entities.DeclKey, bool) {
 	for _, d := range scope {
 		if d.IsTest || d.Key.Name != name {
@@ -156,8 +140,6 @@ func findDeclNamed(scope []entities.Decl, name string) (entities.DeclKey, bool) 
 	return entities.DeclKey{}, false
 }
 
-// findMethodNamed looks up a method by its bare method part (after the
-// receiver's "."), the shape a test name's suffix names.
 func findMethodNamed(decls []entities.Decl, name string) (entities.DeclKey, bool) {
 	for _, d := range decls {
 		if d.Key.Kind != entities.KindMethod {

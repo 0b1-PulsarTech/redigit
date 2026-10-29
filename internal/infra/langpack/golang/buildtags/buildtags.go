@@ -14,13 +14,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Rule registers build-constraint visibility as one of the seven Go
-// rules, so it is discovered and tested alongside the others. It contributes
-// no Edge or Anchor - a build tag does not change birth order - so the
-// reporting itself lives in the package-level BuildConstraints function,
-// which a caller with a reason to ask (the auditing use case) can call
-// directly: RulePack has no return shape for "here is what an untagged index
-// cannot see", only for edges and anchors.
 type Rule struct{}
 
 func (Rule) Name() string { return "build-tags" }
@@ -41,18 +34,12 @@ func (Rule) Anchors(
 	return nil, nil
 }
 
-// BuildTag records that a file is gated behind a build constraint, and the
-// tags that expression names. This is the 194-file blind spot named in the
-// design doc: an index built without these tags never sees the file at all,
-// and a caller has no way to know that unless this says so.
 type BuildTag struct {
 	File       string
 	Constraint string
 	Tags       []string
 }
 
-// BuildConstraints reports every file behind a build constraint (//go:build,
-// or the legacy // +build), in Files order.
 func BuildConstraints(snap entities.Snapshot) ([]BuildTag, error) {
 	var out []BuildTag
 
@@ -129,10 +116,6 @@ func ConstraintTags(expr constraint.Expr) []string {
 	return tags
 }
 
-// Hidden reports which of tags name a constraint that satisfied does NOT
-// satisfy: the set an index built with those tags never sees. Being behind a
-// constraint and being invisible differ, and a "//go:build linux" file read
-// normally on Linux would bury the integration-tagged files really missing.
 func Hidden(tags []BuildTag, satisfied []string) ([]BuildTag, error) {
 	// simplification: satisfied plus GOOS, GOARCH and "unix" is the whole
 	// truth here, so a "go1.27" or "cgo" guard evaluates false and is named
@@ -168,8 +151,6 @@ func Hidden(tags []BuildTag, satisfied []string) ([]BuildTag, error) {
 	return out, nil
 }
 
-// unixGOOS lists the platforms for which the "unix" constraint is true, as
-// go/build defines it.
 var unixGOOS = []string{
 	"aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos",
 	"ios", "linux", "netbsd", "openbsd", "solaris",

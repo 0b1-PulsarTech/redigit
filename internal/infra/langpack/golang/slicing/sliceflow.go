@@ -7,9 +7,6 @@ import (
 	"slices"
 )
 
-// bodyFlow is which locals each top-level statement of a body declares, writes
-// and reads. Locals are told apart by the parser's resolution, so a shadowing
-// name in a nested scope is another local.
 type bodyFlow struct {
 	declares []map[types.Object]bool
 	writes   []map[types.Object]bool
@@ -45,9 +42,6 @@ func readFlow(stmts []ast.Stmt, info *types.Info) bodyFlow {
 	return flow
 }
 
-// declaredBy is the locals a top-level statement brings into scope: the
-// variables of a short declaration and the names of a var, const or type. A
-// name the short declaration only assigns again is a write, not a declaration.
 func declaredBy(stmt ast.Stmt, info *types.Info) map[types.Object]bool {
 	out := map[types.Object]bool{}
 
@@ -89,9 +83,6 @@ func declaredBy(stmt ast.Stmt, info *types.Info) map[types.Object]bool {
 	return out
 }
 
-// visit records, for one statement, the known locals it writes and reads. A
-// plain name on the left of an assignment is a write; any other mention is a
-// read, which is the conservative reading of `x++` and `&x`.
 func (flow bodyFlow) visit(index int, stmt ast.Stmt) {
 	targets := map[*ast.Ident]bool{}
 
@@ -131,7 +122,6 @@ func (flow bodyFlow) visit(index int, stmt ast.Stmt) {
 	})
 }
 
-// objectOf is the local an identifier names, whether it declares it or uses it.
 func (flow bodyFlow) objectOf(ident *ast.Ident) types.Object {
 	if obj := flow.info.Defs[ident]; obj != nil {
 		return obj
@@ -140,9 +130,6 @@ func (flow bodyFlow) objectOf(ident *ast.Ident) types.Object {
 	return flow.info.Uses[ident]
 }
 
-// needs is the earlier statements the statement at index cannot compile
-// without, or would silently change meaning without: the declaration of every
-// local it touches and the nearest earlier write of every local it reads.
 func (flow bodyFlow) needs(index int) []int {
 	var out []int
 
@@ -176,9 +163,6 @@ func (flow bodyFlow) needs(index int) []int {
 	return slices.Compact(out)
 }
 
-// joinDeclarations makes each declaration share a group with a statement that
-// reads what it declares, so the pair is born in one commit: a local with no
-// reader does not compile.
 func (flow bodyFlow) joinDeclarations(groups groups) {
 	for index := range flow.declares {
 		for obj := range flow.declares[index] {
@@ -209,7 +193,6 @@ func (flow bodyFlow) joinReader(groups groups, declaration int, obj types.Object
 	}
 }
 
-// groups is a union-find over the pieces of one function.
 type groups struct{ parent []int }
 
 func newGroups(size int) groups {

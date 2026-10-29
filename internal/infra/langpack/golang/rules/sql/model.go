@@ -11,9 +11,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/sqlstmt"
 )
 
-// sqlTable is one table seen from every file that describes it: the
-// statements that build it, the ORM type that declares it and the struct
-// sqlc maps it to.
 type sqlTable struct {
 	name  string
 	stmts []sqlStmt
@@ -35,8 +32,6 @@ type sqlStmt struct {
 	words []string
 }
 
-// create is the statement that creates the table: every other statement about
-// it, and every query that reads it, waits for this one.
 func (table *sqlTable) create() (entities.DeclKey, bool) {
 	for _, stmt := range table.stmts {
 		if stmt.kind == sqlstmt.CreateTable {
@@ -47,8 +42,6 @@ func (table *sqlTable) create() (entities.DeclKey, bool) {
 	return entities.DeclKey{}, false
 }
 
-// sqlQuery is one "-- name:" block, the tables it reads and the generated
-// declarations sqlc wrote for it.
 type sqlQuery struct {
 	name   string
 	block  entities.DeclKey
@@ -60,8 +53,6 @@ type sqlQuery struct {
 	method     entities.DeclKey
 }
 
-// sqlModel is the schema as the migration files, the ORM schema, the query
-// files and the sqlc output describe it together.
 type sqlModel struct {
 	tables map[string]*sqlTable
 	order  []string
@@ -76,10 +67,6 @@ type sqlModel struct {
 	decls  map[string][]entities.Decl
 }
 
-// loadSQLModel reads every migration and query file the snapshot lists and
-// joins them to the declarations that realise them. A part that is absent
-// leaves its field empty: a repository with no ORM schema has tables without
-// an ent type, and the rules below skip what is missing.
 func loadSQLModel(snap entities.Snapshot, decls []entities.Decl) (sqlModel, error) {
 	model := sqlModel{
 		tables:     map[string]*sqlTable{},
@@ -143,8 +130,6 @@ func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
 	return nil
 }
 
-// joinORM finds each table's ORM schema type: a type declared under an
-// "entschema" directory whose name is the table's, singular or plural.
 func (model *sqlModel) joinORM(decls []entities.Decl) {
 	for _, decl := range decls {
 		if decl.Key.Kind != entities.KindType || !isORMFile(decl.Key.File) {
@@ -171,9 +156,6 @@ func (model *sqlModel) joinORM(decls []entities.Decl) {
 
 func isORMFile(file string) bool { return strings.Contains(file, "entschema/") }
 
-// joinModels finds the struct sqlc wrote for each table, and collects the
-// generated declarations that serve no table: they are in files sqlc wrote
-// that are neither a query file's nor the models file.
 func (model *sqlModel) joinModels(snap entities.Snapshot) {
 	for _, file := range sortedFiles(model.decls) {
 		if !isDBGenOutput(snap, file) || strings.HasSuffix(file, ".sql.go") {
@@ -213,8 +195,6 @@ func (model *sqlModel) tableOfType(typeName string) (*sqlTable, bool) {
 	return nil, false
 }
 
-// isDBGenOutput reports whether file is Go that sqlc wrote under a "dbgen"
-// directory.
 func isDBGenOutput(snap entities.Snapshot, file string) bool {
 	if !strings.Contains(file, "dbgen/") || !strings.HasSuffix(file, ".go") {
 		return false
@@ -270,9 +250,6 @@ func (model *sqlModel) readQueries(snap entities.Snapshot) error {
 	return nil
 }
 
-// generatedByName indexes the declarations in sqlc's query output by the name
-// they carry, so a query finds its function, its constant and its row types
-// without a scan of the whole tree per query.
 func (model *sqlModel) generatedByName(snap entities.Snapshot) map[string][]entities.Decl {
 	out := map[string][]entities.Decl{}
 
@@ -294,9 +271,6 @@ func (model *sqlModel) generatedByName(snap entities.Snapshot) map[string][]enti
 	return out
 }
 
-// attachGenerated gathers what sqlc wrote for a query: the function, the
-// constant holding its text and the parameter and row types, which carry the
-// query's name with a suffix.
 func (model *sqlModel) attachGenerated(query *sqlQuery, generated map[string][]entities.Decl) {
 	for _, name := range []string{
 		query.name, lowerFirst(query.name), query.name + "Params", query.name + "Row",
@@ -315,8 +289,6 @@ func (model *sqlModel) attachGenerated(query *sqlQuery, generated map[string][]e
 	}
 }
 
-// ownsQueryName separates the declaration sqlc wrote for query from a
-// same-named one of another kind.
 func ownsQueryName(kind entities.DeclKind, matched, query string) bool {
 	switch kind {
 	case entities.KindMethod:
@@ -338,9 +310,6 @@ func lowerFirst(name string) string {
 	return strings.ToLower(name[:1]) + name[1:]
 }
 
-// tableNamesType reports whether typeName is the name an ORM or a code
-// generator gives the type for table: the same words, in the singular or the
-// plural, without the underscores.
 func tableNamesType(table, typeName string) bool {
 	want := strings.ToLower(strings.ReplaceAll(table, "_", ""))
 	have := strings.ToLower(typeName)

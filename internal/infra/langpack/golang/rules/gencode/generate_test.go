@@ -87,9 +87,6 @@ func TestGenerateDestinations(t *testing.T) {
 	}
 }
 
-// The edge the rule exists for: running the generator in a tree that holds the
-// mock but not the directive finds nothing to run, so the mock is not
-// reproducible there - it was born 195 commits early on a real repository.
 func TestGenerateRuleTiesAMockToItsDirective(t *testing.T) {
 	t.Parallel()
 
@@ -135,7 +132,6 @@ func TestGenerateRuleTiesAMockToItsDirective(t *testing.T) {
 	}
 }
 
-// A destination the tree does not hold names nothing to order.
 func TestGenerateRuleIgnoresAnAbsentDestination(t *testing.T) {
 	t.Parallel()
 

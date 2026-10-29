@@ -10,20 +10,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// Anchor pulls a test toward the declaration it exercises. It is an
-// Anchor, not an Edge: "not before the function" is only a floor, and with
-// only the floor a package's whole suite arrived six hundred commits late.
-//
-// Finding the subject is two steps. First, the twin source file: the longest
-// prefix of the test file's stem, cutting at each "_", that names a real
-// file in the same directory. Second, the subject within it: strip the
-// Test/Benchmark/Fuzz/Example prefix, tokenize what remains by "_" or (with
-// none) by capital letter, and walk the token boundaries left to right,
-// checking at each cut whether the growing prefix names a type or the
-// shrinking suffix names a method. The LAST match wins, not the first:
-// TestFSStorePutGet names the type FS and the methods Put and Get, and a
-// scan that stopped at the first match (the type, at the first cut) reported
-// a defect where the test was correctly waiting on the method.
 type Anchor struct{}
 
 func (Anchor) Name() string { return "test-anchor" }
@@ -90,8 +76,6 @@ func groupByUnit(decls []entities.Decl) map[entities.UnitID][]entities.Decl {
 	return byUnit
 }
 
-// twinFile finds the longest prefix of testBase's stem, cutting at "_", that
-// is a real file in dir.
 func twinFile(dir, testBase string, byFile map[string][]entities.Decl) (string, bool) {
 	stem := strings.TrimSuffix(testBase, "_test.go")
 	segments := strings.Split(stem, "_")
@@ -106,8 +90,6 @@ func twinFile(dir, testBase string, byFile map[string][]entities.Decl) (string, 
 	return "", false
 }
 
-// testSubjectPrefix strips the go test binary's recognized prefix, reporting
-// false for a name (or a case) it would not have run either.
 func testSubjectPrefix(name string) (string, bool) {
 	for _, prefix := range [...]string{"Test", "Benchmark", "Fuzz", "Example"} {
 		if rest, ok := strings.CutPrefix(name, prefix); ok && rest != "" {
@@ -118,8 +100,6 @@ func testSubjectPrefix(name string) (string, bool) {
 	return "", false
 }
 
-// camelOrSnakeTokens splits on "_" when present, else on capital-letter word
-// boundaries, keeping a run of capitals ("FS") together as one token.
 func camelOrSnakeTokens(name string) []string {
 	if strings.Contains(name, "_") {
 		return strings.Split(name, "_")

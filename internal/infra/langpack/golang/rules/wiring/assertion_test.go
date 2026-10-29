@@ -133,9 +133,6 @@ func assertionTree(t *testing.T, body string) (entities.Snapshot, entities.Span)
 		entities.Span{Start: start, End: len(source)}
 }
 
-// The edge the whole rule exists for: the assertion compiles only once every
-// method the interface demands exists, and a method with no caller has nothing
-// else pulling it forward.
 func TestAssertionRuleTiesTheAssertionToTheReceiversMethods(t *testing.T) {
 	t.Parallel()
 
