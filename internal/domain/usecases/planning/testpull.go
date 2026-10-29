@@ -33,7 +33,7 @@ func (index sharedIndex) safeToPull(
 			provider := edge.Provider
 
 			switch {
-			case isSoft(edge.Reason) || seen[provider] || born[provider]:
+			case IsSoft(edge.Reason) || seen[provider] || born[provider]:
 				continue
 			case index.own.owner[provider] != reach.SharedFeature:
 				return false
@@ -64,5 +64,5 @@ func (index sharedIndex) safeToPull(
 func driftsToTest(graph entities.Graph, edge entities.Edge) bool {
 	provider, found := graph.Decl(edge.Provider)
 
-	return isSoft(edge.Reason) && found && entities.IsTestSide(provider)
+	return IsSoft(edge.Reason) && found && entities.IsTestSide(provider)
 }

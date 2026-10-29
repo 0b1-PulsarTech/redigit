@@ -20,9 +20,9 @@ func (p Planner) cut(
 	order entities.Ordering,
 	in bucket,
 ) []entities.PlannedCommit {
-	keys := sortForBirth(graph, order, in.keys, nil)
+	keys := SortForBirth(graph, order, in.keys, nil)
 	keys = gatherDocuments(graph, placeTests(graph, keys))
-	lastOf := cycleExtent(graph, keys, reach.AtomExtent(graph, keys))
+	lastOf := CycleExtent(graph, keys, reach.AtomExtent(graph, keys))
 
 	var (
 		start    int

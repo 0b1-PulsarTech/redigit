@@ -175,7 +175,7 @@ func TestCycleExtentHoldsMutualAtomsTogether(t *testing.T) {
 		nil,
 	)
 
-	got := cycleExtent(graph, keys, []int{1, 1, 2, 3})
+	got := CycleExtent(graph, keys, []int{1, 1, 2, 3})
 
 	if want := []int{2, 2, 2, 3}; !slices.Equal(got, want) {
 		t.Fatalf("extent = %v, want %v", got, want)

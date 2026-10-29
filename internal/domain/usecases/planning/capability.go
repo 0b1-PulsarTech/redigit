@@ -74,7 +74,7 @@ func (p Planner) emitByCapability(
 
 	// The affinity a tie is resolved by: the atom first, because its members
 	// must end up in ONE commit, then the slice.
-	keys = sortForBirth(graph, order, keys, func(key entities.DeclKey) FeatureID {
+	keys = SortForBirth(graph, order, keys, func(key entities.DeclKey) FeatureID {
 		if atom, grouped := atoms[key]; grouped {
 			return FeatureID(atom)
 		}

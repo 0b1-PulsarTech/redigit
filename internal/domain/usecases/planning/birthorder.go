@@ -8,11 +8,11 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// sortForBirth orders declarations as commits must carry them: by settled
+// SortForBirth orders declarations as commits must carry them: by settled
 // position, and WITHIN a position by dependency. The fixed point only
 // guarantees a provider is not LATER, so provider and dependent routinely
 // share a position, and a name tie-break inverts them.
-func sortForBirth(
+func SortForBirth(
 	graph entities.Graph,
 	order entities.Ordering,
 	keys []entities.DeclKey,
@@ -78,7 +78,7 @@ func byDependency(
 
 			links = append(
 				links,
-				link{provider: provider, dependent: dependent, soft: isSoft(edge.Reason)},
+				link{provider: provider, dependent: dependent, soft: IsSoft(edge.Reason)},
 			)
 		}
 
@@ -121,10 +121,10 @@ type link struct {
 	soft                bool
 }
 
-// isSoft is an edge that orders without being read: generated output follows
+// IsSoft is an edge that orders without being read: generated output follows
 // its directive and a double follows what it mirrors, yet neither is needed for
 // the other to compile.
-func isSoft(reason entities.EdgeReason) bool {
+func IsSoft(reason entities.EdgeReason) bool {
 	return reason == entities.ReasonGeneratedBy || reason == entities.ReasonMirrors
 }
 

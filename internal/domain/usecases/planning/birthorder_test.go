@@ -24,7 +24,7 @@ func TestSortForBirthKeepsAnAtomContiguousWithinAPosition(t *testing.T) {
 		nil,
 	)
 
-	got := sortForBirth(
+	got := SortForBirth(
 		graph,
 		entities.Ordering{},
 		[]entities.DeclKey{first.Key, looseA.Key, second.Key, looseB.Key},
@@ -58,7 +58,7 @@ func TestSortForBirthWaitsForWhatAnAtomMemberNeeds(t *testing.T) {
 		nil,
 	)
 
-	got := sortForBirth(
+	got := SortForBirth(
 		graph,
 		entities.Ordering{},
 		[]entities.DeclKey{first.Key, second.Key, helper.Key},
@@ -88,7 +88,7 @@ func TestSortForBirthIgnoresAGeneratedByEdgeThatClosesACycle(t *testing.T) {
 		nil,
 	)
 
-	got := sortForBirth(
+	got := SortForBirth(
 		graph,
 		entities.Ordering{},
 		[]entities.DeclKey{helper.Key, mock.Key},
@@ -112,7 +112,7 @@ func TestSortForBirthKeepsAHardCycleInArrivalOrder(t *testing.T) {
 		nil,
 	)
 
-	got := sortForBirth(
+	got := SortForBirth(
 		graph,
 		entities.Ordering{},
 		[]entities.DeclKey{first.Key, second.Key},
@@ -138,7 +138,7 @@ func TestSortForBirthPutsWhatWaitsOnAHardCycleAfterIt(t *testing.T) {
 		nil,
 	)
 
-	got := sortForBirth(
+	got := SortForBirth(
 		graph,
 		entities.Ordering{},
 		[]entities.DeclKey{dependent.Key, first.Key, second.Key},

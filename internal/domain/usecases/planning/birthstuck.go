@@ -100,12 +100,12 @@ func (walk *componentWalk) visit(node entities.DeclKey) {
 	walk.stack = walk.stack[:start]
 }
 
-// cycleExtent widens the extent of every member of a hard cycle to the cycle's
+// CycleExtent widens the extent of every member of a hard cycle to the cycle's
 // last member: mutual references compile in one commit or in none, so a cut
 // between two of them is not a cut the plan may make. An atom is one node of the
 // cycle, since its members are born together: two tables whose ORM types name
 // each other form one, though no single declaration of either does.
-func cycleExtent(graph entities.Graph, keys []entities.DeclKey, extent []int) []int {
+func CycleExtent(graph entities.Graph, keys []entities.DeclKey, extent []int) []int {
 	nodes := atomNodes(graph, keys)
 	providers := map[entities.DeclKey][]entities.DeclKey{}
 
@@ -114,7 +114,7 @@ func cycleExtent(graph entities.Graph, keys []entities.DeclKey, extent []int) []
 
 		for _, edge := range graph.Needs(key) {
 			provider, inside := nodes.leaderOf[edge.Provider]
-			if inside && provider != dependent && !isSoft(edge.Reason) {
+			if inside && provider != dependent && !IsSoft(edge.Reason) {
 				providers[dependent] = append(providers[dependent], provider)
 			}
 		}
