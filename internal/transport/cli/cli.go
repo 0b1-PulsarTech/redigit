@@ -44,7 +44,10 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, star
 
 	cfg, far, err := parse(newFlagSet(), args[1:])
 	if err != nil {
-		_, _ = fmt.Fprint(stderr, usage)
+		// A config error already names the file and the key; the flag list buries it.
+		if !errors.Is(err, bootstrap.ErrConfig) {
+			_, _ = fmt.Fprint(stderr, usage)
+		}
 
 		return err
 	}

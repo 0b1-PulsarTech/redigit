@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -121,5 +123,56 @@ func TestRunDelegatesToRealDispatch(t *testing.T) {
 	err := Run(context.Background(), nil, &stdout, &stderr)
 	if !errors.Is(err, ErrUsage) {
 		t.Fatalf("err = %v, want it to wrap ErrUsage", err)
+	}
+}
+
+func TestDispatchPrintsAConfigErrorAlone(t *testing.T) {
+	t.Parallel()
+
+	errStart := fmt.Errorf("%w: config file c.json: rules[0]", bootstrap.ErrConfig)
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
+		t.Fatal("a load-time config error must never start a pipeline")
+
+		return nil, nil
+	}
+
+	testCases := []struct {
+		name  string
+		args  []string
+		start starter
+		want  string
+	}{
+		{
+			name:  "refused while parsing",
+			args:  []string{cmdGraph, "--repo", ".", "--config", absent},
+			start: unreachable,
+			want:  "config file ",
+		},
+		{
+			name:  "refused when the pipeline starts",
+			args:  []string{cmdGraph, "--repo", "."},
+			start: func(context.Context, bootstrap.Config) (pipeline, error) { return nil, errStart },
+			want:  errStart.Error(),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+
+			err := dispatch(t.Context(), testCase.args, &stdout, &stderr, testCase.start)
+			if !errors.Is(err, bootstrap.ErrConfig) ||
+				!strings.HasPrefix(err.Error(), testCase.want) {
+				t.Fatalf("err = %v, want ErrConfig starting %q", err, testCase.want)
+			}
+
+			if stderr.Len() != 0 {
+				t.Fatalf("stderr = %q, want no usage dump over a config error", stderr.String())
+			}
+		})
 	}
 }

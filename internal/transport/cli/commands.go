@@ -61,6 +61,10 @@ func withPipeline(
 	run func(pipeline) error,
 ) error {
 	pl, err := start(ctx, cfg)
+	if errors.Is(err, bootstrap.ErrConfig) {
+		return err
+	}
+
 	if err != nil {
 		return fmt.Errorf("start pipeline: %w", err)
 	}
