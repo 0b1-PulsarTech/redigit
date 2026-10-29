@@ -237,10 +237,10 @@ func TestPlannerBearsTheTitleWithTheFirstEntry(t *testing.T) {
 	decls := append(graph.Decls(), title, lead, bill)
 	edges := append(
 		graph.Edges(),
-		edgeOf(lead, parts["leadAPI"], entities.ReasonProse),
-		edgeOf(lead, title, entities.ReasonProse),
-		edgeOf(bill, parts["billAPI"], entities.ReasonProse),
-		edgeOf(bill, title, entities.ReasonProse),
+		proseEdge(lead, parts["leadAPI"]),
+		proseEdge(lead, title),
+		proseEdge(bill, parts["billAPI"]),
+		proseEdge(bill, title),
 	)
 
 	order.At[title.Key], order.At[lead.Key], order.At[bill.Key] = 9, 7, 8

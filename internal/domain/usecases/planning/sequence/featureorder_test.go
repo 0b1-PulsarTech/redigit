@@ -85,7 +85,7 @@ func TestSortFeatures(t *testing.T) {
 func TestFeatureNeeds(t *testing.T) {
 	t.Parallel()
 
-	graph, _, _ := twoFeatures()
+	graph, _ := twoFeatures()
 	own := owners.Assign(graph)
 	needs := FeatureNeeds(graph, own)
 
@@ -103,7 +103,7 @@ func TestFeatureNeeds(t *testing.T) {
 func TestEarliest(t *testing.T) {
 	t.Parallel()
 
-	graph, order, _ := twoFeatures()
+	graph, order := twoFeatures()
 	own := owners.Assign(graph)
 	at := Earliest(own, order)
 

@@ -24,7 +24,7 @@ func needs(dependent, provider entities.Decl) entities.Edge {
 	}
 }
 
-func twoFeatures() (entities.Graph, entities.Ordering, map[string]entities.Decl) {
+func twoFeatures() (entities.Graph, map[string]entities.Decl) {
 	kernel := decl("kernel/id.go", "NewID", "kernel")
 
 	leadUse := decl("lead/usecases/create.go", "Create", "lead/usecases")
@@ -43,17 +43,7 @@ func twoFeatures() (entities.Graph, entities.Ordering, map[string]entities.Decl)
 		needs(billUse, kernel),
 	}
 
-	at := map[entities.DeclKey]entities.Position{
-		kernel.Key:   0,
-		leadRepo.Key: 1,
-		leadUse.Key:  2,
-		leadAPI.Key:  3,
-		billUse.Key:  4,
-		billAPI.Key:  5,
-	}
-
 	return entities.NewGraph(decls, edges, nil),
-		entities.Ordering{At: at},
 		map[string]entities.Decl{
 			"kernel": kernel, "leadUse": leadUse, "leadRepo": leadRepo,
 			"leadAPI": leadAPI, "billUse": billUse, "billAPI": billAPI,

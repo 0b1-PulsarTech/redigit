@@ -11,7 +11,7 @@ import (
 func TestAssign(t *testing.T) {
 	t.Parallel()
 
-	graph, _, named := twoFeatures()
+	graph, named := twoFeatures()
 	own := Assign(graph)
 
 	testCases := []struct {
@@ -74,7 +74,7 @@ func TestAssignKeepsUnreachedDeclarations(t *testing.T) {
 func TestAssignHasNoSharingThreshold(t *testing.T) {
 	t.Parallel()
 
-	graph, _, named := twoFeatures()
+	graph, named := twoFeatures()
 
 	if got := Assign(graph).Owner[named["kernel"].Key]; got != reach.SharedFeature {
 		t.Fatalf("owner = %q, want the shared bucket", got)
@@ -141,7 +141,7 @@ func TestAssignMergesAnAtomIntoOneOwner(t *testing.T) {
 func TestAssignOrdersFeaturesDeterministically(t *testing.T) {
 	t.Parallel()
 
-	graph, _, _ := twoFeatures()
+	graph, _ := twoFeatures()
 
 	first := Assign(graph).Order
 	second := Assign(graph).Order
