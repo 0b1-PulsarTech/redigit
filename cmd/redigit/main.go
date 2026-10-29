@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/transport/cli"
 )
 
@@ -51,7 +52,7 @@ func run(parent context.Context, args []string, stdout, stderr io.Writer, execut
 	// correct rather than returning.
 	logger.Error("run", slog.String("error", err.Error()))
 
-	if errors.Is(err, cli.ErrUsage) {
+	if errors.Is(err, cli.ErrUsage) || errors.Is(err, bootstrap.ErrConfig) {
 		return exitUsage
 	}
 

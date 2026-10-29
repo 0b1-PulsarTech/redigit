@@ -44,6 +44,16 @@ Flags:
                 graph with no edges and look exactly like code nothing reads.
                 Every command now names those files on stderr, and audit lists
                 them under "unseen", so the choice is at least reported.
+  --config FILE a redigit.json: per-language tags and virtual modules, plus
+                rules. A flag replaces the file's whole setting for it (a
+                --virtual drops every virtual module the file lists), and a
+                file that names an unknown rule type or a glob matching
+                nothing in the tree is refused before the language server
+                starts.
+
+                  {"languages": {
+                    "go":  {"tags": ["integration"]},
+                    "web": {"virtual": {"virtual:x": "web/x.dart"}}}}
   --far  N      positions a declaration may sit ahead of its first outside
                 reader before audit reports it (default 25)
   --layers FILE which path prefixes come first when the graph is indifferent.

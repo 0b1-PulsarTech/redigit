@@ -2,8 +2,13 @@ package cli
 
 import (
 	"errors"
+	"flag"
 	"maps"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/bootstrap"
 )
 
 type parseTestCase struct {
@@ -101,49 +106,14 @@ func checkParseResult(t *testing.T, testCase parseTestCase) {
 		t.Fatalf("BuildTags = %v, want %v", cfg.BuildTags, testCase.wantTags)
 	}
 
-	for i, tag := range testCase.wantTags {
-		if cfg.BuildTags[i] != tag {
+	for idx, tag := range testCase.wantTags {
+		if cfg.BuildTags[idx] != tag {
 			t.Fatalf("BuildTags = %v, want %v", cfg.BuildTags, testCase.wantTags)
 		}
 	}
 
 	if far != testCase.wantFar {
 		t.Fatalf("far = %d, want %d", far, testCase.wantFar)
-	}
-}
-
-func TestSplitTags(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name string
-		tags string
-		want []string
-	}{
-		{"empty string yields none", "", nil},
-		{"whitespace only yields none", "   ", nil},
-		{"one tag", "a", []string{"a"}},
-		{"two tags", "a,b", []string{"a", "b"}},
-		{"blank entries between commas are dropped", "a,,b", []string{"a", "b"}},
-		{"surrounding whitespace is trimmed", " a , b ", []string{"a", "b"}},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := splitTags(testCase.tags)
-
-			if len(got) != len(testCase.want) {
-				t.Fatalf("splitTags(%q) = %v, want %v", testCase.tags, got, testCase.want)
-			}
-
-			for i, tag := range testCase.want {
-				if got[i] != tag {
-					t.Fatalf("splitTags(%q) = %v, want %v", testCase.tags, got, testCase.want)
-				}
-			}
-		})
 	}
 }
 
@@ -203,5 +173,60 @@ func TestParseVirtual(t *testing.T) {
 				t.Fatalf("Virtual = %v, want %v", cfg.Virtual, testCase.want)
 			}
 		})
+	}
+}
+
+func TestParseKeepsTheInnerCause(t *testing.T) {
+	t.Parallel()
+
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	testCases := []struct {
+		name      string
+		args      []string
+		wantInner error
+	}{
+		{"a flag the parser rejects", []string{"--help"}, flag.ErrHelp},
+		{"an unreadable layer file", []string{"--repo", ".", "--layers", absent}, os.ErrNotExist},
+		{
+			"an unreadable feature file",
+			[]string{"--repo", ".", "--features", absent},
+			os.ErrNotExist,
+		},
+		{
+			"an unreadable chunk map",
+			[]string{"--repo", ".", "--chunk-map", absent},
+			os.ErrNotExist,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, _, err := parse(newFlagSet(), testCase.args)
+			if !errors.Is(err, ErrUsage) {
+				t.Fatalf("err = %v, want it to wrap ErrUsage", err)
+			}
+
+			if !errors.Is(err, testCase.wantInner) {
+				t.Fatalf("err = %v, want the cause %v kept", err, testCase.wantInner)
+			}
+		})
+	}
+}
+
+func TestSettingFlagsAreDefined(t *testing.T) {
+	t.Parallel()
+
+	set := newFlagSet()
+	if _, _, err := parse(set, []string{"--repo", "."}); err != nil {
+		t.Fatalf("parse() = %v", err)
+	}
+
+	for _, name := range bootstrap.SettingFlags() {
+		if set.Lookup(name) == nil {
+			t.Fatalf("a setting names the flag %q, which newFlagSet() does not define", name)
+		}
 	}
 }

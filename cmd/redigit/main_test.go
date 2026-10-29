@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"testing"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/transport/cli"
 )
 
@@ -38,6 +41,13 @@ func TestRun(t *testing.T) {
 			name: "a wrapped usage error still returns exit 2",
 			execute: func(context.Context, []string, io.Writer, io.Writer) error {
 				return errors.Join(cli.ErrUsage, errBoom)
+			},
+			wantCode: exitUsage,
+		},
+		{
+			name: "a config error returns exit 2",
+			execute: func(context.Context, []string, io.Writer, io.Writer) error {
+				return fmt.Errorf("start: %w", bootstrap.ErrConfig)
 			},
 			wantCode: exitUsage,
 		},
@@ -85,5 +95,31 @@ func TestRunLogsTheFailureOnce(t *testing.T) {
 
 	if stderr.Len() == 0 {
 		t.Fatal("expected the failure to be logged to stderr")
+	}
+}
+
+func TestRunConfigMistakeIsOneMessage(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	var stdout, stderr bytes.Buffer
+
+	code := run(
+		context.Background(), []string{"graph", "--repo", ".", "--config", dir},
+		&stdout, &stderr, cli.Run,
+	)
+
+	if code != exitUsage {
+		t.Fatalf("run() = %d, want %d", code, exitUsage)
+	}
+
+	message := "config file " + dir + ": not a regular file"
+	if strings.Count(stderr.String(), message) != 1 {
+		t.Fatalf("stderr = %q, want %q exactly once", stderr.String(), message)
+	}
+
+	if strings.Contains(stderr.String(), "invalid config") {
+		t.Fatalf("stderr = %q, want no sentinel prefix", stderr.String())
 	}
 }

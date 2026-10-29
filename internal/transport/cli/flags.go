@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -9,8 +8,6 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 )
-
-var errVirtualForm = errors.New("--virtual wants ID=PATH")
 
 func newFlagSet() *flag.FlagSet {
 	set := flag.NewFlagSet("redigit", flag.ContinueOnError)
@@ -27,7 +24,9 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 		layerFile    string
 		featureFile  string
 		chunkMapFile string
+		configFile   string
 		far          int
+		virtualErr   error
 	)
 
 	set.StringVar(&cfg.Repo, "repo", "", "repository to read")
@@ -55,17 +54,35 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 		"chunk map file: JSON spans for a format redigit cannot parse on its own",
 	)
 
-	set.Func("virtual", "ID=PATH: the file a virtual module compiles from", addVirtual(&cfg))
+	set.StringVar(
+		&configFile,
+		"config",
+		"",
+		"config file: tags, virtual modules and rules for a project",
+	)
+
+	add := addVirtual(&cfg, &virtualErr)
+	set.Func("virtual", "ID=PATH: the file a virtual module compiles from", add)
 
 	if err := set.Parse(args); err != nil {
-		return bootstrap.Config{}, 0, fmt.Errorf("%w: %s", ErrUsage, err)
+		return bootstrap.Config{}, 0, fmt.Errorf("%w: %w", ErrUsage, err)
+	}
+
+	if virtualErr != nil {
+		return bootstrap.Config{}, 0, fmt.Errorf("%w: --virtual: %w", ErrUsage, virtualErr)
 	}
 
 	if cfg.Repo == "" {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: --repo is required", ErrUsage)
 	}
 
-	cfg.BuildTags = splitTags(tags)
+	if err := applyTags(&cfg, tags); err != nil {
+		return bootstrap.Config{}, 0, err
+	}
+
+	if err := applyConfigFile(&cfg, set, configFile); err != nil {
+		return bootstrap.Config{}, 0, err
+	}
 
 	if err := loadSlicing(&cfg, layerFile, featureFile); err != nil {
 		return bootstrap.Config{}, 0, err
@@ -84,7 +101,7 @@ func loadSlicing(cfg *bootstrap.Config, layerFile, featureFile string) error {
 	if layerFile != "" {
 		layers, err := bootstrap.LoadLayers(layerFile)
 		if err != nil {
-			return fmt.Errorf("%w: %s", ErrUsage, err)
+			return fmt.Errorf("%w: %w", ErrUsage, err)
 		}
 
 		cfg.Ordering.Layers = layers
@@ -93,31 +110,13 @@ func loadSlicing(cfg *bootstrap.Config, layerFile, featureFile string) error {
 	if featureFile != "" {
 		features, err := bootstrap.LoadFeatures(featureFile)
 		if err != nil {
-			return fmt.Errorf("%w: %s", ErrUsage, err)
+			return fmt.Errorf("%w: %w", ErrUsage, err)
 		}
 
 		cfg.Ordering.Features = features
 	}
 
 	return nil
-}
-
-func splitTags(tags string) []string {
-	if strings.TrimSpace(tags) == "" {
-		return nil
-	}
-
-	parts := strings.Split(tags, ",")
-
-	out := make([]string, 0, len(parts))
-
-	for _, part := range parts {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-
-	return out
 }
 
 // loadChunkMap reads the operator-supplied chunk map named by --chunk-map, if
@@ -130,7 +129,7 @@ func loadChunkMap(cfg *bootstrap.Config, chunkMapFile string) error {
 
 	chunkMap, err := bootstrap.LoadChunkMap(chunkMapFile)
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrUsage, err)
+		return fmt.Errorf("%w: %w", ErrUsage, err)
 	}
 
 	cfg.ChunkMap = chunkMap
@@ -138,21 +137,29 @@ func loadChunkMap(cfg *bootstrap.Config, chunkMapFile string) error {
 	return nil
 }
 
-// addVirtual reads one --virtual flag into cfg; the flag repeats, one virtual
-// module per occurrence.
-func addVirtual(cfg *bootstrap.Config) func(string) error {
+func addVirtual(cfg *bootstrap.Config, refused *error) func(string) error {
+	// The flag repeats. A refusal is kept, not returned: flag flattens it to text.
 	return func(value string) error {
-		id, file, found := strings.Cut(value, "=")
-		if !found || strings.TrimSpace(id) == "" || strings.TrimSpace(file) == "" {
-			return fmt.Errorf("%w, got %q", errVirtualForm, value)
-		}
-
 		if cfg.Virtual == nil {
 			cfg.Virtual = map[string]string{}
 		}
 
-		cfg.Virtual[strings.TrimSpace(id)] = strings.TrimSpace(file)
+		id, file, _ := strings.Cut(value, "=")
+		if err := bootstrap.AddVirtual(cfg.Virtual, id, file); err != nil && *refused == nil {
+			*refused = err
+		}
 
 		return nil
 	}
+}
+
+func applyTags(cfg *bootstrap.Config, tags string) error {
+	parsed, err := bootstrap.ParseTags(tags)
+	if err != nil {
+		return fmt.Errorf("%w: --tags: %w", ErrUsage, err)
+	}
+
+	cfg.BuildTags = parsed
+
+	return nil
 }
