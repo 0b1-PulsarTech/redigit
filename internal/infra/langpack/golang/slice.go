@@ -115,8 +115,8 @@ func findFuncDecl(file *ast.File, key entities.DeclKey) *ast.FuncDecl {
 			continue
 		}
 
-		ident := funcIdent(fn)
-		if ident.kind == key.Kind && ident.name == key.Name {
+		ident := FuncIdent(fn)
+		if ident.Kind == key.Kind && ident.Name == key.Name {
 			return fn
 		}
 	}

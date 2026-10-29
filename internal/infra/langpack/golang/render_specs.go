@@ -11,25 +11,25 @@ func filterGenDecl(
 	fset *token.FileSet,
 	source []byte,
 	d *ast.GenDecl,
-	keepSet map[declIdent]bool,
+	keepSet map[Ident]bool,
 ) []ast.Decl {
 	if d.Tok == token.TYPE {
-		return filterSpecs(d, keepSet, func(spec ast.Spec) (declIdent, bool) {
+		return filterSpecs(d, keepSet, func(spec ast.Spec) (Ident, bool) {
 			ts, ok := spec.(*ast.TypeSpec)
 			if !ok {
-				return declIdent{}, false
+				return Ident{}, false
 			}
 
-			return declIdent{entities.KindType, ts.Name.Name}, true
+			return Ident{entities.KindType, ts.Name.Name}, true
 		})
 	}
 
-	if d.Tok == token.CONST && hasImplicitSpec(d) {
+	if d.Tok == token.CONST && HasImplicitSpec(d) {
 		// Any surviving name keeps the whole group: an iota constant that is
 		// not written down still takes its value from its position in the
 		// block, so the block cannot be cut.
-		for _, name := range groupNames(d) {
-			if keepSet[declIdent{entities.KindValue, name}] {
+		for _, name := range GroupNames(d) {
+			if keepSet[Ident{entities.KindValue, name}] {
 				return []ast.Decl{d}
 			}
 		}
@@ -44,8 +44,8 @@ func filterGenDecl(
 // dropping the whole GenDecl when none survive.
 func filterSpecs(
 	d *ast.GenDecl,
-	keepSet map[declIdent]bool,
-	identOf func(ast.Spec) (declIdent, bool),
+	keepSet map[Ident]bool,
+	identOf func(ast.Spec) (Ident, bool),
 ) []ast.Decl {
 	var specs []ast.Spec
 
@@ -68,7 +68,7 @@ func filterValueSpecs(
 	fset *token.FileSet,
 	source []byte,
 	d *ast.GenDecl,
-	keepSet map[declIdent]bool,
+	keepSet map[Ident]bool,
 ) []ast.Decl {
 	var specs []ast.Spec
 
@@ -79,7 +79,7 @@ func filterValueSpecs(
 		}
 
 		for _, name := range vs.Names {
-			if keepSet[declIdent{entities.KindValue, valueName(fset, source, vs, name)}] {
+			if keepSet[Ident{entities.KindValue, ValueName(fset, source, vs, name)}] {
 				specs = append(specs, spec)
 
 				break
@@ -115,7 +115,7 @@ func finishGenDecl(d *ast.GenDecl, specs []ast.Spec) []ast.Decl {
 // than judging it accidental.
 func resetSpacingIfSafe(specs []ast.Spec) {
 	for _, spec := range specs {
-		if specDoc(spec) != nil {
+		if SpecDoc(spec) != nil {
 			return
 		}
 	}

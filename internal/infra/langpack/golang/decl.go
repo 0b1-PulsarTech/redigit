@@ -31,10 +31,10 @@ var _ indexing.Syntax = Syntax{}
 // A parenthesized const group where a later spec omits both its type and its
 // value (an iota chain) is kept as one atomic declaration: splitting it would
 // let a later commit change what an untouched constant evaluates to.
-// fileDeclName is the name given to the single declaration standing for a file
+// FileDeclName is the name given to the single declaration standing for a file
 // that declares nothing of its own. It is not a legal Go identifier on purpose,
 // so it can never collide with a real declaration.
-const fileDeclName = "<file>"
+const FileDeclName = "<file>"
 
 func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]entities.Decl, error) {
 	fset := token.NewFileSet()
@@ -91,7 +91,7 @@ func wholeFile(
 	file *ast.File,
 ) entities.Decl {
 	return entities.Decl{
-		Key:      entities.DeclKey{File: path, Kind: entities.KindOther, Name: fileDeclName},
+		Key:      entities.DeclKey{File: path, Kind: entities.KindOther, Name: FileDeclName},
 		Unit:     unit,
 		Span:     entities.Span{Start: 0, End: len(source)},
 		Selector: locationOf(fset, path, source, file.Name.Pos()),
@@ -140,7 +140,7 @@ func buildFuncDecl(
 	if decl.Recv != nil {
 		kind = entities.KindMethod
 
-		if recv := receiverName(decl.Recv); recv != "" {
+		if recv := ReceiverName(decl.Recv); recv != "" {
 			name = recv + "." + name
 		}
 	}
@@ -159,11 +159,11 @@ func buildFuncDecl(
 	}
 }
 
-// receiverName returns the base type name of a method receiver, stripping a
+// ReceiverName returns the base type name of a method receiver, stripping a
 // pointer and any generic type parameters: "*Repo[T]" and "Repo[T]" both name
 // "Repo". Without the receiver, two types that both implement Error()
 // collapse into one declaration.
-func receiverName(recv *ast.FieldList) string {
+func ReceiverName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
 	}
@@ -251,18 +251,18 @@ func utf16Units(encoded []byte) int {
 	return len(utf16.Encode([]rune(string(encoded))))
 }
 
-// declIdent identifies a surviving declaration by kind and name only: Render
+// Ident identifies a surviving declaration by kind and name only: Render
 // is handed a source file already scoped to one path, so the DeclKey.File a
 // caller carries is redundant here.
-type declIdent struct {
-	kind entities.DeclKind
-	name string
+type Ident struct {
+	Kind entities.DeclKind
+	Name string
 }
 
-func funcIdent(d *ast.FuncDecl) declIdent {
+func FuncIdent(d *ast.FuncDecl) Ident {
 	if d.Recv == nil || len(d.Recv.List) == 0 {
-		return declIdent{entities.KindFunc, d.Name.Name}
+		return Ident{entities.KindFunc, d.Name.Name}
 	}
 
-	return declIdent{entities.KindMethod, receiverName(d.Recv) + "." + d.Name.Name}
+	return Ident{entities.KindMethod, ReceiverName(d.Recv) + "." + d.Name.Name}
 }

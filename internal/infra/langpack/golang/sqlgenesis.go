@@ -279,5 +279,5 @@ func holdsAny(dir string, files []string) bool {
 }
 
 func wholeFileKey(file string) entities.DeclKey {
-	return entities.DeclKey{File: file, Kind: entities.KindOther, Name: fileDeclName}
+	return entities.DeclKey{File: file, Kind: entities.KindOther, Name: FileDeclName}
 }

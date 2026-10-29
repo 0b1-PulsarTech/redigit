@@ -108,7 +108,7 @@ func atomCases() []atomCase {
 		{
 			"the first table with the sqlc configuration",
 			key(migration, entities.KindOther, "table:accounts"),
-			key("database/sqlc.yaml", entities.KindOther, fileDeclName),
+			key("database/sqlc.yaml", entities.KindOther, FileDeclName),
 			true,
 		},
 		{
@@ -120,7 +120,7 @@ func atomCases() []atomCase {
 		{
 			"the first table with the migration checksum",
 			key(migration, entities.KindOther, "table:accounts"),
-			key("database/migrations/atlas.sum", entities.KindOther, fileDeclName),
+			key("database/migrations/atlas.sum", entities.KindOther, FileDeclName),
 			true,
 		},
 		{

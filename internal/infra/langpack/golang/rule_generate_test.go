@@ -106,7 +106,7 @@ func TestGenerateRuleTiesAMockToItsDirective(t *testing.T) {
 	}
 	mock := entities.Decl{
 		Key: entities.DeclKey{
-			File: "store/repo_mock_test.go", Kind: entities.KindOther, Name: fileDeclName,
+			File: "store/repo_mock_test.go", Kind: entities.KindOther, Name: FileDeclName,
 		},
 		Unit: "store",
 		Span: entities.Span{Start: 0, End: 60},

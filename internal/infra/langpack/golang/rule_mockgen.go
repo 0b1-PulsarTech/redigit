@@ -242,7 +242,7 @@ type mockDependent struct {
 // waits for its own subject.
 func mockDependents(decls []entities.Decl, source []byte) []mockDependent {
 	for _, decl := range decls {
-		if decl.Key.Kind != entities.KindOther || decl.Key.Name != fileDeclName {
+		if decl.Key.Kind != entities.KindOther || decl.Key.Name != FileDeclName {
 			continue
 		}
 

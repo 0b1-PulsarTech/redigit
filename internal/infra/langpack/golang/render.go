@@ -25,16 +25,16 @@ import (
 // travels with the node CommentMap attached it to, so it is dropped when that
 // node is dropped and kept, in place, when it survives.
 func (Syntax) Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, error) {
-	keepSet := make(map[declIdent]bool, len(keep))
+	keepSet := make(map[Ident]bool, len(keep))
 	for _, k := range keep {
-		keepSet[declIdent{k.Kind, k.Name}] = true
+		keepSet[Ident{k.Kind, k.Name}] = true
 	}
 
 	// A file that declares nothing is carried by one declaration standing for
 	// the whole of it, so keeping that one means keeping the file verbatim.
 	// Filtering it through the printer instead would drop its imports, which
 	// are the only thing it holds.
-	if keepSet[declIdent{entities.KindOther, fileDeclName}] {
+	if keepSet[Ident{entities.KindOther, FileDeclName}] {
 		return source, nil
 	}
 
@@ -111,11 +111,11 @@ func filterDecl(
 	fset *token.FileSet,
 	source []byte,
 	decl ast.Decl,
-	keepSet map[declIdent]bool,
+	keepSet map[Ident]bool,
 ) []ast.Decl {
 	switch d := decl.(type) {
 	case *ast.FuncDecl:
-		if keepSet[funcIdent(d)] {
+		if keepSet[FuncIdent(d)] {
 			keepStatements(d, keepSet)
 
 			return []ast.Decl{d}
@@ -132,18 +132,18 @@ func filterDecl(
 // keepStatements cuts a function down to the statements the caller kept. A
 // function none of whose statements is named was not cut when the declarations
 // were read, so it is written whole.
-func keepStatements(fn *ast.FuncDecl, keepSet map[declIdent]bool) {
+func keepStatements(fn *ast.FuncDecl, keepSet map[Ident]bool) {
 	if fn.Body == nil {
 		return
 	}
 
-	name := funcIdent(fn).name
+	name := FuncIdent(fn).Name
 
 	if elements, replace := returnedElements(fn.Body); len(elements) >= minGroup {
 		keptElements := make([]ast.Expr, 0, len(elements))
 
 		for index, element := range elements {
-			if keepSet[declIdent{entities.KindStmt, stmtName(name, index)}] {
+			if keepSet[Ident{entities.KindStmt, stmtName(name, index)}] {
 				keptElements = append(keptElements, element)
 			}
 		}
@@ -158,7 +158,7 @@ func keepStatements(fn *ast.FuncDecl, keepSet map[declIdent]bool) {
 	kept := make([]ast.Stmt, 0, len(fn.Body.List))
 
 	for index, stmt := range fn.Body.List {
-		if keepSet[declIdent{entities.KindStmt, stmtName(name, index)}] {
+		if keepSet[Ident{entities.KindStmt, stmtName(name, index)}] {
 			kept = append(kept, stmt)
 		}
 	}

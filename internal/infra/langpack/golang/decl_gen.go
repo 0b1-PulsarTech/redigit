@@ -30,7 +30,7 @@ func buildGenDecl(
 	case token.TYPE:
 		return buildTypeSpecs(fset, path, source, unit, decl)
 	case token.CONST:
-		if hasImplicitSpec(decl) {
+		if HasImplicitSpec(decl) {
 			return buildAtomicGroup(fset, path, source, unit, entities.KindValue, decl)
 		}
 
@@ -42,7 +42,7 @@ func buildGenDecl(
 	}
 }
 
-func hasImplicitSpec(decl *ast.GenDecl) bool {
+func HasImplicitSpec(decl *ast.GenDecl) bool {
 	for i, spec := range decl.Specs {
 		if i == 0 {
 			continue
@@ -76,7 +76,7 @@ func buildAtomicGroup(
 
 	var decls []entities.Decl
 
-	size := len(groupNames(decl))
+	size := len(GroupNames(decl))
 
 	for _, spec := range decl.Specs {
 		vs, ok := spec.(*ast.ValueSpec)
@@ -98,9 +98,9 @@ func buildAtomicGroup(
 	return decls
 }
 
-// groupNames lists every name an atomic group binds, so the renderer can keep
+// GroupNames lists every name an atomic group binds, so the renderer can keep
 // the group when a plan names any one of them.
-func groupNames(decl *ast.GenDecl) []string {
+func GroupNames(decl *ast.GenDecl) []string {
 	var names []string
 
 	for _, spec := range decl.Specs {
@@ -161,7 +161,7 @@ func buildValueSpecs(
 	// two members is as indivisible as one of twenty-seven. Counting siblings
 	// per FILE gets that wrong the moment a file holds two enums, or one enum
 	// beside a loose constant.
-	size := len(groupNames(decl))
+	size := len(GroupNames(decl))
 
 	for _, spec := range decl.Specs {
 		vs, ok := spec.(*ast.ValueSpec)
@@ -176,7 +176,7 @@ func buildValueSpecs(
 				Key: entities.DeclKey{
 					File: path,
 					Kind: entities.KindValue,
-					Name: valueName(fset, source, vs, name),
+					Name: ValueName(fset, source, vs, name),
 				},
 				Unit:      unit,
 				Span:      spanOf(fset, start, vs.End()),
@@ -203,11 +203,11 @@ func specStart(decl *ast.GenDecl, specDoc *ast.CommentGroup, specPos token.Pos) 
 	return specPos
 }
 
-// valueName disambiguates a blank identifier by appending its declared type
+// ValueName disambiguates a blank identifier by appending its declared type
 // and initializer text: every "var _ Iface = (*T)(nil)" in a package shares
 // the same Iface, so the type alone would still collapse them all into one
 // name. The value (the concrete T being asserted) is what tells them apart.
-func valueName(fset *token.FileSet, source []byte, vs *ast.ValueSpec, name *ast.Ident) string {
+func ValueName(fset *token.FileSet, source []byte, vs *ast.ValueSpec, name *ast.Ident) string {
 	if name.Name != "_" {
 		return name.Name
 	}
@@ -236,7 +236,7 @@ func exprText(fset *token.FileSet, source []byte, expr ast.Expr) string {
 	return string(source[start:end])
 }
 
-func specDoc(spec ast.Spec) *ast.CommentGroup {
+func SpecDoc(spec ast.Spec) *ast.CommentGroup {
 	switch s := spec.(type) {
 	case *ast.ValueSpec:
 		return s.Doc
