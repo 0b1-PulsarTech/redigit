@@ -1,4 +1,4 @@
-package planning
+package testplace
 
 import (
 	"testing"

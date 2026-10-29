@@ -1,4 +1,4 @@
-package planning
+package testplace
 
 import (
 	"slices"
@@ -87,15 +87,6 @@ func TestPlaceTests(t *testing.T) {
 			}
 		})
 	}
-}
-
-func keysOf(decls []entities.Decl) []entities.DeclKey {
-	out := make([]entities.DeclKey, 0, len(decls))
-	for _, item := range decls {
-		out = append(out, item.Key)
-	}
-
-	return out
 }
 
 func TestGatherTestAtoms(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/testplace"
 )
 
 // ownership is which feature each declaration belongs to, and how many features
@@ -52,7 +53,7 @@ func assign(graph entities.Graph) ownership {
 		loose: reach.LooseLines(graph),
 	}
 
-	own.support = TestSupport(graph)
+	own.support = testplace.TestSupport(graph)
 	own.deferred = reach.DeferTests(graph, own.roots, own.support)
 
 	entries := reach.EntryPoints(graph, own.roots)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/testplace"
 )
 
 // Config tunes where the planner cuts. Both knobs are deliberate: a tool that
@@ -62,7 +63,7 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		return p.emitByCapability(graph, order, ownershipFrom(p.cfg.Capabilities, graph)), nil
 	}
 
-	graph, order = AnchorTests(graph, order)
+	graph, order = testplace.AnchorTests(graph, order)
 	p.sizes = generatedSizes(graph)
 	own := assign(graph)
 
