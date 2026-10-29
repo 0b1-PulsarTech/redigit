@@ -1,4 +1,4 @@
-package golang
+package sql
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestSQLAtomRuleAtoms(t *testing.T) {
@@ -60,74 +61,74 @@ func atomCases() []atomCase {
 	return []atomCase{
 		{
 			"a table with its ORM type",
-			key(migration, entities.KindOther, "table:templates"),
-			key("database/entschema/template.go", entities.KindType, "Template"),
+			testkit.DeclKey(migration, entities.KindOther, "table:templates"),
+			testkit.DeclKey("database/entschema/template.go", entities.KindType, "Template"),
 			true,
 		},
 		{
 			"a table with its index",
-			key(migration, entities.KindOther, "table:templates"),
-			key(migration, entities.KindOther, "alter:templates"),
+			testkit.DeclKey(migration, entities.KindOther, "table:templates"),
+			testkit.DeclKey(migration, entities.KindOther, "alter:templates"),
 			true,
 		},
 		{
 			"a table with its generated struct",
-			key(migration, entities.KindOther, "table:templates"),
-			key("dbgen/models.go", entities.KindType, "Template"),
+			testkit.DeclKey(migration, entities.KindOther, "table:templates"),
+			testkit.DeclKey("dbgen/models.go", entities.KindType, "Template"),
 			true,
 		},
 		{
 			"a query with its function and row type",
-			key("database/queries/template.sql", entities.KindOther, "ListTemplates"),
-			key("dbgen/template.sql.go", entities.KindType, "ListTemplatesRow"),
+			testkit.DeclKey("database/queries/template.sql", entities.KindOther, "ListTemplates"),
+			testkit.DeclKey("dbgen/template.sql.go", entities.KindType, "ListTemplatesRow"),
 			true,
 		},
 		{
 			"a later table apart from the first",
-			key(migration, entities.KindOther, "table:templates"),
-			key(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey(migration, entities.KindOther, "table:templates"),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
 			false,
 		},
 		{
 			"the first table with the package root",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("dbgen/db.go", entities.KindType, "Queries"),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("dbgen/db.go", entities.KindType, "Queries"),
 			true,
 		},
 		{
 			"the first table with a query that reads only it",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("database/queries/account.sql", entities.KindOther, "GetAccount"),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("database/queries/account.sql", entities.KindOther, "GetAccount"),
 			true,
 		},
 		{
 			"the first table with the ORM helpers it stands on",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("database/entschema/customixins/uuid.go", entities.KindFunc, "UUID"),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("database/entschema/customixins/uuid.go", entities.KindFunc, "UUID"),
 			true,
 		},
 		{
 			"the first table with the sqlc configuration",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("database/sqlc.yaml", entities.KindOther, syntax.FileDeclName),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("database/sqlc.yaml", entities.KindOther, syntax.FileDeclName),
 			true,
 		},
 		{
 			"the first table with the module of the sqlc configuration",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("database/go.mod", entities.KindOther, "example.com/database"),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("database/go.mod", entities.KindOther, "example.com/database"),
 			true,
 		},
 		{
 			"the first table with the migration checksum",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("database/migrations/atlas.sum", entities.KindOther, syntax.FileDeclName),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("database/migrations/atlas.sum", entities.KindOther, syntax.FileDeclName),
 			true,
 		},
 		{
 			"a helper that reaches for a table stays out of the first one",
-			key(migration, entities.KindOther, "table:accounts"),
-			key("database/entschema/owner.go", entities.KindType, "OwnerMixin"),
+			testkit.DeclKey(migration, entities.KindOther, "table:accounts"),
+			testkit.DeclKey("database/entschema/owner.go", entities.KindType, "OwnerMixin"),
 			false,
 		},
 	}

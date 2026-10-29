@@ -1,4 +1,4 @@
-package golang
+package sql
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestSqlcRuleEdges(t *testing.T) {
@@ -20,7 +21,7 @@ func TestSqlcRuleEdges(t *testing.T) {
 
 	const migration = "database/migrations/0001_all.sql"
 
-	block := key("database/queries/template.sql", entities.KindOther, "ListTemplates")
+	block := testkit.DeclKey("database/queries/template.sql", entities.KindOther, "ListTemplates")
 	queryEdge := func(dependent, provider entities.DeclKey) entities.Edge {
 		return entities.Edge{Dependent: dependent, Provider: provider, Reason: entities.ReasonQuery}
 	}
@@ -31,28 +32,28 @@ func TestSqlcRuleEdges(t *testing.T) {
 	}{
 		{
 			"a query after each table it reads",
-			queryEdge(block, key(migration, entities.KindOther, "table:templates")),
+			queryEdge(block, testkit.DeclKey(migration, entities.KindOther, "table:templates")),
 		},
 		{
 			"a query after the second table it reads",
-			queryEdge(block, key(migration, entities.KindOther, "table:accounts")),
+			queryEdge(block, testkit.DeclKey(migration, entities.KindOther, "table:accounts")),
 		},
 		{
 			"a query after the extension it calls",
-			queryEdge(block, key(migration, entities.KindOther, "extension:unaccent")),
+			queryEdge(block, testkit.DeclKey(migration, entities.KindOther, "extension:unaccent")),
 		},
 		{
 			"a generated function after its query",
 			queryEdge(
-				key("dbgen/template.sql.go", entities.KindMethod, "Queries.ListTemplates"),
+				testkit.DeclKey("dbgen/template.sql.go", entities.KindMethod, "Queries.ListTemplates"),
 				block,
 			),
 		},
 		{
 			"a model after the generated package root",
 			queryEdge(
-				key("dbgen/models.go", entities.KindType, "Template"),
-				key("dbgen/db.go", entities.KindType, "Queries"),
+				testkit.DeclKey("dbgen/models.go", entities.KindType, "Template"),
+				testkit.DeclKey("dbgen/db.go", entities.KindType, "Queries"),
 			),
 		},
 	}

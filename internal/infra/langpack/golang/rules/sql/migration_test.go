@@ -1,4 +1,4 @@
-package golang
+package sql
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestMigrationRuleEdges(t *testing.T) {
@@ -20,10 +21,10 @@ func TestMigrationRuleEdges(t *testing.T) {
 
 	const migration = "database/migrations/0001_all.sql"
 
-	accounts := key(migration, entities.KindOther, "table:accounts")
-	templates := key(migration, entities.KindOther, "table:templates")
-	foreignKey := key(migration, entities.KindOther, "alter:templates")
-	index := key(migration, entities.KindOther, "index:account_id")
+	accounts := testkit.DeclKey(migration, entities.KindOther, "table:accounts")
+	templates := testkit.DeclKey(migration, entities.KindOther, "table:templates")
+	foreignKey := testkit.DeclKey(migration, entities.KindOther, "alter:templates")
+	index := testkit.DeclKey(migration, entities.KindOther, "index:account_id")
 
 	testCases := []struct {
 		name string
@@ -33,7 +34,7 @@ func TestMigrationRuleEdges(t *testing.T) {
 			"a table after the ORM type it was generated from",
 			schemaEdge(
 				accounts,
-				key("database/entschema/account.go", entities.KindType, "Account"),
+				testkit.DeclKey("database/entschema/account.go", entities.KindType, "Account"),
 			),
 		},
 		{"an index after its table", schemaEdge(index, accounts)},
@@ -41,11 +42,11 @@ func TestMigrationRuleEdges(t *testing.T) {
 		{"a foreign key after the table it points at", schemaEdge(foreignKey, accounts)},
 		{
 			"a table after the extension defining a type it uses",
-			schemaEdge(templates, key(migration, entities.KindOther, "extension:unaccent")),
+			schemaEdge(templates, testkit.DeclKey(migration, entities.KindOther, "extension:unaccent")),
 		},
 		{
 			"the migrations package after the first table",
-			schemaEdge(key("database/migrations/embed.go", entities.KindValue, "FS"), accounts),
+			schemaEdge(testkit.DeclKey("database/migrations/embed.go", entities.KindValue, "FS"), accounts),
 		},
 	}
 

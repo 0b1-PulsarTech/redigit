@@ -1,10 +1,11 @@
-package golang
+package sql
 
 import (
 	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestDropSqlcConstruction(t *testing.T) {
@@ -12,9 +13,9 @@ func TestDropSqlcConstruction(t *testing.T) {
 
 	snap, _ := schemaTree(t)
 
-	newFunc := key("dbgen/db.go", entities.KindFunc, "New")
-	method := key("dbgen/account.sql.go", entities.KindMethod, "Queries.GetAccount")
-	caller := key("repo/repo.go", entities.KindMethod, "Repo.Get")
+	newFunc := testkit.DeclKey("dbgen/db.go", entities.KindFunc, "New")
+	method := testkit.DeclKey("dbgen/account.sql.go", entities.KindMethod, "Queries.GetAccount")
+	caller := testkit.DeclKey("repo/repo.go", entities.KindMethod, "Repo.Get")
 
 	testCases := []struct {
 		name string

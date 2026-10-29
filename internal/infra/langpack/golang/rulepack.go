@@ -10,6 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/gencode"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/sql"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/tests"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/typecheck"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/rules/wiring"
@@ -40,9 +41,9 @@ var rules = []rule{
 	gencode.Goverter{},
 	gencode.Mockgen{},
 	gencode.Generate{},
-	Sqlc{},
-	Atoms{},
-	Migration{},
+	sql.Sqlc{},
+	sql.Atoms{},
+	sql.Migration{},
 	tests.Anchor{},
 	wiring.Encloses{},
 	wiring.Assertion{},
@@ -103,7 +104,7 @@ func (p RulePack) Edges(
 // FilterEdges drops the structural edges the sqlc output would otherwise
 // carry, whichever side found them.
 func (p RulePack) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
-	return DropConstruction(snap, edges)
+	return sql.DropConstruction(snap, edges)
 }
 
 func (p RulePack) Anchors(
