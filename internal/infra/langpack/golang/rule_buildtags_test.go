@@ -89,7 +89,7 @@ func TestBuildConstraintsReadError(t *testing.T) {
 func TestBuildTagsRuleContributesNoEdgesOrAnchors(t *testing.T) {
 	t.Parallel()
 
-	edges, err := buildTagsRule{}.Edges(context.Background(), entities.Snapshot{}, nil)
+	edges, err := Rule{}.Edges(context.Background(), entities.Snapshot{}, nil)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
@@ -98,7 +98,7 @@ func TestBuildTagsRuleContributesNoEdgesOrAnchors(t *testing.T) {
 		t.Fatalf("got %d edges, want 0", len(edges))
 	}
 
-	anchors, err := buildTagsRule{}.Anchors(context.Background(), entities.Snapshot{}, nil)
+	anchors, err := Rule{}.Anchors(context.Background(), entities.Snapshot{}, nil)
 	if err != nil {
 		t.Fatalf("Anchors() error = %v", err)
 	}

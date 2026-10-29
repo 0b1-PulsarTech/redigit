@@ -14,18 +14,18 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-// buildTagsRule registers build-constraint visibility as one of the seven Go
+// Rule registers build-constraint visibility as one of the seven Go
 // rules, so it is discovered and tested alongside the others. It contributes
 // no Edge or Anchor - a build tag does not change birth order - so the
 // reporting itself lives in the package-level BuildConstraints function,
 // which a caller with a reason to ask (the auditing use case) can call
 // directly: RulePack has no return shape for "here is what an untagged index
 // cannot see", only for edges and anchors.
-type buildTagsRule struct{}
+type Rule struct{}
 
-func (buildTagsRule) Name() string { return "build-tags" }
+func (Rule) Name() string { return "build-tags" }
 
-func (buildTagsRule) Edges(
+func (Rule) Edges(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -33,7 +33,7 @@ func (buildTagsRule) Edges(
 	return nil, nil
 }
 
-func (buildTagsRule) Anchors(
+func (Rule) Anchors(
 	context.Context,
 	entities.Snapshot,
 	[]entities.Decl,
@@ -93,13 +93,13 @@ func buildTagFor(file string, source []byte) (BuildTag, bool, error) {
 			return BuildTag{}, false, fmt.Errorf("parse constraint %q in %s: %w", line, file, err)
 		}
 
-		return BuildTag{File: file, Constraint: line, Tags: constraintTags(expr)}, true, nil
+		return BuildTag{File: file, Constraint: line, Tags: ConstraintTags(expr)}, true, nil
 	}
 
 	return BuildTag{}, false, nil
 }
 
-func constraintTags(expr constraint.Expr) []string {
+func ConstraintTags(expr constraint.Expr) []string {
 	seen := map[string]bool{}
 
 	var walk func(constraint.Expr)
@@ -148,7 +148,7 @@ func Hidden(tags []BuildTag, satisfied []string) ([]BuildTag, error) {
 	known[runtime.GOOS] = true
 	known[runtime.GOARCH] = true
 
-	if isUnix(runtime.GOOS) {
+	if IsUnix(runtime.GOOS) {
 		known["unix"] = true
 	}
 
@@ -175,4 +175,4 @@ var unixGOOS = []string{
 	"ios", "linux", "netbsd", "openbsd", "solaris",
 }
 
-func isUnix(goos string) bool { return slices.Contains(unixGOOS, goos) }
+func IsUnix(goos string) bool { return slices.Contains(unixGOOS, goos) }

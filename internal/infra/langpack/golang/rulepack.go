@@ -42,7 +42,7 @@ var rules = []rule{
 	assertionRule{},
 	conversionRule{},
 	boundRule{},
-	buildTagsRule{},
+	Rule{},
 	embedRule{},
 	routePathRule{},
 }

@@ -92,7 +92,7 @@ func showingTags(line string, tags []string) ([]string, bool) {
 		return nil, false
 	}
 
-	named := constraintTags(expr)
+	named := ConstraintTags(expr)
 	slices.Sort(named)
 
 	// Tags a constraint can name by hand are few; anything wider is not a build
@@ -126,6 +126,6 @@ func showingTags(line string, tags []string) ([]string, bool) {
 func satisfies(expr constraint.Expr, tags []string) bool {
 	return expr.Eval(func(name string) bool {
 		return slices.Contains(tags, name) || name == runtime.GOOS || name == runtime.GOARCH ||
-			(name == "unix" && isUnix(runtime.GOOS))
+			(name == "unix" && IsUnix(runtime.GOOS))
 	})
 }
