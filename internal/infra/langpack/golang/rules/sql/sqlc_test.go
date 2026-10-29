@@ -104,9 +104,9 @@ func TestExtractQueryNames(t *testing.T) {
 				t.Fatalf("extractQueryNames() = %v, want %v", got, testCase.want)
 			}
 
-			for i, name := range got {
-				if name != testCase.want[i] {
-					t.Fatalf("extractQueryNames()[%d] = %q, want %q", i, name, testCase.want[i])
+			for index, name := range got {
+				if name != testCase.want[index] {
+					t.Fatalf("extractQueryNames()[%d] = %q, want %q", index, name, testCase.want[index])
 				}
 			}
 		})

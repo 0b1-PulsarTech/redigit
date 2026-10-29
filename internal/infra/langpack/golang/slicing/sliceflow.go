@@ -204,27 +204,27 @@ func newGroups(size int) groups {
 	return groups{parent: parent}
 }
 
-func (g groups) find(index int) int {
-	for g.parent[index] != index {
-		g.parent[index] = g.parent[g.parent[index]]
-		index = g.parent[index]
+func (set groups) find(index int) int {
+	for set.parent[index] != index {
+		set.parent[index] = set.parent[set.parent[index]]
+		index = set.parent[index]
 	}
 
 	return index
 }
 
-func (g groups) join(a, b int) {
-	rootA, rootB := g.find(a), g.find(b)
+func (set groups) join(left, right int) {
+	rootA, rootB := set.find(left), set.find(right)
 	if rootA != rootB {
-		g.parent[max(rootA, rootB)] = min(rootA, rootB)
+		set.parent[max(rootA, rootB)] = min(rootA, rootB)
 	}
 }
 
-func (g groups) size(root int) int {
+func (set groups) size(root int) int {
 	count := 0
 
-	for index := range g.parent {
-		if g.find(index) == root {
+	for index := range set.parent {
+		if set.find(index) == root {
 			count++
 		}
 	}

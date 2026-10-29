@@ -4,8 +4,8 @@ import (
 	"go/types"
 )
 
-func (s *factScan) uses() {
-	for ident, obj := range s.pkg.TypesInfo.Uses {
+func (scan *factScan) uses() {
+	for ident, obj := range scan.pkg.TypesInfo.Uses {
 		if obj.Pkg() == nil {
 			continue
 		}
@@ -18,16 +18,16 @@ func (s *factScan) uses() {
 			obj = fn.Origin()
 		}
 
-		dependent, inTree := s.where.declAt(s.pkg.Fset, ident.Pos())
+		dependent, inTree := scan.where.declAt(scan.pkg.Fset, ident.Pos())
 		if !inTree {
 			continue
 		}
 
-		provider, found := s.where.declAt(s.pkg.Fset, obj.Pos())
+		provider, found := scan.where.declAt(scan.pkg.Fset, obj.Pos())
 		if !found || provider == dependent {
 			continue
 		}
 
-		s.facts.Uses = append(s.facts.Uses, Use{Dependent: dependent, Provider: provider})
+		scan.facts.Uses = append(scan.facts.Uses, Use{Dependent: dependent, Provider: provider})
 	}
 }

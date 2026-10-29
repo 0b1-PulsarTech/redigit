@@ -91,18 +91,18 @@ func ConstraintTags(expr constraint.Expr) []string {
 
 	var walk func(constraint.Expr)
 
-	walk = func(e constraint.Expr) {
-		switch n := e.(type) {
+	walk = func(expr constraint.Expr) {
+		switch typed := expr.(type) {
 		case *constraint.TagExpr:
-			seen[n.Tag] = true
+			seen[typed.Tag] = true
 		case *constraint.NotExpr:
-			walk(n.X)
+			walk(typed.X)
 		case *constraint.AndExpr:
-			walk(n.X)
-			walk(n.Y)
+			walk(typed.X)
+			walk(typed.Y)
 		case *constraint.OrExpr:
-			walk(n.X)
-			walk(n.Y)
+			walk(typed.X)
+			walk(typed.Y)
 		}
 	}
 

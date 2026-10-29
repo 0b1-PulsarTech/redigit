@@ -4,8 +4,8 @@ import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
 func GroupByFile(decls []entities.Decl) map[string][]entities.Decl {
 	byFile := make(map[string][]entities.Decl, len(decls))
-	for _, d := range decls {
-		byFile[d.Key.File] = append(byFile[d.Key.File], d)
+	for _, decl := range decls {
+		byFile[decl.Key.File] = append(byFile[decl.Key.File], decl)
 	}
 
 	return byFile
@@ -17,9 +17,9 @@ func FindDecl(
 	kind entities.DeclKind,
 	name string,
 ) (entities.DeclKey, bool) {
-	for _, d := range decls {
-		if d.Key.File == file && d.Key.Kind == kind && d.Key.Name == name {
-			return d.Key, true
+	for _, decl := range decls {
+		if decl.Key.File == file && decl.Key.Kind == kind && decl.Key.Name == name {
+			return decl.Key, true
 		}
 	}
 
@@ -27,9 +27,9 @@ func FindDecl(
 }
 
 func FindTypeNamed(decls []entities.Decl, name string) (entities.DeclKey, bool) {
-	for _, d := range decls {
-		if d.Key.Kind == entities.KindType && d.Key.Name == name {
-			return d.Key, true
+	for _, decl := range decls {
+		if decl.Key.Kind == entities.KindType && decl.Key.Name == name {
+			return decl.Key, true
 		}
 	}
 

@@ -9,16 +9,16 @@ import (
 )
 
 func testSubject(
-	d entities.Decl,
+	decl entities.Decl,
 	scope []entities.Decl,
 	snap entities.Snapshot,
 	sources map[string][]byte,
 ) (entities.DeclKey, bool) {
-	if to, ok := calledSubject(d, scope, snap, sources); ok {
+	if to, ok := calledSubject(decl, scope, snap, sources); ok {
 		return to, true
 	}
 
-	prefix, ok := testSubjectPrefix(d.Key.Name)
+	prefix, ok := testSubjectPrefix(decl.Key.Name)
 	if !ok {
 		return entities.DeclKey{}, false
 	}
@@ -27,23 +27,23 @@ func testSubject(
 }
 
 func calledSubject(
-	d entities.Decl,
+	decl entities.Decl,
 	scope []entities.Decl,
 	snap entities.Snapshot,
 	sources map[string][]byte,
 ) (entities.DeclKey, bool) {
-	source, cached := sources[d.Key.File]
+	source, cached := sources[decl.Key.File]
 	if !cached {
-		read, err := declsource.ReadSource(snap, d.Key.File)
+		read, err := declsource.ReadSource(snap, decl.Key.File)
 		if err != nil {
 			read = nil
 		}
 
 		source = read
-		sources[d.Key.File] = source
+		sources[decl.Key.File] = source
 	}
 
-	fn := declsource.ParseFunc(declsource.SliceSpan(source, d.Span))
+	fn := declsource.ParseFunc(declsource.SliceSpan(source, decl.Span))
 	if fn == nil || fn.Body == nil {
 		return entities.DeclKey{}, false
 	}
@@ -80,10 +80,10 @@ func calledSubject(
 }
 
 func findFuncNamed(scope []entities.Decl, name string) (entities.DeclKey, bool) {
-	for _, d := range scope {
-		if d.Key.Kind == entities.KindFunc && !d.IsTest &&
-			!strings.HasSuffix(d.Key.File, "_test.go") && d.Key.Name == name {
-			return d.Key, true
+	for _, decl := range scope {
+		if decl.Key.Kind == entities.KindFunc && !decl.IsTest &&
+			!strings.HasSuffix(decl.Key.File, "_test.go") && decl.Key.Name == name {
+			return decl.Key, true
 		}
 	}
 
@@ -126,14 +126,14 @@ func longestBareMatch(scope []entities.Decl, tokens []string) (entities.DeclKey,
 }
 
 func findDeclNamed(scope []entities.Decl, name string) (entities.DeclKey, bool) {
-	for _, d := range scope {
-		if d.IsTest || d.Key.Name != name {
+	for _, decl := range scope {
+		if decl.IsTest || decl.Key.Name != name {
 			continue
 		}
 
-		switch d.Key.Kind {
+		switch decl.Key.Kind {
 		case entities.KindType, entities.KindFunc, entities.KindValue:
-			return d.Key, true
+			return decl.Key, true
 		}
 	}
 
@@ -141,13 +141,13 @@ func findDeclNamed(scope []entities.Decl, name string) (entities.DeclKey, bool) 
 }
 
 func findMethodNamed(decls []entities.Decl, name string) (entities.DeclKey, bool) {
-	for _, d := range decls {
-		if d.Key.Kind != entities.KindMethod {
+	for _, decl := range decls {
+		if decl.Key.Kind != entities.KindMethod {
 			continue
 		}
 
-		if _, method, ok := strings.Cut(d.Key.Name, "."); ok && method == name {
-			return d.Key, true
+		if _, method, ok := strings.Cut(decl.Key.Name, "."); ok && method == name {
+			return decl.Key, true
 		}
 	}
 

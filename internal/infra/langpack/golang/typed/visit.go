@@ -12,67 +12,67 @@ type conversionVisitor struct {
 	results *types.Tuple
 }
 
-func (v *conversionVisitor) Visit(node ast.Node) ast.Visitor {
-	checked := v.scan.pkg.TypesInfo
+func (visitor *conversionVisitor) Visit(node ast.Node) ast.Visitor {
+	checked := visitor.scan.pkg.TypesInfo
 
-	switch node := node.(type) {
+	switch typed := node.(type) {
 	case *ast.FuncDecl:
-		return v.within(checked.Defs[node.Name])
+		return visitor.within(checked.Defs[typed.Name])
 	case *ast.FuncLit:
-		sig, _ := checked.TypeOf(node).(*types.Signature)
+		sig, _ := checked.TypeOf(typed).(*types.Signature)
 
-		return v.withResults(sig)
+		return visitor.withResults(sig)
 	case *ast.CallExpr:
-		v.call(node)
+		visitor.call(typed)
 	case *ast.AssignStmt:
-		v.assign(node)
+		visitor.assign(typed)
 	case *ast.ValueSpec:
-		v.valueSpec(node)
+		visitor.valueSpec(typed)
 	case *ast.ReturnStmt:
-		v.returns(node)
+		visitor.returns(typed)
 	case *ast.CompositeLit:
-		v.composite(node)
+		visitor.composite(typed)
 	case *ast.SendStmt:
-		if ch, isChan := checked.TypeOf(node.Chan).Underlying().(*types.Chan); isChan {
-			v.scan.convert(node.Pos(), checked.TypeOf(node.Value), ch.Elem())
+		if ch, isChan := checked.TypeOf(typed.Chan).Underlying().(*types.Chan); isChan {
+			visitor.scan.convert(typed.Pos(), checked.TypeOf(typed.Value), ch.Elem())
 		}
 	case *ast.TypeAssertExpr:
-		if node.Type != nil {
-			v.scan.convert(node.Pos(), checked.TypeOf(node.Type), checked.TypeOf(node.X))
+		if typed.Type != nil {
+			visitor.scan.convert(typed.Pos(), checked.TypeOf(typed.Type), checked.TypeOf(typed.X))
 		}
 	case *ast.TypeSwitchStmt:
-		v.typeSwitch(node)
+		visitor.typeSwitch(typed)
 	}
 
-	return v
+	return visitor
 }
 
-func (v *conversionVisitor) within(obj types.Object) ast.Visitor {
+func (visitor *conversionVisitor) within(obj types.Object) ast.Visitor {
 	fn, isFunc := obj.(*types.Func)
 	if !isFunc {
-		return v
+		return visitor
 	}
 
 	sig, _ := fn.Type().(*types.Signature)
 
-	return v.withResults(sig)
+	return visitor.withResults(sig)
 }
 
-func (v *conversionVisitor) withResults(sig *types.Signature) ast.Visitor {
+func (visitor *conversionVisitor) withResults(sig *types.Signature) ast.Visitor {
 	if sig == nil {
-		return &conversionVisitor{scan: v.scan}
+		return &conversionVisitor{scan: visitor.scan}
 	}
 
-	return &conversionVisitor{scan: v.scan, results: sig.Results()}
+	return &conversionVisitor{scan: visitor.scan, results: sig.Results()}
 }
 
-func (v *conversionVisitor) call(call *ast.CallExpr) {
-	checked := v.scan.pkg.TypesInfo
+func (visitor *conversionVisitor) call(call *ast.CallExpr) {
+	checked := visitor.scan.pkg.TypesInfo
 	fun := checked.Types[call.Fun]
 
 	if fun.IsType() {
 		if len(call.Args) == 1 {
-			v.scan.convert(call.Pos(), checked.TypeOf(call.Args[0]), fun.Type)
+			visitor.scan.convert(call.Pos(), checked.TypeOf(call.Args[0]), fun.Type)
 		}
 
 		return
@@ -86,7 +86,7 @@ func (v *conversionVisitor) call(call *ast.CallExpr) {
 	params := sig.Params()
 
 	for index, arg := range call.Args {
-		v.scan.convert(arg.Pos(), checked.TypeOf(arg), paramAt(sig, params, index, call.Ellipsis))
+		visitor.scan.convert(arg.Pos(), checked.TypeOf(arg), paramAt(sig, params, index, call.Ellipsis))
 	}
 }
 
@@ -115,15 +115,15 @@ func paramAt(sig *types.Signature, params *types.Tuple, index int, ellipsis toke
 	return nil
 }
 
-func (v *conversionVisitor) assign(stmt *ast.AssignStmt) {
+func (visitor *conversionVisitor) assign(stmt *ast.AssignStmt) {
 	if stmt.Tok != token.ASSIGN || len(stmt.Lhs) != len(stmt.Rhs) {
 		return
 	}
 
-	checked := v.scan.pkg.TypesInfo
+	checked := visitor.scan.pkg.TypesInfo
 
 	for index, target := range stmt.Lhs {
-		v.scan.convert(
+		visitor.scan.convert(
 			stmt.Rhs[index].Pos(),
 			checked.TypeOf(stmt.Rhs[index]),
 			checked.TypeOf(target),
@@ -131,33 +131,33 @@ func (v *conversionVisitor) assign(stmt *ast.AssignStmt) {
 	}
 }
 
-func (v *conversionVisitor) valueSpec(spec *ast.ValueSpec) {
+func (visitor *conversionVisitor) valueSpec(spec *ast.ValueSpec) {
 	if spec.Type == nil || len(spec.Values) != len(spec.Names) {
 		return
 	}
 
-	checked := v.scan.pkg.TypesInfo
+	checked := visitor.scan.pkg.TypesInfo
 	target := checked.TypeOf(spec.Type)
 
 	for _, value := range spec.Values {
-		v.scan.convert(value.Pos(), checked.TypeOf(value), target)
+		visitor.scan.convert(value.Pos(), checked.TypeOf(value), target)
 	}
 }
 
-func (v *conversionVisitor) returns(stmt *ast.ReturnStmt) {
-	if v.results == nil || len(stmt.Results) != v.results.Len() {
+func (visitor *conversionVisitor) returns(stmt *ast.ReturnStmt) {
+	if visitor.results == nil || len(stmt.Results) != visitor.results.Len() {
 		return
 	}
 
-	checked := v.scan.pkg.TypesInfo
+	checked := visitor.scan.pkg.TypesInfo
 
 	for index, result := range stmt.Results {
-		v.scan.convert(result.Pos(), checked.TypeOf(result), v.results.At(index).Type())
+		visitor.scan.convert(result.Pos(), checked.TypeOf(result), visitor.results.At(index).Type())
 	}
 }
 
-func (v *conversionVisitor) composite(lit *ast.CompositeLit) {
-	checked := v.scan.pkg.TypesInfo
+func (visitor *conversionVisitor) composite(lit *ast.CompositeLit) {
+	checked := visitor.scan.pkg.TypesInfo
 
 	literal := checked.TypeOf(lit)
 	if literal == nil {
@@ -173,33 +173,33 @@ func (v *conversionVisitor) composite(lit *ast.CompositeLit) {
 		for index, elt := range lit.Elts {
 			field, value := structElement(shape, index, elt)
 			if field != nil {
-				v.scan.convert(value.Pos(), checked.TypeOf(value), field.Type())
+				visitor.scan.convert(value.Pos(), checked.TypeOf(value), field.Type())
 			}
 		}
 	case *types.Slice:
-		v.elements(lit, nil, shape.Elem())
+		visitor.elements(lit, nil, shape.Elem())
 	case *types.Array:
-		v.elements(lit, nil, shape.Elem())
+		visitor.elements(lit, nil, shape.Elem())
 	case *types.Map:
-		v.elements(lit, shape.Key(), shape.Elem())
+		visitor.elements(lit, shape.Key(), shape.Elem())
 	}
 }
 
-func (v *conversionVisitor) elements(lit *ast.CompositeLit, key, elem types.Type) {
-	checked := v.scan.pkg.TypesInfo
+func (visitor *conversionVisitor) elements(lit *ast.CompositeLit, key, elem types.Type) {
+	checked := visitor.scan.pkg.TypesInfo
 
 	for _, elt := range lit.Elts {
 		pair, isPair := elt.(*ast.KeyValueExpr)
 		if !isPair {
-			v.scan.convert(elt.Pos(), checked.TypeOf(elt), elem)
+			visitor.scan.convert(elt.Pos(), checked.TypeOf(elt), elem)
 
 			continue
 		}
 
-		v.scan.convert(pair.Value.Pos(), checked.TypeOf(pair.Value), elem)
+		visitor.scan.convert(pair.Value.Pos(), checked.TypeOf(pair.Value), elem)
 
 		if key != nil {
-			v.scan.convert(pair.Key.Pos(), checked.TypeOf(pair.Key), key)
+			visitor.scan.convert(pair.Key.Pos(), checked.TypeOf(pair.Key), key)
 		}
 	}
 }
@@ -228,8 +228,8 @@ func structElement(shape *types.Struct, index int, elt ast.Expr) (*types.Var, as
 	return nil, elt
 }
 
-func (v *conversionVisitor) typeSwitch(stmt *ast.TypeSwitchStmt) {
-	checked := v.scan.pkg.TypesInfo
+func (visitor *conversionVisitor) typeSwitch(stmt *ast.TypeSwitchStmt) {
+	checked := visitor.scan.pkg.TypesInfo
 
 	var assertion ast.Expr
 
@@ -257,7 +257,7 @@ func (v *conversionVisitor) typeSwitch(stmt *ast.TypeSwitchStmt) {
 
 		for _, expr := range cc.List {
 			if checked.Types[expr].IsType() {
-				v.scan.convert(expr.Pos(), checked.TypeOf(expr), subject)
+				visitor.scan.convert(expr.Pos(), checked.TypeOf(expr), subject)
 			}
 		}
 	}

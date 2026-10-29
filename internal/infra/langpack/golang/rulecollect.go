@@ -15,10 +15,10 @@ func collectEdges(
 ) ([]entities.Edge, error) {
 	var edges []entities.Edge
 
-	for _, r := range rs {
-		found, err := r.Edges(ctx, snap, decls)
+	for _, entry := range rs {
+		found, err := entry.Edges(ctx, snap, decls)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", r.Name(), err)
+			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
 
 		edges = append(edges, found...)
@@ -35,10 +35,10 @@ func collectAnchors(
 ) ([]entities.Anchor, error) {
 	var anchors []entities.Anchor
 
-	for _, r := range rs {
-		found, err := r.Anchors(ctx, snap, decls)
+	for _, entry := range rs {
+		found, err := entry.Anchors(ctx, snap, decls)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", r.Name(), err)
+			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
 
 		anchors = append(anchors, found...)

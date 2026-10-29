@@ -29,8 +29,8 @@ func builtTypes(
 		}
 	}
 
-	ast.Inspect(node, func(n ast.Node) bool {
-		switch node := n.(type) {
+	ast.Inspect(node, func(node ast.Node) bool {
+		switch node := node.(type) {
 		case *ast.KeyValueExpr:
 			collect(node.Value)
 		case *ast.CallExpr:

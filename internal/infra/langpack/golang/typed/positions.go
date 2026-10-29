@@ -18,17 +18,17 @@ func newDeclLocator(decls []entities.Decl) declLocator {
 	byFile := declsource.GroupByFile(decls)
 
 	for _, group := range byFile {
-		slices.SortFunc(group, func(a, b entities.Decl) int { return a.Span.Start - b.Span.Start })
+		slices.SortFunc(group, func(left, right entities.Decl) int { return left.Span.Start - right.Span.Start })
 	}
 
 	return declLocator{byFile: byFile}
 }
 
-func (l declLocator) enclosing(file string, offset int) (entities.DeclKey, bool) {
-	group := l.byFile[file]
+func (locator declLocator) enclosing(file string, offset int) (entities.DeclKey, bool) {
+	group := locator.byFile[file]
 
-	index, exact := slices.BinarySearchFunc(group, offset, func(d entities.Decl, at int) int {
-		return d.Span.Start - at
+	index, exact := slices.BinarySearchFunc(group, offset, func(decl entities.Decl, at int) int {
+		return decl.Span.Start - at
 	})
 	if !exact {
 		index--
@@ -55,8 +55,8 @@ func newPositions(root string, locator declLocator) positions {
 	return positions{root: root, locator: locator, rel: map[string]string{}}
 }
 
-func (p positions) relative(name string) string {
-	if cached, known := p.rel[name]; known {
+func (where positions) relative(name string) string {
+	if cached, known := where.rel[name]; known {
 		return cached
 	}
 
@@ -65,27 +65,27 @@ func (p positions) relative(name string) string {
 		resolved = target
 	}
 
-	rel, err := filepath.Rel(p.root, resolved)
+	rel, err := filepath.Rel(where.root, resolved)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		rel = ""
 	}
 
-	p.rel[name] = filepath.ToSlash(rel)
+	where.rel[name] = filepath.ToSlash(rel)
 
-	return p.rel[name]
+	return where.rel[name]
 }
 
-func (p positions) declAt(fset *token.FileSet, pos token.Pos) (entities.DeclKey, bool) {
+func (where positions) declAt(fset *token.FileSet, pos token.Pos) (entities.DeclKey, bool) {
 	if !pos.IsValid() {
 		return entities.DeclKey{}, false
 	}
 
 	at := fset.Position(pos)
 
-	rel := p.relative(at.Filename)
+	rel := where.relative(at.Filename)
 	if rel == "" {
 		return entities.DeclKey{}, false
 	}
 
-	return p.locator.enclosing(rel, at.Offset)
+	return where.locator.enclosing(rel, at.Offset)
 }

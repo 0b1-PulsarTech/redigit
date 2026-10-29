@@ -11,12 +11,12 @@ type Conversion struct{ Source *typed.Source }
 
 func (Conversion) Name() string { return "typed-conversion" }
 
-func (r Conversion) Edges(
+func (rule Conversion) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	facts, err := r.Source.Facts(ctx, snap, decls)
+	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}

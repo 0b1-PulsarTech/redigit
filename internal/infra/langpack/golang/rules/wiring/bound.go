@@ -129,8 +129,8 @@ func mentionedTypes(
 
 	var out []string
 
-	ast.Inspect(node, func(n ast.Node) bool {
-		if ident, is := n.(*ast.Ident); is && !seen[ident.Name] {
+	ast.Inspect(node, func(node ast.Node) bool {
+		if ident, is := node.(*ast.Ident); is && !seen[ident.Name] {
 			seen[ident.Name] = true
 
 			out = append(out, ident.Name)

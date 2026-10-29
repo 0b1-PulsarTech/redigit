@@ -11,12 +11,12 @@ type Escaped struct{ Source *typed.Source }
 
 func (Escaped) Name() string { return "escaped-methods" }
 
-func (r Escaped) Edges(
+func (rule Escaped) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	facts, err := r.Source.Facts(ctx, snap, decls)
+	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}

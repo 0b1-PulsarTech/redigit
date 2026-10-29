@@ -67,8 +67,8 @@ func TestBuildConstraints(t *testing.T) {
 				t.Fatalf("Tags = %v, want %v", gotTags, testCase.wantTags)
 			}
 
-			for i, want := range testCase.wantTags {
-				if gotTags[i] != want {
+			for index, want := range testCase.wantTags {
+				if gotTags[index] != want {
 					t.Fatalf("Tags = %v, want %v", gotTags, testCase.wantTags)
 				}
 			}

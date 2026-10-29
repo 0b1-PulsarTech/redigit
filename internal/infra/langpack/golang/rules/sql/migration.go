@@ -106,9 +106,9 @@ func (Migration) Anchors(
 func migrationFiles(files []string) []string {
 	var out []string
 
-	for _, f := range files {
-		if strings.Contains(f, "migrations/") && strings.HasSuffix(f, ".sql") {
-			out = append(out, f)
+	for _, file := range files {
+		if strings.Contains(file, "migrations/") && strings.HasSuffix(file, ".sql") {
+			out = append(out, file)
 		}
 	}
 

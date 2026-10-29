@@ -37,8 +37,8 @@ func TestRenderCorpusRoundTrip(t *testing.T) {
 			}
 
 			keep := make([]entities.DeclKey, len(decls))
-			for i, d := range decls {
-				keep[i] = d.Key
+			for index, decl := range decls {
+				keep[index] = decl.Key
 			}
 
 			got, err := Render(context.Background(), source, keep)

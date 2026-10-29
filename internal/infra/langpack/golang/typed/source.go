@@ -32,24 +32,24 @@ func NewSource(tags []string) *Source {
 	return &Source{tags: tags, facts: map[uint64]Facts{}}
 }
 
-func (s *Source) Facts(
+func (source *Source) Facts(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (Facts, error) {
-	s.once.Do(func() {
-		s.loaded, s.err = s.check(ctx, snap)
+	source.once.Do(func() {
+		source.loaded, source.err = source.check(ctx, snap)
 	})
 
-	if s.err != nil {
-		return Facts{}, s.err
+	if source.err != nil {
+		return Facts{}, source.err
 	}
 
-	s.guard.Lock()
-	defer s.guard.Unlock()
+	source.guard.Lock()
+	defer source.guard.Unlock()
 
 	shape := shapeOf(decls)
-	if known, found := s.facts[shape]; found {
+	if known, found := source.facts[shape]; found {
 		return known, nil
 	}
 
@@ -57,13 +57,13 @@ func (s *Source) Facts(
 
 	var facts Facts
 
-	for _, pkgs := range s.loaded {
+	for _, pkgs := range source.loaded {
 		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
 	}
 
-	s.facts[shape] = facts.sorted()
+	source.facts[shape] = facts.sorted()
 
-	return s.facts[shape], nil
+	return source.facts[shape], nil
 }
 
 func shapeOf(decls []entities.Decl) uint64 {
@@ -76,7 +76,7 @@ func shapeOf(decls []entities.Decl) uint64 {
 	return hash.Sum64()
 }
 
-func (s *Source) check(
+func (source *Source) check(
 	ctx context.Context,
 	snap entities.Snapshot,
 ) ([][]*packages.Package, error) {
@@ -89,12 +89,12 @@ func (s *Source) check(
 		return nil, nil
 	}
 
-	passes, err := hiddenPasses(snap, s.tags, modules)
+	passes, err := hiddenPasses(snap, source.tags, modules)
 	if err != nil {
 		return nil, err
 	}
 
-	passes = append([]loadPass{{tags: s.tags, patterns: allPatterns(modules)}}, passes...)
+	passes = append([]loadPass{{tags: source.tags, patterns: allPatterns(modules)}}, passes...)
 
 	loaded := make([][]*packages.Package, 0, len(passes))
 

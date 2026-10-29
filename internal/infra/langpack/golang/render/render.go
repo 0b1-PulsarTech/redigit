@@ -15,8 +15,8 @@ import (
 
 func Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, error) {
 	keepSet := make(map[syntax.Ident]bool, len(keep))
-	for _, k := range keep {
-		keepSet[syntax.Ident{Kind: k.Kind, Name: k.Name}] = true
+	for _, key := range keep {
+		keepSet[syntax.Ident{Kind: key.Kind, Name: key.Name}] = true
 	}
 
 	// A file that declares nothing is carried by one declaration standing for
@@ -74,15 +74,15 @@ func Render(_ context.Context, source []byte, keep []entities.DeclKey) ([]byte, 
 		return nil, fmt.Errorf("render source: %w", err)
 	}
 
-	return buf.b, nil
+	return buf.buf, nil
 }
 
-type bufWriter struct{ b []byte }
+type bufWriter struct{ buf []byte }
 
-func (w *bufWriter) Write(p []byte) (int, error) {
-	w.b = append(w.b, p...)
+func (writer *bufWriter) Write(payload []byte) (int, error) {
+	writer.buf = append(writer.buf, payload...)
 
-	return len(p), nil
+	return len(payload), nil
 }
 
 func isImportDecl(decl ast.Decl) bool {
@@ -97,17 +97,17 @@ func filterDecl(
 	decl ast.Decl,
 	keepSet map[syntax.Ident]bool,
 ) []ast.Decl {
-	switch d := decl.(type) {
+	switch typed := decl.(type) {
 	case *ast.FuncDecl:
-		if keepSet[syntax.FuncIdent(d)] {
-			keepStatements(d, keepSet)
+		if keepSet[syntax.FuncIdent(typed)] {
+			keepStatements(typed, keepSet)
 
-			return []ast.Decl{d}
+			return []ast.Decl{typed}
 		}
 
 		return nil
 	case *ast.GenDecl:
-		return filterGenDecl(fset, source, d, keepSet)
+		return filterGenDecl(fset, source, typed, keepSet)
 	default:
 		return nil
 	}

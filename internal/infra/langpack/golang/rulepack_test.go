@@ -91,7 +91,7 @@ func TestFSGet(t *testing.T) {}
 
 type stubFailingRule struct{ name string }
 
-func (r stubFailingRule) Name() string { return r.name }
+func (stub stubFailingRule) Name() string { return stub.name }
 
 func (stubFailingRule) Edges(
 	context.Context,

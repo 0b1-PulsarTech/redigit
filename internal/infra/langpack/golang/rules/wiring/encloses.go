@@ -44,9 +44,9 @@ func (Encloses) Edges(
 func typeNames(decls []entities.Decl) map[string]entities.DeclKey {
 	types := map[string]entities.DeclKey{}
 
-	for _, d := range decls {
-		if d.Key.Kind == entities.KindType {
-			types[d.Key.Name] = d.Key
+	for _, decl := range decls {
+		if decl.Key.Kind == entities.KindType {
+			types[decl.Key.Name] = decl.Key
 		}
 	}
 
@@ -74,11 +74,11 @@ func enclosesInFile(
 	var edges []entities.Edge
 
 	for _, decl := range parsed.Decls {
-		switch d := decl.(type) {
+		switch typed := decl.(type) {
 		case *ast.FuncDecl:
-			edges = append(edges, funcEncloses(fileDecls, file, types, d)...)
+			edges = append(edges, funcEncloses(fileDecls, file, types, typed)...)
 		case *ast.GenDecl:
-			edges = append(edges, valueEncloses(fileDecls, file, types, d)...)
+			edges = append(edges, valueEncloses(fileDecls, file, types, typed)...)
 		}
 	}
 
@@ -89,18 +89,18 @@ func funcEncloses(
 	fileDecls []entities.Decl,
 	file string,
 	types map[string]entities.DeclKey,
-	d *ast.FuncDecl,
+	fn *ast.FuncDecl,
 ) []entities.Edge {
-	if d.Recv != nil {
+	if fn.Recv != nil {
 		return nil
 	}
 
-	typeKey, ok := singleResultType(d, types)
+	typeKey, ok := singleResultType(fn, types)
 	if !ok {
 		return nil
 	}
 
-	funcKey, ok := declsource.FindDecl(fileDecls, file, entities.KindFunc, d.Name.Name)
+	funcKey, ok := declsource.FindDecl(fileDecls, file, entities.KindFunc, fn.Name.Name)
 	if !ok {
 		return nil
 	}
@@ -108,14 +108,14 @@ func funcEncloses(
 	return []entities.Edge{{Dependent: funcKey, Provider: typeKey, Reason: entities.ReasonEncloses}}
 }
 
-func singleResultType(d *ast.FuncDecl, types map[string]entities.DeclKey) (entities.DeclKey, bool) {
-	if d.Type.Results == nil {
+func singleResultType(fn *ast.FuncDecl, types map[string]entities.DeclKey) (entities.DeclKey, bool) {
+	if fn.Type.Results == nil {
 		return entities.DeclKey{}, false
 	}
 
 	total := 0
 
-	for _, field := range d.Type.Results.List {
+	for _, field := range fn.Type.Results.List {
 		total += max(len(field.Names), 1)
 	}
 
@@ -123,7 +123,7 @@ func singleResultType(d *ast.FuncDecl, types map[string]entities.DeclKey) (entit
 		return entities.DeclKey{}, false
 	}
 
-	expr := d.Type.Results.List[0].Type
+	expr := fn.Type.Results.List[0].Type
 	if star, ok := expr.(*ast.StarExpr); ok {
 		expr = star.X
 	}
@@ -142,15 +142,15 @@ func valueEncloses(
 	fileDecls []entities.Decl,
 	file string,
 	types map[string]entities.DeclKey,
-	d *ast.GenDecl,
+	gen *ast.GenDecl,
 ) []entities.Edge {
-	if d.Tok != token.CONST && d.Tok != token.VAR {
+	if gen.Tok != token.CONST && gen.Tok != token.VAR {
 		return nil
 	}
 
 	var edges []entities.Edge
 
-	for _, spec := range d.Specs {
+	for _, spec := range gen.Specs {
 		vs, ok := spec.(*ast.ValueSpec)
 		if !ok || vs.Type == nil {
 			continue

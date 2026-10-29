@@ -11,8 +11,8 @@ func usedIdents(decls []ast.Decl) map[string]bool {
 	used := map[string]bool{}
 
 	for _, decl := range decls {
-		ast.Inspect(decl, func(n ast.Node) bool {
-			sel, ok := n.(*ast.SelectorExpr)
+		ast.Inspect(decl, func(node ast.Node) bool {
+			sel, ok := node.(*ast.SelectorExpr)
 			if !ok {
 				return true
 			}
@@ -140,12 +140,12 @@ func importLocalName(spec *ast.ImportSpec) string {
 		path = spec.Path.Value
 	}
 
-	if i := strings.LastIndexByte(path, '/'); i >= 0 {
-		last := path[i+1:]
+	if slash := strings.LastIndexByte(path, '/'); slash >= 0 {
+		last := path[slash+1:]
 		if isMajorVersion(last) {
-			path = path[:i]
-			if j := strings.LastIndexByte(path, '/'); j >= 0 {
-				path = path[j+1:]
+			path = path[:slash]
+			if inner := strings.LastIndexByte(path, '/'); inner >= 0 {
+				path = path[inner+1:]
 			}
 		} else {
 			path = last

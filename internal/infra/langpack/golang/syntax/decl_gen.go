@@ -33,8 +33,8 @@ func buildGenDecl(
 }
 
 func HasImplicitSpec(decl *ast.GenDecl) bool {
-	for i, spec := range decl.Specs {
-		if i == 0 {
+	for index, spec := range decl.Specs {
+		if index == 0 {
 			continue
 		}
 
@@ -219,13 +219,13 @@ func exprText(fset *token.FileSet, source []byte, expr ast.Expr) string {
 }
 
 func SpecDoc(spec ast.Spec) *ast.CommentGroup {
-	switch s := spec.(type) {
+	switch typed := spec.(type) {
 	case *ast.ValueSpec:
-		return s.Doc
+		return typed.Doc
 	case *ast.TypeSpec:
-		return s.Doc
+		return typed.Doc
 	case *ast.ImportSpec:
-		return s.Doc
+		return typed.Doc
 	default:
 		return nil
 	}

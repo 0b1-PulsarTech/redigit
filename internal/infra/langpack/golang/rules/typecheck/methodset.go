@@ -12,12 +12,12 @@ type MethodSet struct{ Source *typed.Source }
 
 func (MethodSet) Name() string { return "method-set" }
 
-func (r MethodSet) Edges(
+func (rule MethodSet) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	facts, err := r.Source.Facts(ctx, snap, decls)
+	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}
@@ -43,12 +43,12 @@ func (MethodSet) Anchors(
 	return nil, nil
 }
 
-func (r MethodSet) Atoms(
+func (rule MethodSet) Atoms(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (map[entities.DeclKey]string, error) {
-	facts, err := r.Source.Facts(ctx, snap, decls)
+	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}

@@ -41,8 +41,8 @@ func unused() { fmt.Println() }
 	}
 
 	byName := make(map[string]entities.Decl, len(decls))
-	for _, d := range decls {
-		byName[d.Key.Name] = d
+	for _, decl := range decls {
+		byName[decl.Key.Name] = decl
 	}
 
 	testCases := []struct {
@@ -78,10 +78,10 @@ func unused() { fmt.Println() }
 	}
 }
 
-func keys(m map[string]entities.Decl) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
+func keys(decls map[string]entities.Decl) []string {
+	out := make([]string, 0, len(decls))
+	for name := range decls {
+		out = append(out, name)
 	}
 
 	return out
@@ -151,8 +151,8 @@ func helper()               {}
 	}
 
 	got := map[string]bool{}
-	for _, d := range decls {
-		got[d.Key.Name] = d.IsTest
+	for _, decl := range decls {
+		got[decl.Key.Name] = decl.IsTest
 	}
 
 	testCases := []struct {
@@ -252,9 +252,9 @@ var _ io.Reader = (*ReaderB)(nil)
 
 	names := map[string]int{}
 
-	for _, d := range decls {
-		if d.Key.Kind == entities.KindValue {
-			names[d.Key.Name]++
+	for _, decl := range decls {
+		if decl.Key.Kind == entities.KindValue {
+			names[decl.Key.Name]++
 		}
 	}
 

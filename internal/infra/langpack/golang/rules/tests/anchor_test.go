@@ -88,8 +88,8 @@ func TestTestAnchorRuleTwinFileLongestPrefix(t *testing.T) {
 			t.Parallel()
 
 			byFile := map[string][]entities.Decl{}
-			for _, f := range testCase.files {
-				byFile[filepath.Join("pkg", f)] = nil
+			for _, file := range testCase.files {
+				byFile[filepath.Join("pkg", file)] = nil
 			}
 
 			got, found := twinFile("pkg", testCase.testBase, byFile)
@@ -193,14 +193,14 @@ func TestCamelOrSnakeTokens(t *testing.T) {
 				t.Fatalf("camelOrSnakeTokens(%q) = %v, want %v", testCase.in, got, testCase.want)
 			}
 
-			for i, tok := range got {
-				if tok != testCase.want[i] {
+			for index, tok := range got {
+				if tok != testCase.want[index] {
 					t.Fatalf(
 						"camelOrSnakeTokens(%q)[%d] = %q, want %q",
 						testCase.in,
-						i,
+						index,
 						tok,
-						testCase.want[i],
+						testCase.want[index],
 					)
 				}
 			}

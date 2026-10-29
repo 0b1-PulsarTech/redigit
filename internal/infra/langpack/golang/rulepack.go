@@ -78,24 +78,24 @@ var (
 
 func (RulePack) Name() string { return "go" }
 
-func (p RulePack) Edges(
+func (pack RulePack) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	return collectEdges(ctx, snap, goScope(decls), p.rules)
+	return collectEdges(ctx, snap, goScope(decls), pack.rules)
 }
 
-func (p RulePack) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
+func (pack RulePack) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
 	return sql.DropConstruction(snap, edges)
 }
 
-func (p RulePack) Anchors(
+func (pack RulePack) Anchors(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Anchor, error) {
-	return collectAnchors(ctx, snap, goScope(decls), p.rules)
+	return collectAnchors(ctx, snap, goScope(decls), pack.rules)
 }
 
 func goScope(decls []entities.Decl) []entities.Decl {
@@ -110,7 +110,7 @@ func goScope(decls []entities.Decl) []entities.Decl {
 	return out
 }
 
-func (p RulePack) Atoms(
+func (pack RulePack) Atoms(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
@@ -119,15 +119,15 @@ func (p RulePack) Atoms(
 
 	scoped := goScope(decls)
 
-	for _, r := range p.rules {
-		grouping, isGrouping := r.(atomRule)
+	for _, entry := range pack.rules {
+		grouping, isGrouping := entry.(atomRule)
 		if !isGrouping {
 			continue
 		}
 
 		found, err := grouping.Atoms(ctx, snap, scoped)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", r.Name(), err)
+			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
 
 		for key, name := range found {

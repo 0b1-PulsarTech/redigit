@@ -32,12 +32,12 @@ type Facts struct {
 	Uses []Use
 }
 
-func (f Facts) merged(other Facts) Facts {
+func (facts Facts) merged(other Facts) Facts {
 	return Facts{
-		Forced:    append(f.Forced, other.Forced...),
-		Converted: append(f.Converted, other.Converted...),
-		Escaped:   append(f.Escaped, other.Escaped...),
-		Uses:      append(f.Uses, other.Uses...),
+		Forced:    append(facts.Forced, other.Forced...),
+		Converted: append(facts.Converted, other.Converted...),
+		Escaped:   append(facts.Escaped, other.Escaped...),
+		Uses:      append(facts.Uses, other.Uses...),
 	}
 }
 
@@ -66,27 +66,27 @@ func collectFacts(pkgs []*packages.Package, root string, locator declLocator) Fa
 	return scan.facts
 }
 
-func (f Facts) sorted() Facts {
-	slices.SortStableFunc(f.Forced, compareRequirements)
-	slices.SortStableFunc(f.Converted, compareRequirements)
-	slices.SortStableFunc(f.Escaped, compareRequirements)
+func (facts Facts) sorted() Facts {
+	slices.SortStableFunc(facts.Forced, compareRequirements)
+	slices.SortStableFunc(facts.Converted, compareRequirements)
+	slices.SortStableFunc(facts.Escaped, compareRequirements)
 
-	slices.SortFunc(f.Uses, func(a, b Use) int {
+	slices.SortFunc(facts.Uses, func(left, right Use) int {
 		return cmp.Or(
-			cmp.Compare(a.Dependent.String(), b.Dependent.String()),
-			cmp.Compare(a.Provider.String(), b.Provider.String()),
+			cmp.Compare(left.Dependent.String(), right.Dependent.String()),
+			cmp.Compare(left.Provider.String(), right.Provider.String()),
 		)
 	})
 
-	f.Uses = slices.Compact(f.Uses)
+	facts.Uses = slices.Compact(facts.Uses)
 
-	return f
+	return facts
 }
 
-func compareRequirements(a, b Requirement) int {
+func compareRequirements(left, right Requirement) int {
 	return cmp.Or(
-		cmp.Compare(a.Dependent.String(), b.Dependent.String()),
-		cmp.Compare(a.Owner.String(), b.Owner.String()),
+		cmp.Compare(left.Dependent.String(), right.Dependent.String()),
+		cmp.Compare(left.Owner.String(), right.Owner.String()),
 	)
 }
 
@@ -97,8 +97,8 @@ type factScan struct {
 	dynamic map[string]bool
 }
 
-func (s *factScan) instances() {
-	checked := s.pkg.TypesInfo
+func (scan *factScan) instances() {
+	checked := scan.pkg.TypesInfo
 
 	for ident, instance := range checked.Instances {
 		params := typeParamsOf(checked.Uses[ident])
@@ -106,7 +106,7 @@ func (s *factScan) instances() {
 			continue
 		}
 
-		dependent, inTree := s.where.declAt(s.pkg.Fset, ident.Pos())
+		dependent, inTree := scan.where.declAt(scan.pkg.Fset, ident.Pos())
 		if !inTree {
 			continue
 		}
@@ -117,7 +117,7 @@ func (s *factScan) instances() {
 				continue
 			}
 
-			s.require(&s.facts.Forced, dependent, instance.TypeArgs.At(index), constraint)
+			scan.require(&scan.facts.Forced, dependent, instance.TypeArgs.At(index), constraint)
 		}
 	}
 }

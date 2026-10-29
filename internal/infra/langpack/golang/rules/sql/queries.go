@@ -11,8 +11,8 @@ func extractQueryNames(source []byte) []string {
 	matches := queryNamePattern.FindAllSubmatch(source, -1)
 
 	names := make([]string, len(matches))
-	for i, m := range matches {
-		names[i] = string(m[1])
+	for index, match := range matches {
+		names[index] = string(match[1])
 	}
 
 	return names
@@ -25,9 +25,9 @@ func isQueryFile(path string) bool {
 func queryFiles(files []string) []string {
 	var out []string
 
-	for _, f := range files {
-		if isQueryFile(f) {
-			out = append(out, f)
+	for _, file := range files {
+		if isQueryFile(file) {
+			out = append(out, file)
 		}
 	}
 

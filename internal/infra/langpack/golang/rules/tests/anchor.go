@@ -33,25 +33,25 @@ func (Anchor) Anchors(
 
 	var anchors []entities.Anchor
 
-	for _, d := range decls {
-		if !d.IsTest || d.Key.Kind != entities.KindFunc {
+	for _, decl := range decls {
+		if !decl.IsTest || decl.Key.Kind != entities.KindFunc {
 			continue
 		}
 
-		unit := byUnit[d.Unit]
+		unit := byUnit[decl.Unit]
 		scope := unit
 
 		if twin, found := twinFile(
-			filepath.Dir(d.Key.File),
-			filepath.Base(d.Key.File),
+			filepath.Dir(decl.Key.File),
+			filepath.Base(decl.Key.File),
 			byFile,
 		); found {
 			scope = byFile[twin]
 		}
 
-		to, found := testSubject(d, scope, snap, sources)
+		to, found := testSubject(decl, scope, snap, sources)
 		if !found && len(scope) != len(unit) {
-			to, found = testSubject(d, unit, snap, sources)
+			to, found = testSubject(decl, unit, snap, sources)
 		}
 
 		if !found {
@@ -60,7 +60,7 @@ func (Anchor) Anchors(
 
 		anchors = append(
 			anchors,
-			entities.Anchor{Decl: d.Key, To: to, Reason: entities.ReasonTestOf},
+			entities.Anchor{Decl: decl.Key, To: to, Reason: entities.ReasonTestOf},
 		)
 	}
 
@@ -69,8 +69,8 @@ func (Anchor) Anchors(
 
 func groupByUnit(decls []entities.Decl) map[entities.UnitID][]entities.Decl {
 	byUnit := make(map[entities.UnitID][]entities.Decl, len(decls))
-	for _, d := range decls {
-		byUnit[d.Unit] = append(byUnit[d.Unit], d)
+	for _, decl := range decls {
+		byUnit[decl.Unit] = append(byUnit[decl.Unit], decl)
 	}
 
 	return byUnit
@@ -111,14 +111,14 @@ func camelOrSnakeTokens(name string) []string {
 
 	start := 0
 
-	for i := 1; i < len(runes); i++ {
-		prevUpper := unicode.IsUpper(runes[i-1])
-		curUpper := unicode.IsUpper(runes[i])
-		nextLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+	for index := 1; index < len(runes); index++ {
+		prevUpper := unicode.IsUpper(runes[index-1])
+		curUpper := unicode.IsUpper(runes[index])
+		nextLower := index+1 < len(runes) && unicode.IsLower(runes[index+1])
 
 		if curUpper && (!prevUpper || nextLower) {
-			tokens = append(tokens, string(runes[start:i]))
-			start = i
+			tokens = append(tokens, string(runes[start:index]))
+			start = index
 		}
 	}
 

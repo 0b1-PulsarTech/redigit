@@ -11,12 +11,12 @@ type Reference struct{ Source *typed.Source }
 
 func (Reference) Name() string { return "typed-reference" }
 
-func (r Reference) Edges(
+func (rule Reference) Edges(
 	ctx context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) ([]entities.Edge, error) {
-	facts, err := r.Source.Facts(ctx, snap, decls)
+	facts, err := rule.Source.Facts(ctx, snap, decls)
 	if err != nil {
 		return nil, err
 	}

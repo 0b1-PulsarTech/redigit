@@ -19,7 +19,7 @@ type Mockgen struct{}
 
 func (Mockgen) Name() string { return "mockgen" }
 
-func (r Mockgen) Edges(
+func (rule Mockgen) Edges(
 	_ context.Context,
 	snap entities.Snapshot,
 	decls []entities.Decl,

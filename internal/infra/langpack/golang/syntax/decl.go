@@ -92,11 +92,11 @@ func buildDecls(
 	isTestFile bool,
 	decl ast.Decl,
 ) []entities.Decl {
-	switch d := decl.(type) {
+	switch typed := decl.(type) {
 	case *ast.FuncDecl:
-		return []entities.Decl{buildFuncDecl(fset, path, source, unit, isTestFile, d)}
+		return []entities.Decl{buildFuncDecl(fset, path, source, unit, isTestFile, typed)}
 	case *ast.GenDecl:
-		return buildGenDecl(fset, source, path, unit, d)
+		return buildGenDecl(fset, source, path, unit, typed)
 	default:
 		return nil
 	}
@@ -145,13 +145,13 @@ func ReceiverName(recv *ast.FieldList) string {
 		expr = star.X
 	}
 
-	switch t := expr.(type) {
+	switch typed := expr.(type) {
 	case *ast.Ident:
-		return t.Name
+		return typed.Name
 	case *ast.IndexExpr:
-		return receiverBase(t.X)
+		return receiverBase(typed.X)
 	case *ast.IndexListExpr:
-		return receiverBase(t.X)
+		return receiverBase(typed.X)
 	default:
 		return ""
 	}
@@ -176,8 +176,8 @@ func isTestName(name string) bool {
 			return true
 		}
 
-		r, _ := utf8.DecodeRuneInString(rest)
-		if !unicode.IsLower(r) {
+		first, _ := utf8.DecodeRuneInString(rest)
+		if !unicode.IsLower(first) {
 			return true
 		}
 	}
@@ -217,10 +217,10 @@ type Ident struct {
 	Name string
 }
 
-func FuncIdent(d *ast.FuncDecl) Ident {
-	if d.Recv == nil || len(d.Recv.List) == 0 {
-		return Ident{entities.KindFunc, d.Name.Name}
+func FuncIdent(fn *ast.FuncDecl) Ident {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return Ident{entities.KindFunc, fn.Name.Name}
 	}
 
-	return Ident{entities.KindMethod, ReceiverName(d.Recv) + "." + d.Name.Name}
+	return Ident{entities.KindMethod, ReceiverName(fn.Recv) + "." + fn.Name.Name}
 }

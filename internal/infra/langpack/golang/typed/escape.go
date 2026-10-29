@@ -49,12 +49,12 @@ func dynamicNames(pkgs []*packages.Package) map[string]bool {
 	return names
 }
 
-func (s *factScan) escape(dependent entities.DeclKey, value types.Type) {
+func (scan *factScan) escape(dependent entities.DeclKey, value types.Type) {
 	if value == nil || !isConcrete(value) {
 		return
 	}
 
-	owner := s.ownerOf(value)
+	owner := scan.ownerOf(value)
 
 	if owner != (entities.DeclKey{}) && belongsTo(dependent, owner) {
 		return
@@ -66,11 +66,11 @@ func (s *factScan) escape(dependent entities.DeclKey, value types.Type) {
 
 	for selection := range set.Methods() {
 		fn, isFunc := selection.Obj().(*types.Func)
-		if !isFunc || !s.dynamic[fn.Name()] {
+		if !isFunc || !scan.dynamic[fn.Name()] {
 			continue
 		}
 
-		if key, inTree := s.where.declAt(s.pkg.Fset, fn.Origin().Pos()); inTree {
+		if key, inTree := scan.where.declAt(scan.pkg.Fset, fn.Origin().Pos()); inTree {
 			methods = append(methods, key)
 		}
 	}
@@ -79,7 +79,7 @@ func (s *factScan) escape(dependent entities.DeclKey, value types.Type) {
 		return
 	}
 
-	s.facts.Escaped = append(s.facts.Escaped, Requirement{
+	scan.facts.Escaped = append(scan.facts.Escaped, Requirement{
 		Dependent: dependent,
 		Owner:     owner,
 		Methods:   methods,
@@ -100,7 +100,7 @@ func belongsTo(dependent, owner entities.DeclKey) bool {
 	return strings.TrimPrefix(receiver, "*") == owner.Name
 }
 
-func (s *factScan) require(
+func (scan *factScan) require(
 	into *[]Requirement,
 	dependent entities.DeclKey,
 	value types.Type,
@@ -120,7 +120,7 @@ func (s *factScan) require(
 			continue
 		}
 
-		if key, inTree := s.where.declAt(s.pkg.Fset, fn.Origin().Pos()); inTree {
+		if key, inTree := scan.where.declAt(scan.pkg.Fset, fn.Origin().Pos()); inTree {
 			methods = append(methods, key)
 		}
 	}
@@ -131,12 +131,12 @@ func (s *factScan) require(
 
 	*into = append(*into, Requirement{
 		Dependent: dependent,
-		Owner:     s.ownerOf(value),
+		Owner:     scan.ownerOf(value),
 		Methods:   methods,
 	})
 }
 
-func (s *factScan) ownerOf(value types.Type) entities.DeclKey {
+func (scan *factScan) ownerOf(value types.Type) entities.DeclKey {
 	if pointer, isPointer := value.(*types.Pointer); isPointer {
 		value = pointer.Elem()
 	}
@@ -146,7 +146,7 @@ func (s *factScan) ownerOf(value types.Type) entities.DeclKey {
 		return entities.DeclKey{}
 	}
 
-	key, _ := s.where.declAt(s.pkg.Fset, named.Origin().Obj().Pos())
+	key, _ := scan.where.declAt(scan.pkg.Fset, named.Origin().Obj().Pos())
 
 	return key
 }
@@ -163,7 +163,7 @@ func isConcrete(value types.Type) bool {
 	return !types.IsInterface(value)
 }
 
-func (s *factScan) convert(at token.Pos, value, target types.Type) {
+func (scan *factScan) convert(at token.Pos, value, target types.Type) {
 	if value == nil || target == nil {
 		return
 	}
@@ -177,11 +177,11 @@ func (s *factScan) convert(at token.Pos, value, target types.Type) {
 		return
 	}
 
-	dependent, inTree := s.where.declAt(s.pkg.Fset, at)
+	dependent, inTree := scan.where.declAt(scan.pkg.Fset, at)
 	if !inTree {
 		return
 	}
 
-	s.require(&s.facts.Converted, dependent, value, iface)
-	s.escape(dependent, value)
+	scan.require(&scan.facts.Converted, dependent, value, iface)
+	scan.escape(dependent, value)
 }

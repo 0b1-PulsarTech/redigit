@@ -33,9 +33,9 @@ func (Goverter) Edges(
 		}
 
 		for _, provider := range providers {
-			for _, g := range generated {
+			for _, decl := range generated {
 				edges = append(edges, entities.Edge{
-					Dependent: g.Key,
+					Dependent: decl.Key,
 					Provider:  provider,
 					Reason:    entities.ReasonGeneratedBy,
 				})
@@ -63,10 +63,10 @@ func directiveDecls(
 			return nil, err
 		}
 
-		for _, d := range candidates {
-			if d.Key.Kind == entities.KindType &&
-				strings.Contains(declsource.SliceSpan(source, d.Span), "goverter:") {
-				providers = append(providers, d.Key)
+		for _, candidate := range candidates {
+			if candidate.Key.Kind == entities.KindType &&
+				strings.Contains(declsource.SliceSpan(source, candidate.Span), "goverter:") {
+				providers = append(providers, candidate.Key)
 			}
 		}
 	}
