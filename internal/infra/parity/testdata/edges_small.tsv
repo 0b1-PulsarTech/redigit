@@ -1,0 +1,4 @@
+a.go:func:A	go.mod:other:<file>	module
+b.go:func:B	a.go:func:A	reference
+b.go:func:B	a.go:func:A	prose
+b.go:func:B	b.go:func:B	reference

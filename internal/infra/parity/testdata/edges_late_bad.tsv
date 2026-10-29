@@ -1,0 +1,3 @@
+a.go:func:A	go.mod:other:<file>	module
+b.go:func:B	a.go:func:A	reference
+broken

@@ -1,0 +1,7 @@
+a.go:func:Use	b.go:method:T.M	implements
+mock_a.go:func:Use	b.go:method:T.M	implements
+a.go:func:Use	b.go:type:T	implements
+a.go:type:U	b.go:method:T.M	implements
+a.go:stmt:s	b.go:method:T.M	implements
+a.go:method:V.N	b.go:method:T.M	implements
+b.go:method:T.M	b.go:method:T.M	implements
