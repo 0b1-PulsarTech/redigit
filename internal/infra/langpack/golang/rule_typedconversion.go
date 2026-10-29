@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 // typedConversionRule makes a declaration that hands a concrete value to an
@@ -15,7 +16,7 @@ import (
 // the type checker's, so it covers every place Go converts silently (argument,
 // assignment, return, literal element, send, type assertion) instead of the few
 // a text rule could name.
-type typedConversionRule struct{ source *Source }
+type typedConversionRule struct{ source *typed.Source }
 
 func (typedConversionRule) Name() string { return "typed-conversion" }
 

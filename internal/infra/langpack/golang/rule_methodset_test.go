@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 const methodSetBase = `package fixture
@@ -47,8 +49,8 @@ func (e *ErrMissing) Status() int { return 404 }
 `,
 			},
 			wantAtom: []entities.DeclKey{
-				declKey("missing.go", entities.KindType, "ErrMissing"),
-				declKey("missing_methods.go", entities.KindMethod, "ErrMissing.Error"),
+				testkit.DeclKey("missing.go", entities.KindType, "ErrMissing"),
+				testkit.DeclKey("missing_methods.go", entities.KindMethod, "ErrMissing.Error"),
 			},
 		},
 		{
@@ -67,8 +69,8 @@ var Wrapped BaseError[ErrMissing, *ErrMissing]
 `,
 			},
 			wantEdges: []entities.Edge{{
-				Dependent: declKey("use.go", entities.KindValue, "Wrapped"),
-				Provider:  declKey("missing.go", entities.KindMethod, "ErrMissing.Error"),
+				Dependent: testkit.DeclKey("use.go", entities.KindValue, "Wrapped"),
+				Provider:  testkit.DeclKey("missing.go", entities.KindMethod, "ErrMissing.Error"),
 				Reason:    entities.ReasonMethodSet,
 			}},
 		},
@@ -89,8 +91,8 @@ type Names struct{ Set[string] }
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			snap, decls := typedFixture(t, testCase.files)
-			rule := methodSetRule{source: NewSource(nil)}
+			snap, decls := testkit.Fixture(t, testCase.files)
+			rule := methodSetRule{source: typed.NewSource(nil)}
 
 			checkAtoms(t, rule, snap, decls, testCase.wantAtom)
 			checkEdges(t, rule, snap, decls, testCase.wantEdges)
@@ -137,7 +139,7 @@ func checkEdges(
 		t.Fatalf("Edges() error = %v", err)
 	}
 
-	got := edgeSet(edges)
+	got := testkit.EdgeSet(edges)
 	if len(got) != len(want) {
 		t.Fatalf("Edges() = %+v, want %+v", edges, want)
 	}

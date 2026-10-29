@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 const escapedTypes = `package fixture
@@ -35,7 +37,7 @@ func TestEscapedRule(t *testing.T) {
 		{
 			"a value wrapped by %w into an error",
 			"import \"fmt\"\n\nfunc Render() error { return fmt.Errorf(\"x: %w\", Missing{}) }\n",
-			declKey("use.go", entities.KindFunc, "Render"),
+			testkit.DeclKey("use.go", entities.KindFunc, "Render"),
 			[]string{"Missing.Error", "Missing.Unwrap"},
 			"Missing.Helper",
 		},
@@ -43,7 +45,7 @@ func TestEscapedRule(t *testing.T) {
 			"a value held as any and asserted to a duck-typed port",
 			"func Code(v any) int { return v.(statusCoder).StatusCode() }\n\n" +
 				"func Use() int { return Code(Missing{}) }\n",
-			declKey("use.go", entities.KindFunc, "Use"),
+			testkit.DeclKey("use.go", entities.KindFunc, "Use"),
 			[]string{"Missing.StatusCode"},
 			"Missing.Helper",
 		},
@@ -53,24 +55,24 @@ func TestEscapedRule(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			snap, decls := typedFixture(t, map[string]string{
+			snap, decls := testkit.Fixture(t, map[string]string{
 				"types.go": escapedTypes,
 				"use.go":   "package fixture\n\n" + testCase.use,
 			})
 
-			edges, err := escapedRule{source: NewSource(nil)}.Edges(
+			edges, err := escapedRule{source: typed.NewSource(nil)}.Edges(
 				context.Background(), snap, decls,
 			)
 			if err != nil {
 				t.Fatalf("Edges() error = %v", err)
 			}
 
-			got := edgeSet(edges)
+			got := testkit.EdgeSet(edges)
 
 			for _, method := range testCase.want {
 				want := entities.Edge{
 					Dependent: testCase.wantBy,
-					Provider:  declKey("types.go", entities.KindMethod, method),
+					Provider:  testkit.DeclKey("types.go", entities.KindMethod, method),
 					Reason:    entities.ReasonImplements,
 				}
 				if !got[want] {
@@ -90,13 +92,13 @@ func TestEscapedRule(t *testing.T) {
 func TestEscapedRuleSkipsTheTypesOwnMethods(t *testing.T) {
 	t.Parallel()
 
-	snap, decls := typedFixture(t, map[string]string{
+	snap, decls := testkit.Fixture(t, map[string]string{
 		"types.go": escapedTypes + `
 func (m Missing) Wrap() error { return error(m) }
 `,
 	})
 
-	edges, err := escapedRule{source: NewSource(nil)}.Edges(
+	edges, err := escapedRule{source: typed.NewSource(nil)}.Edges(
 		context.Background(), snap, decls,
 	)
 	if err != nil {

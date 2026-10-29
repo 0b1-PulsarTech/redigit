@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 const typedUseHelper = `package fixture
@@ -23,7 +25,7 @@ const Limit = 3
 func TestTypedUseRule(t *testing.T) {
 	t.Parallel()
 
-	snap, decls := typedFixture(t, map[string]string{
+	snap, decls := testkit.Fixture(t, map[string]string{
 		"helper.go": typedUseHelper,
 		"gen.go": `package fixture
 
@@ -53,13 +55,13 @@ func runEnrichCase(t *testing.T, c enrichCase) { t.Log(c.name) }
 `,
 	})
 
-	edges, err := typedUseRule{source: NewSource(nil)}.Edges(context.Background(), snap, decls)
+	edges, err := typedUseRule{source: typed.NewSource(nil)}.Edges(context.Background(), snap, decls)
 	if err != nil {
 		t.Fatalf("Edges() error = %v", err)
 	}
 
-	got := edgeSet(edges)
-	convert := declKey("gen.go", entities.KindFunc, "Convert")
+	got := testkit.EdgeSet(edges)
+	convert := testkit.DeclKey("gen.go", entities.KindFunc, "Convert")
 
 	reference := func(dependent, provider entities.DeclKey) entities.Edge {
 		return entities.Edge{
@@ -70,16 +72,16 @@ func runEnrichCase(t *testing.T, c enrichCase) { t.Log(c.name) }
 	}
 
 	wants := []entities.Edge{
-		reference(convert, declKey("helper.go", entities.KindFunc, "SecondsToDuration")),
-		reference(convert, declKey("helper.go", entities.KindType, "Box")),
-		reference(convert, declKey("helper.go", entities.KindMethod, "Box.Open")),
+		reference(convert, testkit.DeclKey("helper.go", entities.KindFunc, "SecondsToDuration")),
+		reference(convert, testkit.DeclKey("helper.go", entities.KindType, "Box")),
+		reference(convert, testkit.DeclKey("helper.go", entities.KindMethod, "Box.Open")),
 		reference(
-			declKey("gen.go", entities.KindFunc, "Cap"),
-			declKey("helper.go", entities.KindValue, "Limit"),
+			testkit.DeclKey("gen.go", entities.KindFunc, "Cap"),
+			testkit.DeclKey("helper.go", entities.KindValue, "Limit"),
 		),
 		reference(
-			declKey("case_test.go", entities.KindFunc, "runEnrichCase"),
-			declKey("case_test.go", entities.KindType, "enrichCase"),
+			testkit.DeclKey("case_test.go", entities.KindFunc, "runEnrichCase"),
+			testkit.DeclKey("case_test.go", entities.KindType, "enrichCase"),
 		),
 	}
 

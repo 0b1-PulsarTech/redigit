@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 // escapedRule makes a declaration that hands a concrete value to an interface
@@ -13,7 +14,7 @@ import (
 // duck-typed port call Error, Unwrap, Is, As and StatusCode at run time. A
 // tree where the wrapping landed before those methods fails go vet, or behaves
 // differently: a mapped 409 became a 500 and errors.Is answered false.
-type escapedRule struct{ source *Source }
+type escapedRule struct{ source *typed.Source }
 
 func (escapedRule) Name() string { return "escaped-methods" }
 

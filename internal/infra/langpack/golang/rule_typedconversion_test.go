@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 const conversionTypes = `package fixture
@@ -21,7 +23,7 @@ func (Repo) Write(string) {}
 func TestTypedConversionRule(t *testing.T) {
 	t.Parallel()
 
-	read := declKey("types.go", entities.KindMethod, "Repo.Read")
+	read := testkit.DeclKey("types.go", entities.KindMethod, "Repo.Read")
 
 	testCases := []struct {
 		name   string
@@ -31,27 +33,27 @@ func TestTypedConversionRule(t *testing.T) {
 		{
 			"an argument handed to an interface parameter",
 			"func Take(Reader) {}\n\nfunc Wire() { Take(Repo{}) }\n",
-			declKey("use.go", entities.KindFunc, "Wire"),
+			testkit.DeclKey("use.go", entities.KindFunc, "Wire"),
 		},
 		{
 			"a return of a concrete value from an interface result",
 			"func New() Reader { return &Repo{} }\n",
-			declKey("use.go", entities.KindFunc, "New"),
+			testkit.DeclKey("use.go", entities.KindFunc, "New"),
 		},
 		{
 			"a blank assertion",
 			"var _ Reader = (*Repo)(nil)\n",
-			declKey("use.go", entities.KindValue, "_ Reader = (*Repo)(nil)"),
+			testkit.DeclKey("use.go", entities.KindValue, "_ Reader = (*Repo)(nil)"),
 		},
 		{
 			"a field of a composite literal",
 			"type Holder struct{ R Reader }\n\nvar Held = Holder{R: Repo{}}\n",
-			declKey("use.go", entities.KindValue, "Held"),
+			testkit.DeclKey("use.go", entities.KindValue, "Held"),
 		},
 		{
 			"an assignment to an interface variable",
 			"func Set() { var r Reader; r = Repo{}; _ = r }\n",
-			declKey("use.go", entities.KindFunc, "Set"),
+			testkit.DeclKey("use.go", entities.KindFunc, "Set"),
 		},
 	}
 
@@ -59,12 +61,12 @@ func TestTypedConversionRule(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			snap, decls := typedFixture(t, map[string]string{
+			snap, decls := testkit.Fixture(t, map[string]string{
 				"types.go": conversionTypes,
 				"use.go":   "package fixture\n\n" + testCase.use,
 			})
 
-			edges, err := typedConversionRule{source: NewSource(nil)}.Edges(
+			edges, err := typedConversionRule{source: typed.NewSource(nil)}.Edges(
 				context.Background(), snap, decls,
 			)
 			if err != nil {
@@ -77,7 +79,7 @@ func TestTypedConversionRule(t *testing.T) {
 				Reason:    entities.ReasonImplements,
 			}
 
-			got := edgeSet(edges)
+			got := testkit.EdgeSet(edges)
 			if !got[want] {
 				t.Fatalf("Edges() = %+v, missing %+v", edges, want)
 			}
@@ -95,7 +97,7 @@ func TestTypedConversionRule(t *testing.T) {
 func TestTypedConversionRuleIgnoresInterfaceToInterface(t *testing.T) {
 	t.Parallel()
 
-	snap, decls := typedFixture(t, map[string]string{
+	snap, decls := testkit.Fixture(t, map[string]string{
 		"types.go": conversionTypes,
 		"use.go": `package fixture
 
@@ -108,7 +110,7 @@ func Narrow(w Wide) Reader { return w }
 `,
 	})
 
-	edges, err := typedConversionRule{source: NewSource(nil)}.Edges(
+	edges, err := typedConversionRule{source: typed.NewSource(nil)}.Edges(
 		context.Background(), snap, decls,
 	)
 	if err != nil {
@@ -123,7 +125,7 @@ func Narrow(w Wide) Reader { return w }
 func TestTypedSourceWithoutModuleLoadsNothing(t *testing.T) {
 	t.Parallel()
 
-	facts, err := NewSource(nil).Facts(
+	facts, err := typed.NewSource(nil).Facts(
 		context.Background(), entities.Snapshot{Root: t.TempDir()}, nil,
 	)
 	if err != nil {

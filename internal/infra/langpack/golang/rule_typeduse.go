@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 // typedUseRule is every reference the type checker resolves, asked of the
@@ -14,7 +15,7 @@ import (
 // between fail: "undefined: enrichCase" in a test file, "repo.GetByID
 // undefined" in another. The checker resolved every identifier of those same
 // files already.
-type typedUseRule struct{ source *Source }
+type typedUseRule struct{ source *typed.Source }
 
 func (typedUseRule) Name() string { return "typed-reference" }
 

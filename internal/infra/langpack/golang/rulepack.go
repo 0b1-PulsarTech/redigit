@@ -9,6 +9,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 // rule is one independently testable edge source. RulePack is a Composite
@@ -70,7 +71,7 @@ type RulePack struct {
 // language server answers about. The tree is loaded on the first question and
 // shared by every rule that asks.
 func NewRulePack(tags []string) RulePack {
-	source := NewSource(tags)
+	source := typed.NewSource(tags)
 
 	return RulePack{rules: append(slices.Clone(rules),
 		methodSetRule{source: source},

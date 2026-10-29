@@ -1,4 +1,4 @@
-package golang
+package typed
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
 func TestShowingTags(t *testing.T) {
@@ -59,7 +60,7 @@ func TestShowingTags(t *testing.T) {
 func TestTypedSourceChecksTheFilesTheTagsHide(t *testing.T) {
 	t.Parallel()
 
-	snap, decls := typedFixture(t, map[string]string{
+	snap, decls := testkit.Fixture(t, map[string]string{
 		"verifier.go": "package fixture\n\nfunc NewGateway() int { return 1 }\n",
 		"verifier_prod.go": `//go:build !dev
 
@@ -76,8 +77,8 @@ func NewVerifier() int { return NewGateway() }
 	}
 
 	want := Use{
-		Dependent: declKey("verifier_prod.go", entities.KindFunc, "NewVerifier"),
-		Provider:  declKey("verifier.go", entities.KindFunc, "NewGateway"),
+		Dependent: testkit.DeclKey("verifier_prod.go", entities.KindFunc, "NewVerifier"),
+		Provider:  testkit.DeclKey("verifier.go", entities.KindFunc, "NewGateway"),
 	}
 
 	if slices.Contains(facts.Uses, want) {
