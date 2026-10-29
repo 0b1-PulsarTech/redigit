@@ -5,31 +5,32 @@ import (
 	"go/token"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 func filterGenDecl(
 	fset *token.FileSet,
 	source []byte,
 	d *ast.GenDecl,
-	keepSet map[Ident]bool,
+	keepSet map[syntax.Ident]bool,
 ) []ast.Decl {
 	if d.Tok == token.TYPE {
-		return filterSpecs(d, keepSet, func(spec ast.Spec) (Ident, bool) {
+		return filterSpecs(d, keepSet, func(spec ast.Spec) (syntax.Ident, bool) {
 			ts, ok := spec.(*ast.TypeSpec)
 			if !ok {
-				return Ident{}, false
+				return syntax.Ident{}, false
 			}
 
-			return Ident{entities.KindType, ts.Name.Name}, true
+			return syntax.Ident{Kind: entities.KindType, Name: ts.Name.Name}, true
 		})
 	}
 
-	if d.Tok == token.CONST && HasImplicitSpec(d) {
+	if d.Tok == token.CONST && syntax.HasImplicitSpec(d) {
 		// Any surviving name keeps the whole group: an iota constant that is
 		// not written down still takes its value from its position in the
 		// block, so the block cannot be cut.
-		for _, name := range GroupNames(d) {
-			if keepSet[Ident{entities.KindValue, name}] {
+		for _, name := range syntax.GroupNames(d) {
+			if keepSet[syntax.Ident{Kind: entities.KindValue, Name: name}] {
 				return []ast.Decl{d}
 			}
 		}
@@ -44,8 +45,8 @@ func filterGenDecl(
 // dropping the whole GenDecl when none survive.
 func filterSpecs(
 	d *ast.GenDecl,
-	keepSet map[Ident]bool,
-	identOf func(ast.Spec) (Ident, bool),
+	keepSet map[syntax.Ident]bool,
+	identOf func(ast.Spec) (syntax.Ident, bool),
 ) []ast.Decl {
 	var specs []ast.Spec
 
@@ -68,7 +69,7 @@ func filterValueSpecs(
 	fset *token.FileSet,
 	source []byte,
 	d *ast.GenDecl,
-	keepSet map[Ident]bool,
+	keepSet map[syntax.Ident]bool,
 ) []ast.Decl {
 	var specs []ast.Spec
 
@@ -79,7 +80,7 @@ func filterValueSpecs(
 		}
 
 		for _, name := range vs.Names {
-			if keepSet[Ident{entities.KindValue, ValueName(fset, source, vs, name)}] {
+			if keepSet[syntax.Ident{Kind: entities.KindValue, Name: syntax.ValueName(fset, source, vs, name)}] {
 				specs = append(specs, spec)
 
 				break
@@ -115,7 +116,7 @@ func finishGenDecl(d *ast.GenDecl, specs []ast.Spec) []ast.Decl {
 // than judging it accidental.
 func resetSpacingIfSafe(specs []ast.Spec) {
 	for _, spec := range specs {
-		if SpecDoc(spec) != nil {
+		if syntax.SpecDoc(spec) != nil {
 			return
 		}
 	}

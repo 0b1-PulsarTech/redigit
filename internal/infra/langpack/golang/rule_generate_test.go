@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 func generateTree(t *testing.T, files map[string]string) entities.Snapshot {
@@ -106,7 +107,7 @@ func TestGenerateRuleTiesAMockToItsDirective(t *testing.T) {
 	}
 	mock := entities.Decl{
 		Key: entities.DeclKey{
-			File: "store/repo_mock_test.go", Kind: entities.KindOther, Name: FileDeclName,
+			File: "store/repo_mock_test.go", Kind: entities.KindOther, Name: syntax.FileDeclName,
 		},
 		Unit: "store",
 		Span: entities.Span{Start: 0, End: 60},

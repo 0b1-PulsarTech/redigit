@@ -12,9 +12,8 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
-
-var _ indexing.Slicer = Syntax{}
 
 const (
 	// minStatements is the fewest statements worth cutting a body into.
@@ -115,7 +114,7 @@ func findFuncDecl(file *ast.File, key entities.DeclKey) *ast.FuncDecl {
 			continue
 		}
 
-		ident := FuncIdent(fn)
+		ident := syntax.FuncIdent(fn)
 		if ident.Kind == key.Kind && ident.Name == key.Name {
 			return fn
 		}

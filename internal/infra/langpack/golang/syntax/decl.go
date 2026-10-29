@@ -1,4 +1,4 @@
-package golang
+package syntax
 
 import (
 	"context"
@@ -13,30 +13,19 @@ import (
 	"unicode/utf8"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
-	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/genmark"
 )
 
-// Syntax implements indexing.Syntax for Go source: declaration boundaries via
-// go/ast, partial-file rendering via github.com/dave/dst.
-type Syntax struct{}
-
-// NewSyntax builds the Go syntax adapter. It carries no state: every call is
-// self-contained on the source it is given.
-func NewSyntax() Syntax { return Syntax{} }
-
-var _ indexing.Syntax = Syntax{}
-
-// Declarations parses source and returns one Decl per top-level declaration.
-// A parenthesized const group where a later spec omits both its type and its
-// value (an iota chain) is kept as one atomic declaration: splitting it would
-// let a later commit change what an untouched constant evaluates to.
 // FileDeclName is the name given to the single declaration standing for a file
 // that declares nothing of its own. It is not a legal Go identifier on purpose,
 // so it can never collide with a real declaration.
 const FileDeclName = "<file>"
 
-func (Syntax) Declarations(_ context.Context, path string, source []byte) ([]entities.Decl, error) {
+// Declarations parses source and returns one Decl per top-level declaration.
+// A parenthesized const group where a later spec omits both its type and its
+// value (an iota chain) is kept as one atomic declaration: splitting it would
+// let a later commit change what an untouched constant evaluates to.
+func Declarations(_ context.Context, path string, source []byte) ([]entities.Decl, error) {
 	fset := token.NewFileSet()
 
 	file, err := parser.ParseFile(

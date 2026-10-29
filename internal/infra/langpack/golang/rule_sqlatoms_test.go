@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 func TestSQLAtomRuleAtoms(t *testing.T) {
@@ -108,7 +109,7 @@ func atomCases() []atomCase {
 		{
 			"the first table with the sqlc configuration",
 			key(migration, entities.KindOther, "table:accounts"),
-			key("database/sqlc.yaml", entities.KindOther, FileDeclName),
+			key("database/sqlc.yaml", entities.KindOther, syntax.FileDeclName),
 			true,
 		},
 		{
@@ -120,7 +121,7 @@ func atomCases() []atomCase {
 		{
 			"the first table with the migration checksum",
 			key(migration, entities.KindOther, "table:accounts"),
-			key("database/migrations/atlas.sum", entities.KindOther, FileDeclName),
+			key("database/migrations/atlas.sum", entities.KindOther, syntax.FileDeclName),
 			true,
 		},
 		{

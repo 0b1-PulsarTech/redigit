@@ -1,8 +1,7 @@
-package golang
+package syntax
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -36,9 +35,7 @@ const MaxRetries = 3
 func unused() { fmt.Println() }
 `
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -99,9 +96,7 @@ func TestSyntaxDeclarationsSpanStartsAtDocComment(t *testing.T) {
 func Greet() {}
 `
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -126,9 +121,7 @@ func TestSyntaxDeclarationsSelectorIsTheName(t *testing.T) {
 
 	const src = "package sample\n\nfunc Greet() {}\n"
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -152,9 +145,7 @@ func BenchmarkFoo(b *testing.B) {}
 func helper()               {}
 `
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample_test.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample_test.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -220,13 +211,11 @@ func TestSyntaxDeclarationsUnit(t *testing.T) {
 		},
 	}
 
-	syntax := NewSyntax()
-
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			decls, err := syntax.Declarations(
+			decls, err := Declarations(
 				context.Background(),
 				testCase.path,
 				[]byte(testCase.src),
@@ -256,9 +245,7 @@ var _ io.Reader = (*ReaderA)(nil)
 var _ io.Reader = (*ReaderB)(nil)
 `
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -296,7 +283,7 @@ const (
 )
 `
 
-	decls, err := NewSyntax().Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -337,49 +324,6 @@ const (
 	}
 }
 
-// TestRenderKeepsAnIotaGroupFromAnyMember pins the other half: naming any one
-// constant of the block renders the whole block.
-func TestRenderKeepsAnIotaGroupFromAnyMember(t *testing.T) {
-	t.Parallel()
-
-	const src = `package sample
-
-const (
-	Sunday int = iota
-	Monday
-	Tuesday
-)
-`
-
-	testCases := []struct {
-		name string
-		keep string
-	}{
-		{"the first constant", "Sunday"},
-		{"a middle one", "Monday"},
-		{"the last", "Tuesday"},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			out, err := NewSyntax().Render(context.Background(), []byte(src), []entities.DeclKey{
-				{File: "sample.go", Kind: entities.KindValue, Name: testCase.keep},
-			})
-			if err != nil {
-				t.Fatalf("Render() = %v", err)
-			}
-
-			for _, want := range []string{"Sunday", "Monday", "Tuesday"} {
-				if !strings.Contains(string(out), want) {
-					t.Fatalf("keeping %s dropped %s:\n%s", testCase.keep, want, out)
-				}
-			}
-		})
-	}
-}
-
 func TestSyntaxDeclarationsUngroupedConstsSplit(t *testing.T) {
 	t.Parallel()
 
@@ -391,9 +335,7 @@ const (
 )
 `
 
-	syntax := NewSyntax()
-
-	decls, err := syntax.Declarations(context.Background(), "sample.go", []byte(src))
+	decls, err := Declarations(context.Background(), "sample.go", []byte(src))
 	if err != nil {
 		t.Fatalf("Declarations() error = %v", err)
 	}
@@ -406,9 +348,7 @@ const (
 func TestSyntaxDeclarationsParseError(t *testing.T) {
 	t.Parallel()
 
-	syntax := NewSyntax()
-
-	_, err := syntax.Declarations(
+	_, err := Declarations(
 		context.Background(),
 		"broken.go",
 		[]byte("package sample\nfunc ("),
@@ -435,9 +375,7 @@ func TestReceiverName(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			syntax := NewSyntax()
-
-			decls, err := syntax.Declarations(context.Background(), "s.go", []byte(testCase.src))
+			decls, err := Declarations(context.Background(), "s.go", []byte(testCase.src))
 			if err != nil {
 				t.Fatalf("Declarations() error = %v", err)
 			}
@@ -447,5 +385,282 @@ func TestReceiverName(t *testing.T) {
 				t.Fatalf("method name = %q, want %q", decls[0].Key.Name, want)
 			}
 		})
+	}
+}
+
+// TestSelectorCountsUTF16Units guards the seam between this package and the
+// language server. token.Position.Column counts BYTES; entities.Location.Char
+// counts UTF-16 code units. They agree on an ASCII line and diverge everywhere
+// else, and a server queried at the wrong column answers about a different
+// symbol without reporting anything amiss.
+func TestSelectorCountsUTF16Units(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		source   string
+		declName string
+		wantLine int
+		wantChar int
+	}{
+		{
+			"an ascii line is the case where bytes and units agree",
+			"package a\n\nfunc Add() {}\n",
+			"Add",
+			2,
+			5,
+		},
+		{
+			"a two-byte receiver name shifts the byte column but not the unit column",
+			"package a\n\ntype Ação struct{}\n\nfunc (a Ação) Run() {}\n",
+			"Ação.Run",
+			4,
+			14,
+		},
+		{
+			"an emoji in a comment does not move a later line",
+			"package a\n\n// \U0001F600 note\nfunc Add() {}\n",
+			"Add",
+			3,
+			5,
+		},
+		{
+			"a value declared after a two-byte name on the same line",
+			"package a\n\nvar café, x = 1, 2\n",
+			"x",
+			2,
+			10,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decls, err := Declarations(
+				context.Background(),
+				"a.go",
+				[]byte(testCase.source),
+			)
+			if err != nil {
+				t.Fatalf("Declarations() = %v", err)
+			}
+
+			var found entities.Decl
+
+			for _, decl := range decls {
+				if decl.Key.Name == testCase.declName {
+					found = decl
+				}
+			}
+
+			if found.Key.Name == "" {
+				t.Fatalf("no declaration named %q among %d", testCase.declName, len(decls))
+			}
+
+			if found.Selector.Line != testCase.wantLine {
+				t.Fatalf("selector line = %d, want %d", found.Selector.Line, testCase.wantLine)
+			}
+
+			if found.Selector.Char != testCase.wantChar {
+				t.Fatalf("selector char = %d, want %d", found.Selector.Char, testCase.wantChar)
+			}
+		})
+	}
+}
+
+// TestInterfaceIsMarked pins the flag that decides which way an implementation
+// edge points. Asking a language server about a concrete type answers with the
+// interfaces it satisfies, and keeping that answer as though the concrete type
+// were the provider makes a stable library depend on whatever implements it.
+func TestInterfaceIsMarked(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(`package a
+
+type Reader interface{ Read() error }
+
+type Repo struct{}
+
+func (Repo) Read() error { return nil }
+
+type Alias = Reader
+
+type Names []string
+`)
+
+	decls, err := Declarations(context.Background(), "a.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	marked := map[string]bool{}
+	for _, decl := range decls {
+		marked[decl.Key.Name] = decl.IsInterface
+	}
+
+	testCases := []struct {
+		name string
+		decl string
+		want bool
+	}{
+		{"an interface is marked", "Reader", true},
+		{"a struct is not", "Repo", false},
+		{"a named slice is not", "Names", false},
+		{
+			"an alias to an interface is not marked; the server answers about the alias",
+			"Alias",
+			false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := marked[testCase.decl]; got != testCase.want {
+				t.Fatalf("%s IsInterface = %v, want %v", testCase.decl, got, testCase.want)
+			}
+		})
+	}
+}
+
+// TestGroupSizeCountsTheBlockNotTheFile pins the structural test that replaces
+// a count of siblings per file. A file holding two enums, or one enum beside a
+// loose constant, gets the per-file count wrong in both directions; only the
+// declaration block says what travels together.
+func TestGroupSizeCountsTheBlockNotTheFile(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(`package a
+
+type Kind uint8
+
+const (
+	KindFixed Kind = iota
+	KindPercentage
+)
+
+type Colour uint8
+
+const (
+	Red Colour = iota
+	Green
+	Blue
+)
+
+const Loose = 7
+
+var (
+	First  = 1
+	Second = 2
+)
+`)
+
+	decls, err := Declarations(context.Background(), "a.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	size := map[string]int{}
+	for _, decl := range decls {
+		size[decl.Key.Name] = decl.GroupSize
+	}
+
+	testCases := []struct {
+		name string
+		decl string
+		want int
+	}{
+		{"an enum of two is still a group", "KindFixed", 2},
+		{"and its sibling agrees", "KindPercentage", 2},
+		{"a second enum in the same file counts its own block", "Red", 3},
+		{"a constant on its own is a group of one", "Loose", 1},
+		{"a var block counts too", "First", 2},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := size[testCase.decl]; got != testCase.want {
+				t.Fatalf("%s GroupSize = %d, want %d", testCase.decl, got, testCase.want)
+			}
+		})
+	}
+}
+
+// A generated file is written by its generator in ONE pass, so its
+// declarations must be born together - but they STAY declarations. Collapsing
+// them into one took their names out of the graph, took every reference edge
+// with them, and let a test land 491 positions before the mock it uses.
+func TestDeclarationsMarkAGeneratedFileAsOneAtom(t *testing.T) {
+	t.Parallel()
+
+	source := []byte("// Code generated by MockGen. DO NOT EDIT.\n" +
+		"package store\n\n" +
+		"type MockReader struct{}\n\n" +
+		"type MockReaderMockRecorder struct{}\n\n" +
+		"func NewMockReader() *MockReader { return &MockReader{} }\n")
+
+	decls, err := Declarations(t.Context(), "store/reader_mock_test.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	if len(decls) != 3 {
+		t.Fatalf("a generated file became %d declarations, want its 3", len(decls))
+	}
+
+	for _, decl := range decls {
+		if decl.Atom != "store/reader_mock_test.go" {
+			t.Fatalf("%s carries atom %q, want the file", decl.Key.Name, decl.Atom)
+		}
+	}
+}
+
+// The same file written by a person is still cut by declaration: a hand-rolled
+// mock is code somebody maintains, and it grows a declaration at a time.
+func TestDeclarationsStillCutAHandWrittenFile(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(
+		"package flow\n\ntype storeMock struct{}\n\nfunc (storeMock) Read() error { return nil }\n",
+	)
+
+	decls, err := Declarations(t.Context(), "flow/store_mock_test.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	if len(decls) != 2 {
+		t.Fatalf("a hand-written file became %d declarations, want 2", len(decls))
+	}
+
+	for _, decl := range decls {
+		if decl.Atom != "" {
+			t.Fatalf("%s carries atom %q: a person maintains this file", decl.Key.Name, decl.Atom)
+		}
+	}
+}
+
+// A sqlc file belongs to its whole run's atom, which the sqlc rule names. A
+// per-file atom set here would win and keep the run's files apart.
+func TestDeclarationsLeaveASqlcFileToTheSqlcRule(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(
+		"// Code generated by sqlc. DO NOT EDIT.\n\npackage dbgen\n\ntype Queries struct{}\n",
+	)
+
+	decls, err := Declarations(t.Context(), "dbgen/db.go", source)
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	for _, decl := range decls {
+		if decl.Atom != "" {
+			t.Fatalf("%s carries atom %q, want none", decl.Key.Name, decl.Atom)
+		}
 	}
 }

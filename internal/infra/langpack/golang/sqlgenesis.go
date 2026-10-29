@@ -11,6 +11,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 // sqlGenesis is the first table with everything the schema tools need to read
@@ -279,5 +280,5 @@ func holdsAny(dir string, files []string) bool {
 }
 
 func wholeFileKey(file string) entities.DeclKey {
-	return entities.DeclKey{File: file, Kind: entities.KindOther, Name: FileDeclName}
+	return entities.DeclKey{File: file, Kind: entities.KindOther, Name: syntax.FileDeclName}
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
 // mockgenRule links a generated mock to the interface it structurally
@@ -242,7 +243,7 @@ type mockDependent struct {
 // waits for its own subject.
 func mockDependents(decls []entities.Decl, source []byte) []mockDependent {
 	for _, decl := range decls {
-		if decl.Key.Kind != entities.KindOther || decl.Key.Name != FileDeclName {
+		if decl.Key.Kind != entities.KindOther || decl.Key.Name != syntax.FileDeclName {
 			continue
 		}
 
