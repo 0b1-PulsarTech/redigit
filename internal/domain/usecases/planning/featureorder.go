@@ -6,9 +6,9 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-// featureNeeds is which features have to be built before which. A feature needs
+// FeatureNeeds is which features have to be built before which. A feature needs
 // another when any declaration it owns waits on a declaration the other owns.
-func featureNeeds(graph entities.Graph, own owners.Ownership) map[FeatureID]map[FeatureID]bool {
+func FeatureNeeds(graph entities.Graph, own owners.Ownership) map[FeatureID]map[FeatureID]bool {
 	needs := map[FeatureID]map[FeatureID]bool{}
 	behind := map[entities.DeclKey]map[FeatureID]bool{}
 
@@ -85,11 +85,11 @@ func featuresBehind(
 	return out
 }
 
-// earliest is the lowest position any of a feature's declarations reached. It
+// Earliest is the lowest position any of a feature's declarations reached. It
 // is the tie-break between features neither of which needs the other, so a
 // rebuilt history still follows the original chronology wherever the dependency
 // graph leaves the choice open.
-func earliest(own owners.Ownership, order entities.Ordering) map[FeatureID]entities.Position {
+func Earliest(own owners.Ownership, order entities.Ordering) map[FeatureID]entities.Position {
 	out := map[FeatureID]entities.Position{}
 
 	for key, feature := range own.Owner {

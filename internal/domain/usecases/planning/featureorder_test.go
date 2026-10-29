@@ -67,9 +67,9 @@ func TestSortFeatures(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, cyclic := sortFeatures(
+			got, cyclic := SortFeatures(
 				testCase.features,
-				featureRules{needs: testCase.needs, at: testCase.at},
+				FeatureRules{Needs: testCase.needs, At: testCase.at},
 			)
 			if !slices.Equal(got, testCase.want) {
 				t.Fatalf("sortFeatures() = %v, want %v", got, testCase.want)
@@ -87,7 +87,7 @@ func TestFeatureNeeds(t *testing.T) {
 
 	graph, _, _ := twoFeatures()
 	own := owners.Assign(graph)
-	needs := featureNeeds(graph, own)
+	needs := FeatureNeeds(graph, own)
 
 	// The lead slice is one feature end to end, so it needs nothing from
 	// another feature; only the shared kernel, which is not a feature edge.
@@ -109,13 +109,13 @@ func TestEarliest(t *testing.T) {
 
 	graph, order, _ := twoFeatures()
 	own := owners.Assign(graph)
-	at := earliest(own, order)
+	at := Earliest(own, order)
 
 	if got := at["lead/api"]; got != 1 {
 		t.Fatalf("earliest lead/api = %d, want 1", got)
 	}
 
-	unset := earliest(own, entities.Ordering{})
+	unset := Earliest(own, entities.Ordering{})
 	if len(unset) != 0 {
 		t.Fatalf("with no ordering, earliest = %v, want nothing set", unset)
 	}
@@ -144,11 +144,11 @@ func TestOwnershipNeverBuildsAFeatureCycle(t *testing.T) {
 
 	own := owners.Assign(graph)
 
-	_, cyclic := sortFeatures(
+	_, cyclic := SortFeatures(
 		own.Order,
-		featureRules{
-			needs: featureNeeds(graph, own),
-			at:    earliest(own, entities.Ordering{}),
+		FeatureRules{
+			Needs: FeatureNeeds(graph, own),
+			At:    Earliest(own, entities.Ordering{}),
 		},
 	)
 	if len(cyclic) != 0 {
@@ -211,7 +211,7 @@ func TestFeatureNeedsBehindADeferred(t *testing.T) {
 				testCase.edges,
 				nil,
 			)
-			got := featureNeeds(graph, owners.Ownership{Owner: owner, Deferred: testCase.deferred})
+			got := FeatureNeeds(graph, owners.Ownership{Owner: owner, Deferred: testCase.deferred})
 
 			if got["lead/api"]["bill/api"] != testCase.want {
 				t.Fatalf("featureNeeds() lead/api -> bill/api = %v, want %v",

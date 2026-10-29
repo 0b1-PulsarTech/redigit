@@ -8,14 +8,14 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 )
 
-// featureRules decides the order of the features: what must precede what, where
+// FeatureRules decides the order of the features: what must precede what, where
 // each first appeared, its product and its cost.
-type featureRules struct {
-	needs map[FeatureID]map[FeatureID]bool
-	waits map[FeatureID]map[FeatureID]bool
-	at    map[FeatureID]entities.Position
-	group map[FeatureID]FeatureID
-	cost  map[FeatureID]int
+type FeatureRules struct {
+	Needs map[FeatureID]map[FeatureID]bool
+	Waits map[FeatureID]map[FeatureID]bool
+	At    map[FeatureID]entities.Position
+	Group map[FeatureID]FeatureID
+	Cost  map[FeatureID]int
 }
 
 // productReaders counts, per product, the other products whose features read
@@ -52,15 +52,15 @@ func productReaders(
 	return out
 }
 
-// sortFeatures returns the build order and the features that need each other.
+// SortFeatures returns the build order and the features that need each other.
 // A cycle is returned, never silently broken. A product is built as a unit, its
 // root first; a feature also waits for the roots of the modules it reads,
 // unless that would leave nothing to build.
-func sortFeatures(
+func SortFeatures(
 	features []FeatureID,
-	rules featureRules,
+	rules FeatureRules,
 ) (sorted []FeatureID, cyclic []FeatureID) {
-	needs, waits, at, group, cost := rules.needs, rules.waits, rules.at, rules.group, rules.cost
+	needs, waits, at, group, cost := rules.Needs, rules.Waits, rules.At, rules.Group, rules.Cost
 	product := func(feature FeatureID) FeatureID { return owners.ProductOf(group, feature) }
 
 	readers := productReaders(waits, product)

@@ -46,9 +46,9 @@ func TestSortFeaturesBuildsAProductAsAUnit(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, cyclic := sortFeatures(
+			got, cyclic := SortFeatures(
 				testCase.features,
-				featureRules{waits: testCase.waits, group: testCase.group, cost: testCase.cost},
+				FeatureRules{Waits: testCase.waits, Group: testCase.group, Cost: testCase.cost},
 			)
 			if len(cyclic) != 0 || !slices.Equal(got, testCase.want) {
 				t.Fatalf("sortFeatures() = %v (cyclic %v), want %v", got, cyclic, testCase.want)

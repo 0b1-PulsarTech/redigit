@@ -78,12 +78,12 @@ func (p Planner) Plan(graph entities.Graph, order entities.Ordering) (entities.P
 		)
 	}
 
-	sorted, cyclic := sortFeatures(own.Order, featureRules{
-		needs: featureNeeds(graph, own),
-		waits: own.Waits,
-		at:    earliest(own, order),
-		group: own.Group,
-		cost:  own.Cost,
+	sorted, cyclic := SortFeatures(own.Order, FeatureRules{
+		Needs: FeatureNeeds(graph, own),
+		Waits: own.Waits,
+		At:    Earliest(own, order),
+		Group: own.Group,
+		Cost:  own.Cost,
 	})
 
 	// Reachability ownership should make this unreachable: if a declaration
