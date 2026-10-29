@@ -17,7 +17,7 @@ func readyDeferred(
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
 	subjects := sharedSubjects(graph, own)
-	atoms := atomGroups(graph)
+	atoms := AtomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
 	for key := range own.deferred {
@@ -137,5 +137,5 @@ func usedBeyondWiring(graph entities.Graph, own ownership, key entities.DeclKey)
 func isManifestKey(graph entities.Graph, key entities.DeclKey) bool {
 	decl, found := graph.Decl(key)
 
-	return found && isManifestLine(graph, decl)
+	return found && IsManifestLine(graph, decl)
 }

@@ -19,7 +19,7 @@ func TestAtomGroups(t *testing.T) {
 
 	graph := entities.NewGraph([]entities.Decl{typeA, typeB, loose}, nil, nil)
 
-	groups := atomGroups(graph)
+	groups := AtomGroups(graph)
 
 	if _, found := groups[""]; found {
 		t.Fatalf("groups carries an entry for the empty atom, want none")

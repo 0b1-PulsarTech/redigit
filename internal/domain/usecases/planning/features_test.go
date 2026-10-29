@@ -8,7 +8,7 @@ import (
 )
 
 func entryPointNames(graph entities.Graph) []string {
-	entries := entryPoints(graph, nil)
+	entries := EntryPoints(graph, nil)
 	got := make([]string, 0, len(entries))
 
 	for _, entry := range entries {
@@ -157,7 +157,7 @@ func TestFeatureOf(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := featureOf(testCase.decl); got != testCase.want {
+			if got := FeatureOf(testCase.decl); got != testCase.want {
 				t.Fatalf("featureOf() = %q, want %q", got, testCase.want)
 			}
 		})
@@ -207,7 +207,7 @@ func TestReachFrom(t *testing.T) {
 			t.Parallel()
 
 			var got []string
-			for key := range reachFrom(graph, testCase.start.Key) {
+			for key := range ReachFrom(graph, testCase.start.Key) {
 				got = append(got, key.Name)
 			}
 
@@ -238,7 +238,7 @@ func TestParentDir(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := parentDir(testCase.path); got != testCase.want {
+			if got := ParentDir(testCase.path); got != testCase.want {
 				t.Fatalf("parentDir(%q) = %q, want %q", testCase.path, got, testCase.want)
 			}
 		})

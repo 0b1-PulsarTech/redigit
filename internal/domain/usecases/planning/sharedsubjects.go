@@ -13,7 +13,7 @@ func sharedSubjects(
 ) map[entities.DeclKey][]entities.DeclKey {
 	out := map[entities.DeclKey][]entities.DeclKey{}
 
-	for test, subjects := range testSubjects(graph) {
+	for test, subjects := range TestSubjects(graph) {
 		for _, subject := range subjects {
 			if own.owner[subject] == SharedFeature {
 				out[test] = append(out[test], subject)

@@ -16,13 +16,13 @@ type FeatureID string
 // SharedFeature is the bucket for declarations no single feature owns.
 const SharedFeature FeatureID = ""
 
-// entryPoints are the declarations nothing else consumes: a handler, a worker,
+// EntryPoints are the declarations nothing else consumes: a handler, a worker,
 // a command. A test consumer does not count, or every tested function would be
 // a feature of its own.
-func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
+func EntryPoints(graph entities.Graph, roots Wiring) []entities.Decl {
 	var out []entities.Decl
 
-	loose := looseLines(graph)
+	loose := LooseLines(graph)
 
 	for _, decl := range graph.Decls() {
 		if entities.IsTestSide(decl) {
@@ -30,7 +30,7 @@ func entryPoints(graph entities.Graph, roots wiring) []entities.Decl {
 		}
 
 		if roots[decl.Key] || loose[decl.Key] || isOrphanProse(graph, decl) ||
-			isAfterword(graph, decl.Key) || isAfterwordBase(graph, decl.Key) {
+			IsAfterword(graph, decl.Key) || IsAfterwordBase(graph, decl.Key) {
 			continue
 		}
 
@@ -62,11 +62,11 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 	return true
 }
 
-func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots wiring) bool {
+func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
 		if found && !entities.IsTestSide(consumer) && !roots[edge.Dependent] &&
-			!isAfterword(graph, edge.Dependent) {
+			!IsAfterword(graph, edge.Dependent) {
 			return true
 		}
 	}
@@ -74,19 +74,19 @@ func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots wir
 	return false
 }
 
-// featureOf names the slice an entry point opens. Two entry points of the same
+// FeatureOf names the slice an entry point opens. Two entry points of the same
 // directory open the same feature: a package's handlers are one feature, not
 // one feature each.
-func featureOf(decl entities.Decl) FeatureID {
+func FeatureOf(decl entities.Decl) FeatureID {
 	dir := decl.Unit.Dir()
 	if dir == "" {
-		dir = parentDir(decl.Key.File)
+		dir = ParentDir(decl.Key.File)
 	}
 
 	return FeatureID(dir)
 }
 
-func parentDir(path string) string {
+func ParentDir(path string) string {
 	if cut := strings.LastIndex(path, "/"); cut > 0 {
 		return path[:cut]
 	}
@@ -94,10 +94,10 @@ func parentDir(path string) string {
 	return "."
 }
 
-// reachFrom walks the dependency closure of one entry point. The walk follows
+// ReachFrom walks the dependency closure of one entry point. The walk follows
 // Needs, so it collects everything that has to exist before the entry point
 // does - which is exactly the slice the entry point is the tip of.
-func reachFrom(graph entities.Graph, start entities.DeclKey) map[entities.DeclKey]bool {
+func ReachFrom(graph entities.Graph, start entities.DeclKey) map[entities.DeclKey]bool {
 	seen := map[entities.DeclKey]bool{start: true}
 	queue := []entities.DeclKey{start}
 

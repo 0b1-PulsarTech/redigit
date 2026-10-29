@@ -8,7 +8,7 @@ import "github.com/wrapped-owls/redigit/internal/domain/entities"
 // count, so a provider of a shared declaration is shared too, and an atom goes
 // whole.
 func shareDependencies(graph entities.Graph, own ownership) {
-	atoms := atomGroups(graph)
+	atoms := AtomGroups(graph)
 	queue := make([]entities.DeclKey, 0, graph.Len())
 
 	for _, decl := range graph.Decls() {

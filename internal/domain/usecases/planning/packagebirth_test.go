@@ -30,7 +30,7 @@ func TestSharedPackagesSkipsWhatIsBornElsewhere(t *testing.T) {
 			plain.Key: SharedFeature, sibling.Key: SharedFeature, generated.Key: SharedFeature,
 			table.Key: SharedFeature, owned.Key: "f", held.Key: SharedFeature,
 		},
-		deferred: wiring{held.Key: true},
+		deferred: Wiring{held.Key: true},
 	}
 
 	got := sharedPackages(graph, own)["lib"]

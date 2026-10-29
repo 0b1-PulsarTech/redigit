@@ -61,8 +61,8 @@ func TestDeferLibraryEntries(t *testing.T) {
 	owned := decl("lib/b.go", "B", "lib")
 	own := ownership{
 		owner:    map[entities.DeclKey]FeatureID{free.Key: SharedFeature, owned.Key: "f"},
-		deferred: wiring{},
-		loose:    wiring{},
+		deferred: Wiring{},
+		loose:    Wiring{},
 	}
 
 	deferLibraryEntries(own, []entities.Decl{free, owned})

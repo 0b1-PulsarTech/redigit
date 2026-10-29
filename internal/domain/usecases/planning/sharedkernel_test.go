@@ -283,7 +283,7 @@ func TestUnbornProvidersBringsWhatAWalkedStatementReadsFromAFeature(t *testing.T
 			health.Key: "w",
 			status.Key: "w",
 		},
-		roots: wiring{stmt.Key: true},
+		roots: Wiring{stmt.Key: true},
 	}
 
 	got := unbornProviders(graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{})

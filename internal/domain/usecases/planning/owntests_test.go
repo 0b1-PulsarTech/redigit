@@ -34,13 +34,13 @@ func TestOwnTests(t *testing.T) {
 			code.Key: "a", later.Key: "b", root.Key: SharedFeature,
 			testCode.Key: SharedFeature, testLater.Key: SharedFeature, testRoot.Key: SharedFeature,
 		},
-		deferred: wiring{
+		deferred: Wiring{
 			root.Key:      true,
 			testCode.Key:  true,
 			testLater.Key: true,
 			testRoot.Key:  true,
 		},
-		roots: wiring{root.Key: true},
+		roots: Wiring{root.Key: true},
 	}
 
 	born := map[entities.DeclKey]bool{code.Key: true}

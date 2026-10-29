@@ -20,7 +20,7 @@ func splitLate(
 		waiting[key] = true
 	}
 
-	atoms := atomGroups(graph)
+	atoms := AtomGroups(graph)
 
 	for changed := true; changed; {
 		changed = false

@@ -7,8 +7,8 @@ import "github.com/wrapped-owls/redigit/internal/domain/entities"
 // own package's tests read is the code under test, not support. Owned as an
 // entry point, support formed a feature of its own and held back every test
 // that needs it; deferred like a test, it is born with the first one.
-func testSupport(graph entities.Graph) wiring {
-	out := wiring{}
+func testSupport(graph entities.Graph) Wiring {
+	out := Wiring{}
 
 	for changed := true; changed; {
 		changed = false
@@ -30,12 +30,12 @@ func testSupport(graph entities.Graph) wiring {
 	return out
 }
 
-func onlyOtherTestsRead(graph entities.Graph, decl entities.Decl, support wiring) bool {
+func onlyOtherTestsRead(graph entities.Graph, decl entities.Decl, support Wiring) bool {
 	read := false
 
 	for _, edge := range graph.Consumers(decl.Key) {
 		consumer, found := graph.Decl(edge.Dependent)
-		if !found || entities.IsStructural(edge.Reason) || isAfterword(graph, edge.Dependent) {
+		if !found || entities.IsStructural(edge.Reason) || IsAfterword(graph, edge.Dependent) {
 			continue
 		}
 

@@ -21,9 +21,9 @@ func unbornProviders(
 	}
 
 	index := sharedIndex{
-		atoms:    atomGroups(graph),
+		atoms:    AtomGroups(graph),
 		testsOf:  testAnchors(graph),
-		subjects: testSubjects(graph),
+		subjects: TestSubjects(graph),
 		walked:   wanted,
 		own:      own,
 	}

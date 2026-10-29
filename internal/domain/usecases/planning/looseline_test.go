@@ -47,7 +47,7 @@ func TestLooseLines(t *testing.T) {
 		{"the code itself", code.Key, false},
 	}
 
-	loose := looseLines(graph)
+	loose := LooseLines(graph)
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -77,19 +77,19 @@ func TestTiedToFreshCountsOnlyWhatTheLineNames(t *testing.T) {
 
 	testCases := []struct {
 		name  string
-		fresh wiring
+		fresh Wiring
 		want  bool
 	}{
-		{"the manifest is fresh, the module is not", wiring{header.Key: true}, false},
-		{"the module it names is fresh", wiring{module.Key: true}, true},
-		{"nothing is fresh", wiring{}, false},
+		{"the manifest is fresh, the module is not", Wiring{header.Key: true}, false},
+		{"the module it names is fresh", Wiring{module.Key: true}, true},
+		{"nothing is fresh", Wiring{}, false},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := tiedToFresh(graph, use.Key, testCase.fresh, wiring{})
+			got := TiedToFresh(graph, use.Key, testCase.fresh, Wiring{})
 			if got != testCase.want {
 				t.Fatalf("tiedToFresh() = %v, want %v", got, testCase.want)
 			}

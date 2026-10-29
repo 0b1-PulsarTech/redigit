@@ -2,7 +2,7 @@ package planning
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
-func atomGroups(graph entities.Graph) map[string][]entities.DeclKey {
+func AtomGroups(graph entities.Graph) map[string][]entities.DeclKey {
 	groups := map[string][]entities.DeclKey{}
 
 	for _, decl := range graph.Decls() {
@@ -16,11 +16,11 @@ func atomGroups(graph entities.Graph) map[string][]entities.DeclKey {
 	return groups
 }
 
-// atomExtent maps each key's index to the index of the last member of its atom,
+// AtomExtent maps each key's index to the index of the last member of its atom,
 // or to its own when it belongs to none. An atom is born in one commit, and
 // members that tied at one position arrive interleaved with unrelated
 // declarations, so a cut between two of them is not a cut the plan may make.
-func atomExtent(graph entities.Graph, keys []entities.DeclKey) []int {
+func AtomExtent(graph entities.Graph, keys []entities.DeclKey) []int {
 	last := map[string]int{}
 	atomOf := make([]string, len(keys))
 

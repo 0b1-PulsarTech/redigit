@@ -31,8 +31,8 @@ func newPlacement(graph entities.Graph, keys []entities.DeclKey) *placement {
 	return &placement{
 		graph:    graph,
 		index:    index,
-		subjects: testSubjects(graph),
-		lastOf:   atomExtent(graph, keys),
+		subjects: TestSubjects(graph),
+		lastOf:   AtomExtent(graph, keys),
 		after:    map[int][]entities.DeclKey{},
 		moved:    map[entities.DeclKey]bool{},
 		slot:     map[entities.DeclKey]int{},

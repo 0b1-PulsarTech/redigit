@@ -10,7 +10,7 @@ func ownTests(
 	own ownership,
 	born, fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
-	subjects := testSubjects(graph)
+	subjects := TestSubjects(graph)
 	taken := map[entities.DeclKey]bool{}
 
 	for _, key := range readyDeferred(graph, own, born, fresh) {

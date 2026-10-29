@@ -69,8 +69,8 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 			own := ownership{
 				owner:    owner,
 				reach:    testCase.reach,
-				deferred: wiring{suite.Key: true},
-				roots:    wiring{},
+				deferred: Wiring{suite.Key: true},
+				roots:    Wiring{},
 			}
 			born := map[entities.DeclKey]bool{counted.Key: true}
 			fresh := map[entities.DeclKey]bool{counted.Key: true}

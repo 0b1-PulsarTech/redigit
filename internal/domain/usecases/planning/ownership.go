@@ -17,14 +17,14 @@ type ownership struct {
 	order []FeatureID
 	// deferred is the wiring and its tests: owned only once the features are
 	// in build order, by the last one they need.
-	deferred wiring
-	roots    wiring
+	deferred Wiring
+	roots    Wiring
 	// support is the code only other packages' tests read; it is deferred and
 	// born with the first test that needs it.
-	support wiring
+	support Wiring
 	// loose is what nothing reads, deferred and born once what it names exists:
 	// the manifest lines and the entries of a library.
-	loose wiring
+	loose Wiring
 	// packages is, per unit, the shared declarations of production code that no
 	// test and no deferral holds back.
 	packages map[entities.UnitID][]entities.DeclKey
@@ -47,14 +47,14 @@ func assign(graph entities.Graph) ownership {
 		reach: map[entities.DeclKey]int{},
 		group: map[FeatureID]FeatureID{},
 		cost:  map[FeatureID]int{},
-		roots: codeWiring(graph, entities.FindWiring(graph)),
-		loose: looseLines(graph),
+		roots: CodeWiring(graph, entities.FindWiring(graph)),
+		loose: LooseLines(graph),
 	}
 
 	own.support = testSupport(graph)
-	own.deferred = deferTests(graph, own.roots, own.support)
+	own.deferred = DeferTests(graph, own.roots, own.support)
 
-	entries := entryPoints(graph, own.roots)
+	entries := EntryPoints(graph, own.roots)
 	walk := walkEntries(graph, own, entries)
 
 	unionAtoms(graph, walk.reachedBy)
@@ -116,7 +116,7 @@ func shareUnreached(graph entities.Graph, own ownership) {
 }
 
 func unionAtoms(graph entities.Graph, reachedBy map[entities.DeclKey]map[FeatureID]bool) {
-	for _, members := range atomGroups(graph) {
+	for _, members := range AtomGroups(graph) {
 		union := map[FeatureID]bool{}
 
 		for _, key := range members {

@@ -27,7 +27,7 @@ func sortForBirth(
 	})
 
 	out := make([]entities.DeclKey, 0, len(sorted))
-	subjects := testSubjects(graph)
+	subjects := TestSubjects(graph)
 
 	for start := 0; start < len(sorted); {
 		end := start + 1

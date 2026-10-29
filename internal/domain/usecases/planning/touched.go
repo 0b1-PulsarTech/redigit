@@ -24,10 +24,10 @@ func touched(
 
 			needed := needsFresh(graph, subjects, key, fresh, out)
 			if own.loose[key] {
-				needed = needed || tiedToFresh(graph, key, fresh, out)
+				needed = needed || TiedToFresh(graph, key, fresh, out)
 			}
 
-			if !needed && isAfterwordBase(graph, key) {
+			if !needed && IsAfterwordBase(graph, key) {
 				needed = consumedBy(graph, key, out)
 			}
 

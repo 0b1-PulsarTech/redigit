@@ -25,7 +25,7 @@ func walkEntries(graph entities.Graph, own ownership, entries []entities.Decl) e
 	}
 
 	for _, entry := range entries {
-		feature := featureOf(entry)
+		feature := FeatureOf(entry)
 
 		if !own.support[entry.Key] && !walk.built[feature] {
 			walk.built[feature] = true
@@ -41,7 +41,7 @@ func walkEntries(graph entities.Graph, own ownership, entries []entities.Decl) e
 			}
 		}
 
-		for key := range reachFrom(graph, entry.Key) {
+		for key := range ReachFrom(graph, entry.Key) {
 			if walk.reachedBy[key] == nil {
 				walk.reachedBy[key] = map[FeatureID]bool{}
 			}

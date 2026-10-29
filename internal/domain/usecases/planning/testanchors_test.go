@@ -26,7 +26,7 @@ func TestAnchorTests(t *testing.T) {
 	)
 
 	anchored, _ := anchorTests(graph, entities.Ordering{})
-	got := testSubjects(anchored)
+	got := TestSubjects(anchored)
 
 	testCases := []struct {
 		name string
@@ -136,7 +136,7 @@ func TestAnchorTestsWaitsForTheEarliestOfATwin(t *testing.T) {
 	}}
 
 	anchored, raised := anchorTests(graph, order)
-	got := testSubjects(anchored)[helper.Key]
+	got := TestSubjects(anchored)[helper.Key]
 
 	if !slices.Equal(got, []entities.DeclKey{early.Key}) {
 		t.Fatalf("subjects = %v, want only %v", got, early.Key)

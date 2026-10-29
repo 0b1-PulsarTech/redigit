@@ -175,7 +175,7 @@ func TestPlannerVerticalCommitCrossesDirectories(t *testing.T) {
 
 		dirs := map[string]bool{}
 		for _, key := range commit.Decls {
-			dirs[parentDir(key.File)] = true
+			dirs[ParentDir(key.File)] = true
 		}
 
 		widest = max(widest, len(dirs))

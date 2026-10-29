@@ -27,7 +27,7 @@ func TestShareCompanionsFollowsTheTypeAFunctionBuilds(t *testing.T) {
 			repo.Key: SharedFeature, build.Key: "wire/di", elsewhere.Key: "wire/di",
 			plain.Key: "wire/di", checkTest.Key: "wire/di",
 		},
-		deferred: wiring{},
+		deferred: Wiring{},
 	}
 
 	shareCompanions(graph, own)

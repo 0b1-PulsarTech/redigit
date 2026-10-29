@@ -21,7 +21,7 @@ func TestHasProductionConsumerIgnoresAnAfterword(t *testing.T) {
 		nil,
 	)
 
-	if hasProductionConsumer(graph, route.Key, wiring{}) {
+	if hasProductionConsumer(graph, route.Key, Wiring{}) {
 		t.Fatal("a changelog line counted as a production consumer of the route it describes")
 	}
 }

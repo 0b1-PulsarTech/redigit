@@ -32,7 +32,7 @@ func TestIsAfterword(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := isAfterword(graph, testCase.key); got != testCase.want {
+			if got := IsAfterword(graph, testCase.key); got != testCase.want {
 				t.Fatalf("isAfterword() = %v, want %v", got, testCase.want)
 			}
 		})
@@ -51,7 +51,7 @@ func TestCodeWiringDropsADocumentThatNamesTheProgram(t *testing.T) {
 		nil,
 	)
 
-	got := codeWiring(graph, wiring{entry.Key: true, boot.Key: true})
+	got := CodeWiring(graph, Wiring{entry.Key: true, boot.Key: true})
 	if got[entry.Key] || !got[boot.Key] {
 		t.Fatalf("codeWiring() = %v, want only the code root", got)
 	}

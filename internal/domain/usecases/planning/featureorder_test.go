@@ -177,19 +177,19 @@ func TestFeatureNeedsBehindADeferred(t *testing.T) {
 	testCases := []struct {
 		name     string
 		edges    []entities.Edge
-		deferred wiring
+		deferred Wiring
 		want     bool
 	}{
 		{
 			"a feature reaching a deferred declaration waits for the features behind it",
 			[]entities.Edge{needs(reader, registry), needs(registry, bill)},
-			wiring{registry.Key: true},
+			Wiring{registry.Key: true},
 			true,
 		},
 		{
 			"through a chain of deferred declarations",
 			[]entities.Edge{needs(reader, registry), needs(registry, hop), needs(hop, bill)},
-			wiring{registry.Key: true, hop.Key: true},
+			Wiring{registry.Key: true, hop.Key: true},
 			true,
 		},
 		{

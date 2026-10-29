@@ -31,8 +31,8 @@ func TestReadyDeferredWaitsForTheWholeAtom(t *testing.T) {
 			code.Key: "a", later.Key: "b",
 			setup.Key: SharedFeature, first.Key: SharedFeature, plain.Key: SharedFeature,
 		},
-		deferred: wiring{setup.Key: true, first.Key: true, plain.Key: true},
-		roots:    wiring{},
+		deferred: Wiring{setup.Key: true, first.Key: true, plain.Key: true},
+		roots:    Wiring{},
 	}
 
 	born := map[entities.DeclKey]bool{code.Key: true}
@@ -86,8 +86,8 @@ func TestReadyDeferredWaitsForSharedCodeAFeatureAlsoUses(t *testing.T) {
 		reach: map[entities.DeclKey]int{
 			both.Key: 2, onlyWiring.Key: 1,
 		},
-		deferred: wiring{registration.Key: true},
-		roots:    wiring{registration.Key: true},
+		deferred: Wiring{registration.Key: true},
+		roots:    Wiring{registration.Key: true},
 	}
 
 	fresh := map[entities.DeclKey]bool{onlyWiring.Key: true}

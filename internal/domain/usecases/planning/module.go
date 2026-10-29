@@ -29,7 +29,7 @@ func moduleDir(graph entities.Graph, decl entities.Decl) string {
 // isHead reports whether an entry point is plugged into the wiring: a handler,
 // a sink, a worker. An unconsumed declaration nothing registers is dead code or
 // a program of its own, and says nothing about the module it sits in.
-func isHead(graph entities.Graph, entry entities.Decl, roots wiring) bool {
+func isHead(graph entities.Graph, entry entities.Decl, roots Wiring) bool {
 	for _, edge := range graph.Consumers(entry.Key) {
 		if roots[edge.Dependent] {
 			return true
@@ -88,7 +88,7 @@ func readFromOutside(graph entities.Graph) map[string]bool {
 func atModuleRoot(graph entities.Graph, decl entities.Decl) bool {
 	dir := decl.Unit.Dir()
 	if dir == "" {
-		dir = parentDir(decl.Key.File)
+		dir = ParentDir(decl.Key.File)
 	}
 
 	return dir == moduleDir(graph, decl)

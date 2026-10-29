@@ -24,7 +24,7 @@ func anchorTests(
 ) (entities.Graph, entities.Ordering) {
 	decls := graph.Decls()
 	index := newSubjectIndex(decls, order)
-	own := testSubjects(graph)
+	own := TestSubjects(graph)
 	anchors := append([]entities.Anchor(nil), graph.Anchors()...)
 
 	inFile := map[string]map[entities.DeclKey]bool{}
