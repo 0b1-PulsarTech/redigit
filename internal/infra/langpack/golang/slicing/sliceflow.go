@@ -1,4 +1,4 @@
-package golang
+package slicing
 
 import (
 	"go/ast"

@@ -1,4 +1,4 @@
-package golang
+package slicing
 
 import (
 	"context"
@@ -61,7 +61,7 @@ func typeLocals(fset *token.FileSet, file *ast.File) *types.Info {
 // reads what it declares, because Go refuses a local that is declared and not
 // used. A function with results is born with its final statement, or it would
 // stop compiling for want of a return.
-func (Syntax) Slice(
+func Slice(
 	_ context.Context,
 	fn entities.Decl,
 	source []byte,

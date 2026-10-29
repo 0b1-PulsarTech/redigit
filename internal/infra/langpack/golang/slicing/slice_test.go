@@ -1,4 +1,4 @@
-package golang
+package slicing
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/render"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
 )
 
@@ -71,7 +72,6 @@ func Use() {
 func sliceOf(t *testing.T, name string) (entities.Decl, bool, []entities.Decl, []entities.Edge) {
 	t.Helper()
 
-	syntax := NewSyntax()
 	source := []byte(sliceSource)
 
 	decls, err := syntax.Declarations(context.Background(), "app/app.go", source)
@@ -84,7 +84,7 @@ func sliceOf(t *testing.T, name string) (entities.Decl, bool, []entities.Decl, [
 			continue
 		}
 
-		sliced, ok, err := syntax.Slice(context.Background(), decl, source)
+		sliced, ok, err := Slice(context.Background(), decl, source)
 		if err != nil {
 			t.Fatalf("Slice(%s) error = %v", name, err)
 		}
@@ -193,7 +193,6 @@ func TestSliceBirthsAFunctionWithoutResultsWithItsFirstStatement(t *testing.T) {
 func TestRenderWritesOnlyTheKeptStatements(t *testing.T) {
 	t.Parallel()
 
-	syntax := NewSyntax()
 	source := []byte(sliceSource)
 	head, _, members, _ := sliceOf(t, "Register")
 
@@ -221,7 +220,7 @@ func TestRenderWritesOnlyTheKeptStatements(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := syntax.Render(context.Background(), source, testCase.keep)
+			got, err := render.Render(context.Background(), source, testCase.keep)
 			if err != nil {
 				t.Fatalf("Render() error = %v", err)
 			}
@@ -244,10 +243,9 @@ func TestRenderWritesOnlyTheKeptStatements(t *testing.T) {
 func TestRenderWritesAFunctionNoStatementNamesWhole(t *testing.T) {
 	t.Parallel()
 
-	syntax := NewSyntax()
 	key := entities.DeclKey{File: "app/app.go", Kind: entities.KindFunc, Name: "Use"}
 
-	got, err := syntax.Render(context.Background(), []byte(sliceSource), []entities.DeclKey{key})
+	got, err := render.Render(context.Background(), []byte(sliceSource), []entities.DeclKey{key})
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -262,7 +260,6 @@ func TestRenderWritesAFunctionNoStatementNamesWhole(t *testing.T) {
 func TestSliceCutsAReturnedListByElement(t *testing.T) {
 	t.Parallel()
 
-	syntax := NewSyntax()
 	source := []byte(sliceSource)
 
 	for _, name := range []string{"Table", "Chain"} {
@@ -276,7 +273,7 @@ func TestSliceCutsAReturnedListByElement(t *testing.T) {
 				head.Atom, members[0].Atom, members[1].Atom)
 		}
 
-		got, err := syntax.Render(
+		got, err := render.Render(
 			context.Background(), source, []entities.DeclKey{head.Key, members[1].Key},
 		)
 		if err != nil {
