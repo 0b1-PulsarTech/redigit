@@ -405,3 +405,62 @@ func TestPlannerBirthsATestWaitingOnItsAtomAfterTheLastFeature(t *testing.T) {
 		}
 	}
 }
+
+func TestPlannerBuildsEachHandlerAsItsOwnArc(t *testing.T) {
+	t.Parallel()
+
+	graph, order, named := rooted()
+
+	plan, err := New(Config{}).Plan(graph, order)
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	if len(plan.Unplaced) != 0 {
+		t.Fatalf("Unplaced = %v, want none", plan.Unplaced)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+	runs := []string{}
+
+	for index, commit := range plan.Commits {
+		if len(runs) == 0 || runs[len(runs)-1] != commit.Feature {
+			runs = append(runs, commit.Feature)
+		}
+
+		for _, key := range commit.Decls {
+			bornAt[key] = index
+		}
+	}
+
+	seen := map[string]bool{}
+
+	for _, feature := range runs {
+		if seen[feature] {
+			t.Fatalf("feature runs %v: %q is split in two", runs, feature)
+		}
+
+		seen[feature] = true
+	}
+
+	if !seen["lead/api"] || !seen["bill/api"] {
+		t.Fatalf("feature runs %v, want one arc for each handler", runs)
+	}
+
+	root := bornAt[named["root"].Key]
+	for _, handler := range []string{"leadAPI", "billAPI"} {
+		if bornAt[named[handler].Key] >= root {
+			t.Fatalf(
+				"%s is born at %d, want before the root at %d",
+				handler,
+				bornAt[named[handler].Key],
+				root,
+			)
+		}
+	}
+
+	first := plan.Commits[bornAt[named["kernel"].Key]].Feature
+	if first != "bill/api" {
+		t.Fatalf("the shared declaration is born by %q, want the first feature built", first)
+	}
+}

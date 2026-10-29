@@ -1,6 +1,9 @@
 package entities
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestFindWiringTreatsACutFunctionAsWiring(t *testing.T) {
 	t.Parallel()
@@ -126,5 +129,99 @@ func TestFindWiringTakesInTheRegistrationStepsOfTheWiring(t *testing.T) {
 				t.Fatalf("wiring[%v] = %v, want %v", testCase.key, got, testCase.want)
 			}
 		})
+	}
+}
+
+func decl(file, name string, unit UnitID) Decl {
+	return Decl{
+		Key:  DeclKey{File: file, Kind: KindFunc, Name: name},
+		Unit: unit,
+	}
+}
+
+func needs(dependent, provider Decl) Edge {
+	return Edge{Dependent: dependent.Key, Provider: provider.Key, Reason: ReasonReference}
+}
+
+func twoFeatures() (Graph, map[string]Decl) {
+	kernel := decl("kernel/id.go", "NewID", "kernel")
+
+	leadUse := decl("lead/usecases/create.go", "Create", "lead/usecases")
+	leadRepo := decl("lead/repo/lead.go", "Insert", "lead/repo")
+	leadAPI := decl("lead/api/handler.go", "Handle", "lead/api")
+
+	billUse := decl("bill/usecases/charge.go", "Charge", "bill/usecases")
+	billAPI := decl("bill/api/handler.go", "Handle", "bill/api")
+
+	decls := []Decl{kernel, leadUse, leadRepo, leadAPI, billUse, billAPI}
+	edges := []Edge{
+		needs(leadAPI, leadUse),
+		needs(leadUse, leadRepo),
+		needs(leadRepo, kernel),
+		needs(billAPI, billUse),
+		needs(billUse, kernel),
+	}
+
+	return NewGraph(decls, edges, nil), map[string]Decl{
+		"kernel": kernel, "leadUse": leadUse, "leadRepo": leadRepo,
+		"leadAPI": leadAPI, "billUse": billUse, "billAPI": billAPI,
+	}
+}
+
+func rooted() (Graph, map[string]Decl) {
+	base, named := twoFeatures()
+	root := decl("cmd/app/main.go", "Run", "cmd/app")
+
+	decls := base.Decls()
+	edges := base.Edges()
+
+	decls = append(decls, root)
+	edges = append(edges, needs(root, named["leadAPI"]), needs(root, named["billAPI"]))
+
+	for index := range 20 {
+		ballast := decl("cmd/app/bind.go", fmt.Sprintf("Bind%d", index), "cmd/app")
+		decls = append(decls, ballast)
+		edges = append(edges, needs(root, ballast))
+	}
+
+	named["root"] = root
+
+	return NewGraph(decls, edges, nil), named
+}
+
+func TestFindWiring(t *testing.T) {
+	t.Parallel()
+
+	graph, named := rooted()
+	roots := FindWiring(graph)
+
+	testCases := []struct {
+		name string
+		decl Decl
+		want bool
+	}{
+		{"the root needs a twentieth of the program", named["root"], true},
+		{"a handler needs a few declarations", named["leadAPI"], false},
+		{"a leaf needs nothing", named["kernel"], false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := roots[testCase.decl.Key]; got != testCase.want {
+				t.Fatalf("wiring = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFindWiringIgnoresASmallProgram(t *testing.T) {
+	t.Parallel()
+
+	graph, _ := twoFeatures()
+
+	if roots := FindWiring(graph); len(roots) != 0 {
+		t.Fatalf("wiring = %v, want none: the program is smaller than any root", roots)
 	}
 }
