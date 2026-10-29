@@ -2,17 +2,28 @@ package indexing
 
 import (
 	"context"
+	"errors"
+	"iter"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-// RevisionTree reads a path's content at one revision of the source history.
-// It is separate from Tree because the two answer different questions: Tree
-// reads the FINAL text every intermediate version is rendered from, while this
-// reads what a commit actually held, which is how a declaration's real birth
-// is found.
-type RevisionTree interface {
-	ReadAt(ctx context.Context, rev, path string) ([]byte, error)
+var ErrBlobMissing = errors.New("blob missing")
+
+type RevisionLog interface {
+	Changes(ctx context.Context) iter.Seq2[RevisionChange, error]
+	ReadBlob(ctx context.Context, blob string) ([]byte, error)
+}
+
+type RevisionChange struct {
+	Rev   string
+	Files []ChangedFile
+}
+
+type ChangedFile struct {
+	Path      string
+	Blob      string
+	IsDeleted bool
 }
 
 // Chunker splits a file that is not source code into the pieces that can be

@@ -11,50 +11,64 @@ package indexing
 
 import (
 	context "context"
+	iter "iter"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
+	gomock "go.uber.org/mock/gomock"
 )
 
-// MockRevisionTree is a mock of RevisionTree interface.
-type MockRevisionTree struct {
+// MockRevisionLog is a mock of RevisionLog interface.
+type MockRevisionLog struct {
 	ctrl     *gomock.Controller
-	recorder *MockRevisionTreeMockRecorder
+	recorder *MockRevisionLogMockRecorder
 	isgomock struct{}
 }
 
-// MockRevisionTreeMockRecorder is the mock recorder for MockRevisionTree.
-type MockRevisionTreeMockRecorder struct {
-	mock *MockRevisionTree
+// MockRevisionLogMockRecorder is the mock recorder for MockRevisionLog.
+type MockRevisionLogMockRecorder struct {
+	mock *MockRevisionLog
 }
 
-// NewMockRevisionTree creates a new mock instance.
-func NewMockRevisionTree(ctrl *gomock.Controller) *MockRevisionTree {
-	mock := &MockRevisionTree{ctrl: ctrl}
-	mock.recorder = &MockRevisionTreeMockRecorder{mock}
+// NewMockRevisionLog creates a new mock instance.
+func NewMockRevisionLog(ctrl *gomock.Controller) *MockRevisionLog {
+	mock := &MockRevisionLog{ctrl: ctrl}
+	mock.recorder = &MockRevisionLogMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRevisionTree) EXPECT() *MockRevisionTreeMockRecorder {
+func (m *MockRevisionLog) EXPECT() *MockRevisionLogMockRecorder {
 	return m.recorder
 }
 
-// ReadAt mocks base method.
-func (m *MockRevisionTree) ReadAt(ctx context.Context, rev, path string) ([]byte, error) {
+// Changes mocks base method.
+func (m *MockRevisionLog) Changes(ctx context.Context) iter.Seq2[RevisionChange, error] {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadAt", ctx, rev, path)
+	ret := m.ctrl.Call(m, "Changes", ctx)
+	ret0, _ := ret[0].(iter.Seq2[RevisionChange, error])
+	return ret0
+}
+
+// Changes indicates an expected call of Changes.
+func (mr *MockRevisionLogMockRecorder) Changes(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Changes", reflect.TypeOf((*MockRevisionLog)(nil).Changes), ctx)
+}
+
+// ReadBlob mocks base method.
+func (m *MockRevisionLog) ReadBlob(ctx context.Context, blob string) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadBlob", ctx, blob)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ReadAt indicates an expected call of ReadAt.
-func (mr *MockRevisionTreeMockRecorder) ReadAt(ctx, rev, path any) *gomock.Call {
+// ReadBlob indicates an expected call of ReadBlob.
+func (mr *MockRevisionLogMockRecorder) ReadBlob(ctx, blob any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadAt", reflect.TypeOf((*MockRevisionTree)(nil).ReadAt), ctx, rev, path)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBlob", reflect.TypeOf((*MockRevisionLog)(nil).ReadBlob), ctx, blob)
 }
 
 // MockChunker is a mock of Chunker interface.
@@ -247,6 +261,46 @@ func (mr *MockSyntaxMockRecorder) Render(ctx, source, keep any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Render", reflect.TypeOf((*MockSyntax)(nil).Render), ctx, source, keep)
 }
 
+// MockSlicer is a mock of Slicer interface.
+type MockSlicer struct {
+	ctrl     *gomock.Controller
+	recorder *MockSlicerMockRecorder
+	isgomock struct{}
+}
+
+// MockSlicerMockRecorder is the mock recorder for MockSlicer.
+type MockSlicerMockRecorder struct {
+	mock *MockSlicer
+}
+
+// NewMockSlicer creates a new mock instance.
+func NewMockSlicer(ctrl *gomock.Controller) *MockSlicer {
+	mock := &MockSlicer{ctrl: ctrl}
+	mock.recorder = &MockSlicerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSlicer) EXPECT() *MockSlicerMockRecorder {
+	return m.recorder
+}
+
+// Slice mocks base method.
+func (m *MockSlicer) Slice(ctx context.Context, fn entities.Decl, source []byte) (Sliced, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Slice", ctx, fn, source)
+	ret0, _ := ret[0].(Sliced)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Slice indicates an expected call of Slice.
+func (mr *MockSlicerMockRecorder) Slice(ctx, fn, source any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Slice", reflect.TypeOf((*MockSlicer)(nil).Slice), ctx, fn, source)
+}
+
 // MockRulePack is a mock of RulePack interface.
 type MockRulePack struct {
 	ctrl     *gomock.Controller
@@ -352,6 +406,44 @@ func (m *MockAtomizer) Atoms(ctx context.Context, snap entities.Snapshot, decls 
 func (mr *MockAtomizerMockRecorder) Atoms(ctx, snap, decls any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Atoms", reflect.TypeOf((*MockAtomizer)(nil).Atoms), ctx, snap, decls)
+}
+
+// MockEdgeFilter is a mock of EdgeFilter interface.
+type MockEdgeFilter struct {
+	ctrl     *gomock.Controller
+	recorder *MockEdgeFilterMockRecorder
+	isgomock struct{}
+}
+
+// MockEdgeFilterMockRecorder is the mock recorder for MockEdgeFilter.
+type MockEdgeFilterMockRecorder struct {
+	mock *MockEdgeFilter
+}
+
+// NewMockEdgeFilter creates a new mock instance.
+func NewMockEdgeFilter(ctrl *gomock.Controller) *MockEdgeFilter {
+	mock := &MockEdgeFilter{ctrl: ctrl}
+	mock.recorder = &MockEdgeFilterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockEdgeFilter) EXPECT() *MockEdgeFilterMockRecorder {
+	return m.recorder
+}
+
+// FilterEdges mocks base method.
+func (m *MockEdgeFilter) FilterEdges(snap entities.Snapshot, edges []entities.Edge) []entities.Edge {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FilterEdges", snap, edges)
+	ret0, _ := ret[0].([]entities.Edge)
+	return ret0
+}
+
+// FilterEdges indicates an expected call of FilterEdges.
+func (mr *MockEdgeFilterMockRecorder) FilterEdges(snap, edges any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FilterEdges", reflect.TypeOf((*MockEdgeFilter)(nil).FilterEdges), snap, edges)
 }
 
 // MockTree is a mock of Tree interface.
