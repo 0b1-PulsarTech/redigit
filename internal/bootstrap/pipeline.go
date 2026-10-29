@@ -23,7 +23,7 @@ import (
 )
 
 // Pipeline holds the stages wired for one run, plus the language server that
-// answers for them. Close stops that server; nothing else here owns a process.
+// answers for them. Close stops that server and the git reader's processes.
 //
 // Each stage is held through a small local interface, not the concrete
 // domain type, so a test can drive Pipeline's own error-wrapping - Graph,
@@ -32,6 +32,7 @@ import (
 type Pipeline struct {
 	checkout  closer
 	session   closer
+	reader    closer
 	indexer   indexer
 	scanner   scanner
 	orderer   orderer
@@ -81,9 +82,22 @@ type auditor interface {
 	Audit(graph entities.Graph, order entities.Ordering) (auditing.Result, error)
 }
 
+type readerCloser struct{ reader gitstore.Reader }
+
+func (adapter readerCloser) Close(context.Context) error {
+	// The reader closes without a context; fitting it to the closer port lets
+	// its cat-file process be released with the rest.
+	if err := adapter.reader.Close(); err != nil {
+		return fmt.Errorf("stop cat-file: %w", err)
+	}
+
+	return nil
+}
+
 var (
 	_ closer  = (*gitstore.Checkout)(nil)
 	_ closer  = (*lsp.Session)(nil)
+	_ closer  = readerCloser{}
 	_ indexer = indexing.Indexer{}
 	_ scanner = indexing.Scanner{}
 	_ orderer = ordering.Orderer{}
@@ -100,24 +114,17 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, fmt.Errorf("resolve repository path: %w", err)
 	}
 
-	reader := gitstore.NewReader(root, cfg.Rev)
-
-	snapshot, err := reader.Snapshot(ctx)
+	opened, err := openRevision(ctx, root, cfg.Rev)
 	if err != nil {
-		return nil, fmt.Errorf("read snapshot: %w", err)
+		return nil, err
 	}
 
-	// The language server reads a working tree, so the revision has to exist
-	// as one. Pointing it at the repository's own checkout would answer about
-	// whatever is checked out there instead, and answer confidently.
-	checkout, err := gitstore.NewCheckout(ctx, root, cfg.Rev)
-	if err != nil {
-		return nil, fmt.Errorf("materialise revision: %w", err)
-	}
+	reader, snapshot, checkout := opened.reader, opened.snapshot, opened.checkout
+	gitReader := readerCloser{reader: reader}
 
 	session, err := startSession(ctx, cfg, checkout)
 	if err != nil {
-		release(ctx, checkout)
+		release(ctx, checkout, gitReader)
 
 		return nil, err
 	}
@@ -131,7 +138,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	)
 
 	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
-		release(ctx, session, checkout)
+		release(ctx, session, gitReader, checkout)
 
 		return nil, fmt.Errorf("validate chunk map: %w", err)
 	}
@@ -148,7 +155,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 
 	source, err := newTreeSource(ctx, reader)
 	if err != nil {
-		release(ctx, session, checkout)
+		release(ctx, session, gitReader, checkout)
 
 		return nil, err
 	}
@@ -156,14 +163,14 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	scanner := indexing.NewScanner(reader, indexCfg)
 
 	if err = loadCapabilities(ctx, &cfg, scanner, snapshot); err != nil {
-		release(ctx, session, checkout)
+		release(ctx, session, gitReader, checkout)
 
 		return nil, err
 	}
 
 	cfg.Auditing.Unseen, err = unseen(snapshot, cfg.BuildTags)
 	if err != nil {
-		release(ctx, session, checkout)
+		release(ctx, session, gitReader, checkout)
 
 		return nil, err
 	}
@@ -173,6 +180,7 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	return &Pipeline{
 		checkout:  checkout,
 		session:   session,
+		reader:    gitReader,
 		indexer:   indexing.New(session, reader, indexCfg),
 		scanner:   scanner,
 		orderer:   ordering.New(cfg.Ordering),
@@ -184,6 +192,35 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		source:    source,
 		renderer:  newRenderer(configSyntax, renderersByExtension(specific)),
 	}, nil
+}
+
+type revision struct {
+	reader   gitstore.Reader
+	snapshot entities.Snapshot
+	checkout *gitstore.Checkout
+}
+
+func openRevision(ctx context.Context, root, rev string) (revision, error) {
+	reader := gitstore.NewReader(root, rev)
+
+	snapshot, err := reader.Snapshot(ctx)
+	if err != nil {
+		release(ctx, readerCloser{reader: reader})
+
+		return revision{}, fmt.Errorf("read snapshot: %w", err)
+	}
+
+	// The language server reads a working tree, so the revision has to exist
+	// as one. Pointing it at the repository's own checkout would answer about
+	// whatever is checked out there instead, and answer confidently.
+	checkout, err := gitstore.NewCheckout(ctx, root, rev)
+	if err != nil {
+		release(ctx, readerCloser{reader: reader})
+
+		return revision{}, fmt.Errorf("materialise revision: %w", err)
+	}
+
+	return revision{reader: reader, snapshot: snapshot, checkout: checkout}, nil
 }
 
 func startSession(
@@ -334,13 +371,17 @@ func (p *Pipeline) Audit(graph entities.Graph, order entities.Ordering) (auditin
 
 // Close stops the language server. It is registered by the caller right after
 // Start, so a failure later still releases the process.
-// Close stops the language server and removes the throwaway checkout, in that
-// order, folding both failures so one does not hide the other.
+// Close stops the language server and the git reader, then removes the
+// throwaway checkout, folding every failure so one does not hide another.
 func (p *Pipeline) Close(ctx context.Context) error {
 	var closeErr error
 
 	if err := p.session.Close(ctx); err != nil {
 		closeErr = errors.Join(closeErr, fmt.Errorf("close language server: %w", err))
+	}
+
+	if err := p.reader.Close(ctx); err != nil {
+		closeErr = errors.Join(closeErr, fmt.Errorf("close git reader: %w", err))
 	}
 
 	if err := p.checkout.Close(ctx); err != nil {

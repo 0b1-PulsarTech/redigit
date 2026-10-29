@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -15,8 +16,9 @@ import (
 // chunker claims, dated against that revision's own history. It starts no
 // language server: chunking needs no semantic resolution, and a caller who
 // wants only the pieces should not pay for gopls to index the repository.
-func Cut(ctx context.Context, cfg Config) ([]chunking.Piece, error) {
+func Cut(ctx context.Context, cfg Config) (pieces []chunking.Piece, err error) {
 	reader := gitstore.NewReader(cfg.Repo, cfg.Rev)
+	defer func() { err = errors.Join(err, reader.Close()) }()
 
 	snap, err := reader.Snapshot(ctx)
 	if err != nil {
@@ -25,7 +27,7 @@ func Cut(ctx context.Context, cfg Config) ([]chunking.Piece, error) {
 
 	cutter := chunking.NewCutter(reader, reader, chunkers(cfg.ChunkMap))
 
-	pieces, err := cutter.Pieces(ctx, snap)
+	pieces, err = cutter.Pieces(ctx, snap)
 	if err != nil {
 		return nil, fmt.Errorf("cut pieces: %w", err)
 	}

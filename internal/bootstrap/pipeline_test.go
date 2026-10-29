@@ -284,31 +284,27 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 	t.Parallel()
 
 	errSession := errors.New("language server would not stop")
+	errReader := errors.New("cat-file would not stop")
 	errCheckout := errors.New("checkout is still locked")
 
 	testCases := []struct {
 		name         string
 		session      fakeCloser
+		reader       fakeCloser
 		checkout     fakeCloser
 		wantSession  bool
+		wantReader   bool
 		wantCheckout bool
 		wantNil      bool
 	}{
-		{
-			name:     "both close cleanly",
-			session:  fakeCloser{},
-			checkout: fakeCloser{},
-			wantNil:  true,
-		},
+		{name: "all close cleanly", wantNil: true},
 		{
 			name:        "only the session fails",
 			session:     fakeCloser{err: errSession},
-			checkout:    fakeCloser{},
 			wantSession: true,
 		},
 		{
 			name:         "only the checkout fails",
-			session:      fakeCloser{},
 			checkout:     fakeCloser{err: errCheckout},
 			wantCheckout: true,
 		},
@@ -319,13 +315,31 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 			wantSession:  true,
 			wantCheckout: true,
 		},
+		{
+			name:       "only the git reader fails",
+			reader:     fakeCloser{err: errReader},
+			wantReader: true,
+		},
+		{
+			name:         "all three fail, and none hides another",
+			session:      fakeCloser{err: errSession},
+			reader:       fakeCloser{err: errReader},
+			checkout:     fakeCloser{err: errCheckout},
+			wantSession:  true,
+			wantReader:   true,
+			wantCheckout: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			pipeline := &Pipeline{session: testCase.session, checkout: testCase.checkout}
+			pipeline := &Pipeline{
+				session:  testCase.session,
+				reader:   testCase.reader,
+				checkout: testCase.checkout,
+			}
 
 			err := pipeline.Close(t.Context())
 
@@ -337,22 +351,18 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 				return
 			}
 
-			if testCase.wantSession && !errors.Is(err, errSession) {
-				t.Fatalf("Close() = %v, want it to wrap %v", err, errSession)
-			}
-
-			if !testCase.wantSession && errors.Is(err, errSession) {
-				t.Fatalf("Close() = %v, did not expect it to wrap %v", err, errSession)
-			}
-
-			if testCase.wantCheckout && !errors.Is(err, errCheckout) {
-				t.Fatalf("Close() = %v, want it to wrap %v", err, errCheckout)
-			}
-
-			if !testCase.wantCheckout && errors.Is(err, errCheckout) {
-				t.Fatalf("Close() = %v, did not expect it to wrap %v", err, errCheckout)
-			}
+			assertWraps(t, err, errSession, testCase.wantSession)
+			assertWraps(t, err, errReader, testCase.wantReader)
+			assertWraps(t, err, errCheckout, testCase.wantCheckout)
 		})
+	}
+}
+
+func assertWraps(t *testing.T, err, target error, want bool) {
+	t.Helper()
+
+	if errors.Is(err, target) != want {
+		t.Fatalf("Close() = %v, wraps %v: %t, want %t", err, target, !want, want)
 	}
 }
 
