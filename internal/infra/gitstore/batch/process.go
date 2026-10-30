@@ -15,7 +15,7 @@ type process struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	stdout *bufio.Reader
-	stderr tailBuffer
+	stderr TailBuffer
 	reap   sync.Once
 }
 

@@ -25,6 +25,11 @@ func TestTailBuffer(t *testing.T) {
 			want:   strings.Repeat("x", stderrLimit-len("tail")) + "tail",
 		},
 		{
+			name:   "a cut inside a multi-byte rune moves on to the next rune",
+			writes: []string{"x" + "\u20ac" + strings.Repeat("a", stderrLimit-2)},
+			want:   strings.Repeat("a", stderrLimit-2),
+		},
+		{
 			name:   "one oversized write keeps its end",
 			writes: []string{strings.Repeat("y", 3*stderrLimit)},
 			want:   strings.Repeat("y", stderrLimit),
@@ -35,7 +40,7 @@ func TestTailBuffer(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			var tail tailBuffer
+			var tail TailBuffer
 
 			for _, chunk := range testCase.writes {
 				if written, err := tail.Write([]byte(chunk)); err != nil || written != len(chunk) {

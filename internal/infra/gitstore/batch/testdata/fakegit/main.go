@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 func main() {
@@ -26,6 +27,9 @@ func main() {
 	case "silent":
 		silent(dir)
 	case "exit0":
+		_, _ = os.Stdout.WriteString(text)
+	case "argv":
+		_ = os.WriteFile(filepath.Join(dir, "argv"), []byte(strings.Join(os.Args[1:], "\n")), 0o600)
 		_, _ = os.Stdout.WriteString(text)
 	case "flood":
 		flood(dir, text)

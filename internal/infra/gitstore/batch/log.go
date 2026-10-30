@@ -24,7 +24,7 @@ func Log(ctx context.Context, repo, ref string) iter.Seq2[Commit, error] {
 		// A grandchild holding stderr open must not hang Wait.
 		cmd.WaitDelay = waitDelay
 
-		var stderr tailBuffer
+		var stderr TailBuffer
 		cmd.Stderr = &stderr
 
 		stdout, err := cmd.StdoutPipe()
@@ -83,7 +83,7 @@ func Log(ctx context.Context, repo, ref string) iter.Seq2[Commit, error] {
 	}
 }
 
-func runFailure(ctx context.Context, waitErr error, stderr *tailBuffer) error {
+func runFailure(ctx context.Context, waitErr error, stderr *TailBuffer) error {
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return fmt.Errorf("run log: %w", ctxErr)
 	}
@@ -95,7 +95,7 @@ type parseFailureInput struct {
 	cmd    *exec.Cmd
 	cancel context.CancelFunc
 	stdout io.Reader
-	stderr *tailBuffer
+	stderr *TailBuffer
 	cause  error
 }
 
