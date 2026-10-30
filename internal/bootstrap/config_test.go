@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
@@ -73,7 +74,7 @@ func TestSettingsMatchThePacks(t *testing.T) {
 	packsWithoutSettings := []string{dartLanguage, configLanguage}
 
 	packs := make([]string, 0, 4)
-	for _, lang := range specificLanguages(config.Syntax{}, finalTree{}, nil) {
+	for _, lang := range specificLanguages(config.Syntax{}, finalTree{}, typed.NewSource(nil)) {
 		packs = append(packs, lang.Name)
 	}
 

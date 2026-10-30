@@ -252,3 +252,45 @@ func TestDispatchHandsTheFarFlagToTheAuditor(t *testing.T) {
 		t.Fatalf("err = %v, FarApart = %d, want the stop and 7", err, got.Auditing.FarApart)
 	}
 }
+
+func TestParseResolver(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		args    []string
+		want    string
+		wantErr bool
+	}{
+		{"the default", []string{"--repo", "."}, bootstrap.ResolverTyped, false},
+		{"lsp", []string{"--repo", ".", "--resolver", "lsp"}, bootstrap.ResolverLSP, false},
+		{"typed", []string{"--repo", ".", "--resolver", "typed"}, bootstrap.ResolverTyped, false},
+		{
+			"an unknown name is a usage error",
+			[]string{"--repo", ".", "--resolver", "gopls"},
+			"",
+			true,
+		},
+		{"an empty name is a usage error", []string{"--repo", ".", "--resolver", ""}, "", true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg, _, err := parse(newFlagSet(), testCase.args)
+
+			if testCase.wantErr {
+				if !errors.Is(err, ErrUsage) || !errors.Is(err, bootstrap.ErrResolver) {
+					t.Fatalf("err = %v, want ErrUsage and ErrResolver", err)
+				}
+
+				return
+			}
+
+			if err != nil || cfg.Resolver != testCase.want {
+				t.Fatalf("Resolver = %q, %v, want %q", cfg.Resolver, err, testCase.want)
+			}
+		})
+	}
+}

@@ -39,7 +39,7 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 		"",
 		"write blobs to this directory instead of the object database",
 	)
-	set.StringVar(&cfg.ServerCommand, "server", cfg.ServerCommand, "language server command")
+	addServerFlags(set, &cfg)
 	set.StringVar(&layerFile, "layers", "", "layer file: which path prefixes come first")
 	set.StringVar(
 		&featureFile,
@@ -76,6 +76,10 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: --repo is required", ErrUsage)
 	}
 
+	if err := bootstrap.CheckResolver(cfg.Resolver); err != nil {
+		return bootstrap.Config{}, 0, fmt.Errorf("%w: --resolver: %w", ErrUsage, err)
+	}
+
 	if err := applyTags(&cfg, tags); err != nil {
 		return bootstrap.Config{}, 0, err
 	}
@@ -93,6 +97,16 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 	}
 
 	return cfg, far, nil
+}
+
+func addServerFlags(set *flag.FlagSet, cfg *bootstrap.Config) {
+	set.StringVar(&cfg.ServerCommand, "server", cfg.ServerCommand, "language server command")
+	set.StringVar(
+		&cfg.Resolver,
+		"resolver",
+		bootstrap.ResolverTyped,
+		"typed with lsp fallback, or lsp",
+	)
 }
 
 // loadSlicing reads the two files that decide how a layer may reorder: the

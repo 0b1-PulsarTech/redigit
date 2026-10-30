@@ -163,6 +163,43 @@ func TestSnapshotRootIsTheMaterialisedRevision(t *testing.T) {
 	}
 }
 
+func TestCloseAfterARealLanguageServerSession(t *testing.T) {
+	t.Parallel()
+
+	if _, err := exec.LookPath("gopls"); err != nil {
+		t.Skip("gopls not on PATH")
+	}
+
+	dir := t.TempDir()
+	writeFixtureModule(t, dir)
+	initFixtureRepo(t, dir)
+
+	pipeline, err := Start(t.Context(), Config{
+		Repo:          dir,
+		Rev:           "HEAD",
+		ServerCommand: "gopls",
+		ServerArgs:    []string{"-mode=stdio"},
+		Resolver:      ResolverLSP,
+	})
+	if err != nil {
+		t.Fatalf("Start() = %v", err)
+	}
+
+	root := pipeline.Snapshot().Root
+
+	if _, err := pipeline.Graph(t.Context()); err != nil {
+		t.Fatalf("Graph() = %v", err)
+	}
+
+	if err := pipeline.Close(context.WithoutCancel(t.Context())); err != nil {
+		t.Fatalf("Close() = %v, want nil", err)
+	}
+
+	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("checkout %q after Close: stat error = %v, want not exist", root, err)
+	}
+}
+
 func TestStartRefusesAnUnmatchedGlobBeforeCheckout(t *testing.T) {
 	t.Parallel()
 

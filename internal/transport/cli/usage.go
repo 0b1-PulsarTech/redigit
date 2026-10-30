@@ -54,6 +54,10 @@ Flags:
                   {"languages": {
                     "go":  {"tags": ["integration"]},
                     "web": {"virtual": {"virtual:x": "web/x.dart"}}}}
+  --resolver R  how reference queries are answered: typed (default) answers
+                from the type-check the rules already ran and starts the
+                language server only for a query it cannot cover; lsp starts
+                the server first and asks it everything.
   --far  N      positions a declaration may sit ahead of its first outside
                 reader before audit reports it (default 25)
   --layers FILE which path prefixes come first when the graph is indifferent.

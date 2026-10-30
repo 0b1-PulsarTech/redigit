@@ -17,3 +17,26 @@ func TestRunUsageFitsAnEightyColumnTerminal(t *testing.T) {
 		}
 	}
 }
+
+func TestUsageDocumentsTheResolverFlag(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		needle string
+	}{
+		{"the flag", "--resolver R"},
+		{"the typed choice and its default", "typed (default)"},
+		{"the lsp choice", "lsp starts"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if !strings.Contains(usage, testCase.needle) {
+				t.Fatalf("usage holds no %q", testCase.needle)
+			}
+		})
+	}
+}

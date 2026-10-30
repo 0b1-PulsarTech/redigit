@@ -12,6 +12,18 @@ func WarnShortfalls(result indexing.Result) {
 	warnBlind(result)
 }
 
+func WarnClosed(err error) {
+	if err == nil {
+		return
+	}
+
+	// The error names the kept checkout, so a leak on /tmp shows in the log.
+	slog.Warn(
+		"the pipeline did not close cleanly; a throwaway checkout may remain",
+		slog.String("error", err.Error()),
+	)
+}
+
 func warnPartial(result indexing.Result) {
 	for _, partial := range result.Partial {
 		slog.Warn(

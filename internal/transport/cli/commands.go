@@ -70,7 +70,7 @@ func withPipeline(
 		return fmt.Errorf("start pipeline: %w", err)
 	}
 
-	defer func() { _ = pl.Close(context.WithoutCancel(ctx)) }()
+	defer func() { session.WarnClosed(pl.Close(context.WithoutCancel(ctx))) }()
 
 	warnUnseen(pl.Unseen())
 	warnUnclaimed(pl.Unclaimed())

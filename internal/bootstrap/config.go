@@ -35,6 +35,7 @@ type Config struct {
 	// Configurable so nothing in this tool hardcodes what Go is.
 	ServerCommand string
 	ServerArgs    []string
+	Resolver      string // ResolverLSP, or ResolverTyped; "" (the zero value) means typed
 
 	Indexing indexing.Config
 	Ordering ordering.Config
@@ -47,7 +48,6 @@ type Config struct {
 	BlobDir string
 
 	Author AuthorConfig
-
 	// Only refines the opaque pack's whole-file default; a path a specific
 	// pack understands structurally is refused (docs/PLANO-EMISSAO.md:113-133).
 	ChunkMap entities.ChunkMap

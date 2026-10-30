@@ -1,9 +1,11 @@
 package bootstrap
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -287,15 +289,22 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 	errSession := errors.New("language server would not stop")
 	errReader := errors.New("cat-file would not stop")
 	errCheckout := errors.New("checkout is still locked")
+	errLoads := errors.New("typed load would not stop")
 
 	testCases := []struct {
 		name     string
+		loads    fakeCloser
 		session  fakeCloser
 		reader   fakeCloser
 		checkout fakeCloser
 		want     []error
 	}{
 		{name: "all close cleanly"},
+		{
+			name:  "only the typed loads fail",
+			loads: fakeCloser{err: errLoads},
+			want:  []error{errLoads},
+		},
 		{
 			name:    "only the session fails",
 			session: fakeCloser{err: errSession},
@@ -307,10 +316,10 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 			want:     []error{errCheckout},
 		},
 		{
-			name:     "both fail, and neither hides the other",
+			name:     "the session fails, so the checkout it may still read is left alone",
 			session:  fakeCloser{err: errSession},
 			checkout: fakeCloser{err: errCheckout},
-			want:     []error{errSession, errCheckout},
+			want:     []error{errSession},
 		},
 		{
 			name:   "only the git reader fails",
@@ -318,11 +327,11 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 			want:   []error{errReader},
 		},
 		{
-			name:     "all three fail, and none hides another",
+			name:     "the reader fails beside a session that keeps the checkout",
 			session:  fakeCloser{err: errSession},
 			reader:   fakeCloser{err: errReader},
 			checkout: fakeCloser{err: errCheckout},
-			want:     []error{errSession, errReader, errCheckout},
+			want:     []error{errSession, errReader},
 		},
 	}
 
@@ -331,6 +340,7 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 			t.Parallel()
 
 			pipeline := &Pipeline{
+				loads:    testCase.loads,
 				session:  testCase.session,
 				reader:   testCase.reader,
 				checkout: testCase.checkout,
@@ -341,13 +351,117 @@ func TestPipelineCloseFoldsBothFailures(t *testing.T) {
 				t.Fatalf("Close() = %v, want nil", err)
 			}
 
-			for _, target := range []error{errSession, errReader, errCheckout} {
+			for _, target := range []error{errLoads, errSession, errReader, errCheckout} {
 				if errors.Is(err, target) != slices.Contains(testCase.want, target) {
 					t.Fatalf("Close() = %v, want exactly %v wrapped", err, testCase.want)
 				}
 			}
 		})
 	}
+}
+
+type orderedCloser struct {
+	name  string
+	order *[]string
+}
+
+func (closing orderedCloser) Close(context.Context) error {
+	*closing.order = append(*closing.order, closing.name)
+
+	return nil
+}
+
+func TestPipelineCloseStopsTheResolverBeforeTheLoadsAndTheCheckoutGoes(t *testing.T) {
+	t.Parallel()
+
+	var order []string
+
+	pipeline := &Pipeline{
+		loads:    orderedCloser{"loads", &order},
+		session:  orderedCloser{"session", &order},
+		reader:   orderedCloser{"reader", &order},
+		checkout: orderedCloser{"checkout", &order},
+	}
+
+	if err := pipeline.Close(t.Context()); err != nil {
+		t.Fatalf("Close() = %v, want nil", err)
+	}
+
+	want := []string{"session", "loads", "reader", "checkout"}
+	if !slices.Equal(order, want) {
+		t.Fatalf("Close() stopped %v, want %v", order, want)
+	}
+}
+
+func TestPipelineCloseKeepsTheCheckoutWhenLoadsStay(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		loadsErr   error
+		sessionErr error
+		wantOrder  []string
+		wantKept   bool
+	}{
+		{"the loads stop", nil, nil, []string{"session", "loads", "reader", "checkout"}, false},
+		{
+			"the close context expired",
+			context.DeadlineExceeded,
+			nil,
+			[]string{"session", "loads", "reader"},
+			true,
+		},
+		{
+			"the session did not close",
+			nil,
+			context.DeadlineExceeded,
+			[]string{"session", "loads", "reader"},
+			true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var order []string
+
+			pipeline := &Pipeline{
+				loads:    failingCloser{orderedCloser{"loads", &order}, testCase.loadsErr},
+				session:  failingCloser{orderedCloser{"session", &order}, testCase.sessionErr},
+				reader:   orderedCloser{"reader", &order},
+				checkout: orderedCloser{"checkout", &order},
+				snapshot: entities.Snapshot{Root: "/tmp/kept-checkout"},
+			}
+
+			err := pipeline.Close(t.Context())
+
+			if !slices.Equal(order, testCase.wantOrder) {
+				t.Fatalf("Close() stopped %v, want %v", order, testCase.wantOrder)
+			}
+
+			if testCase.wantKept {
+				if !errors.Is(err, cmp.Or(testCase.loadsErr, testCase.sessionErr)) ||
+					!strings.Contains(err.Error(), "/tmp/kept-checkout") {
+					t.Fatalf("Close() = %v, want the kept checkout path and the close failure", err)
+				}
+			} else if err != nil {
+				t.Fatalf("Close() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+type failingCloser struct {
+	orderedCloser
+
+	err error
+}
+
+func (closing failingCloser) Close(ctx context.Context) error {
+	_ = closing.orderedCloser.Close(ctx)
+
+	return closing.err
 }
 
 func TestPipelineUnclaimed(t *testing.T) {
@@ -424,9 +538,9 @@ func TestBuildFlags(t *testing.T) {
 		{"empty slice also yields nil", []string{}, nil},
 		{"one tag", []string{"integration"}, []string{"-tags=integration"}},
 		{
-			"multiple tags each get their own flag",
+			"multiple tags share one flag, as go keeps only the last",
 			[]string{"integration", "e2e"},
-			[]string{"-tags=integration", "-tags=e2e"},
+			[]string{"-tags=integration,e2e"},
 		},
 	}
 

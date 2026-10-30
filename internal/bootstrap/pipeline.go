@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
@@ -17,7 +16,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
-	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/web"
 	"github.com/wrapped-owls/redigit/internal/infra/lsp"
 )
@@ -31,6 +30,7 @@ import (
 // language server, git worktree, or parsed source tree.
 type Pipeline struct {
 	checkout  closer
+	loads     closer
 	session   closer
 	reader    closer
 	indexer   indexer
@@ -95,6 +95,7 @@ func (adapter readerCloser) Close(context.Context) error {
 var (
 	_ closer  = (*gitstore.Checkout)(nil)
 	_ closer  = (*lsp.Session)(nil)
+	_ closer  = (*typed.Source)(nil)
 	_ closer  = readerCloser{}
 	_ indexer = indexing.Indexer{}
 	_ scanner = indexing.Scanner{}
@@ -103,9 +104,9 @@ var (
 	_ auditor = auditing.Auditor{}
 )
 
-// Start builds the pipeline: it reads the snapshot, launches the language
-// server, and wires each stage to the ports it consumes. This is the only
-// place that names a concrete adapter.
+// Start builds the pipeline: it reads the snapshot, starts the language server (at once for lsp,
+// on the first fallback for typed), and wires each stage to the ports it consumes. This is the
+// only place that names a concrete adapter.
 func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	root, err := filepath.Abs(cfg.Repo)
 	if err != nil {
@@ -120,9 +121,16 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	reader, snapshot, checkout := opened.reader, opened.snapshot, opened.checkout
 	gitReader := readerCloser{reader: reader}
 
-	session, err := startSession(ctx, cfg, checkout)
+	// The snapshot describes a REVISION, so its root is where that revision was materialised, not
+	// the repository whose working tree holds whatever happens to be checked out. A language pack
+	// that reads a sibling file from disk (a generator directive, a mock header) would otherwise
+	// read the wrong bytes, or fail on a file the revision has and the checkout does not.
+	snapshot.Root = checkout.Dir()
+	goSource := typed.NewSource(cfg.BuildTags)
+
+	wired, err := wireResolver(ctx, cfg, snapshot, goSource, serverStarter(cfg, checkout.Dir()))
 	if err != nil {
-		release(ctx, checkout, gitReader)
+		release(ctx, goSource, checkout, gitReader)
 
 		return nil, err
 	}
@@ -132,28 +140,20 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	specific := specificLanguages(
 		configSyntax,
 		finalTree{snapshot.Files, reader, cfg.Virtual},
-		cfg.BuildTags,
+		goSource,
 	)
 
 	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
-		release(ctx, session, gitReader, checkout)
+		release(ctx, goSource, wired.session, gitReader, checkout)
 
 		return nil, fmt.Errorf("validate chunk map: %w", err)
 	}
 
 	indexCfg.Languages = append(specific, opaqueLanguage(configSyntax))
 
-	// The snapshot describes a REVISION, so its root is where that revision
-	// was materialised - not the repository, whose working tree holds whatever
-	// happens to be checked out. A language pack that reads a sibling file
-	// from disk (a generator directive, a mock header) would otherwise read
-	// the wrong bytes, or fail on a file the revision has and the checkout
-	// does not.
-	snapshot.Root = checkout.Dir()
-
 	source, err := newTreeSource(ctx, reader)
 	if err != nil {
-		release(ctx, session, gitReader, checkout)
+		release(ctx, goSource, wired.session, gitReader, checkout)
 
 		return nil, err
 	}
@@ -161,14 +161,14 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 	scanner := indexing.NewScanner(reader, indexCfg)
 
 	if err = loadCapabilities(ctx, &cfg, scanner, snapshot); err != nil {
-		release(ctx, session, gitReader, checkout)
+		release(ctx, goSource, wired.session, gitReader, checkout)
 
 		return nil, err
 	}
 
 	cfg.Auditing.Unseen, err = unseen(snapshot, cfg.BuildTags)
 	if err != nil {
-		release(ctx, session, gitReader, checkout)
+		release(ctx, goSource, wired.session, gitReader, checkout)
 
 		return nil, err
 	}
@@ -177,9 +177,10 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 
 	return &Pipeline{
 		checkout:  checkout,
-		session:   session,
+		loads:     goSource,
+		session:   wired.session,
 		reader:    gitReader,
-		indexer:   indexing.New(session, reader, indexCfg),
+		indexer:   wired.guard(indexing.New(wired.resolver, reader, indexCfg)),
 		scanner:   scanner,
 		orderer:   ordering.New(cfg.Ordering),
 		planner:   planning.New(cfg.Planning),
@@ -229,95 +230,12 @@ func openRevision(ctx context.Context, root string, cfg Config) (revision, error
 	return revision{reader: reader, snapshot: snapshot, checkout: checkout}, nil
 }
 
-func startSession(
-	ctx context.Context,
-	cfg Config,
-	checkout *gitstore.Checkout,
-) (*lsp.Session, error) {
-	session, err := lsp.StartSession(ctx, lsp.ServerConfig{
-		Command:    cfg.ServerCommand,
-		Args:       cfg.ServerArgs,
-		RootPath:   checkout.Dir(),
-		BuildFlags: buildFlags(cfg.BuildTags),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("start language server: %w", err)
-	}
-
-	return session, nil
-}
-
 // release closes what a failed start already opened. The start's own error is
 // the one worth reporting, so a close error is dropped.
 func release(ctx context.Context, opened ...closer) {
 	for _, c := range opened {
 		_ = c.Close(ctx)
 	}
-}
-
-// unseen names the files this run's build tags leave invisible to the
-// reference queries. It is computed here, at the composition root, because
-// which constraints a tag satisfies is a per-language question and the
-// auditing use case knows no language.
-func unseen(snap entities.Snapshot, tags []string) ([]auditing.Unseen, error) {
-	constrained, err := buildtags.BuildConstraints(snap)
-	if err != nil {
-		return nil, fmt.Errorf("read build constraints: %w", err)
-	}
-
-	hidden, err := buildtags.Hidden(constrained, tags)
-	if err != nil {
-		return nil, fmt.Errorf("evaluate build constraints: %w", err)
-	}
-
-	out := make([]auditing.Unseen, 0, len(hidden))
-	for _, tag := range hidden {
-		out = append(out, auditing.Unseen{
-			File:       tag.File,
-			Constraint: tag.Constraint,
-			Tags:       tag.Tags,
-		})
-	}
-
-	return out, nil
-}
-
-// unclaimed names every final-tree path no configured language's extension
-// list matches. It is computed here, at the composition root, for the same
-// reason unseen is: which extensions a language owns is a per-language
-// question, and the auditing use case knows no language.
-//
-// This is the loud version of the indexer's own read loop
-// (internal/domain/usecases/indexing/indexer.go), which skips exactly these
-// paths with a bare continue and reports nothing - a plan built from this
-// run can never reproduce one of them, and without this, nothing says so
-// until the final-tree invariant fails at the very end.
-func unclaimed(snap entities.Snapshot, langs []indexing.Language) []auditing.Unclaimed {
-	out := make([]auditing.Unclaimed, 0, len(snap.Files))
-
-	for _, file := range snap.Files {
-		if !slices.ContainsFunc(
-			langs,
-			func(lang indexing.Language) bool { return lang.Owns(file) },
-		) {
-			out = append(out, auditing.Unclaimed{File: file})
-		}
-	}
-
-	return out
-}
-
-func buildFlags(tags []string) []string {
-	if len(tags) == 0 {
-		return nil
-	}
-
-	flags := make([]string, 0, len(tags))
-	for _, tag := range tags {
-		flags = append(flags, "-tags="+tag)
-	}
-
-	return flags
 }
 
 func (p *Pipeline) Snapshot() entities.Snapshot { return p.snapshot }
@@ -375,26 +293,36 @@ func (p *Pipeline) Audit(graph entities.Graph, order entities.Ordering) (auditin
 	return result, nil
 }
 
-// Close stops the language server. It is registered by the caller right after
-// Start, so a failure later still releases the process.
-// Close stops the language server and the git reader, then removes the
-// throwaway checkout, folding every failure so one does not hide another.
+// Close stops the language server, the typed loads and the git reader, then
+// removes the throwaway checkout, folding every failure so one does not hide
+// another; the checkout is kept when the session or the loads fail to stop.
+// It is registered by the caller right after Start, so a failure later still
+// releases the process.
 func (p *Pipeline) Close(ctx context.Context) error {
-	var closeErr error
+	// The session and typed loads read the checkout and stop first; one that fails keeps it.
+	// The resolver goes before them: its index build reads the loads, so closing them under it
+	// would log a skipped ad hoc pass that was only cancelled.
+	sessionErr := p.session.Close(ctx)
+	loadsErr := p.loads.Close(ctx)
+	closeErr := errors.Join(
+		stopped("close language server", sessionErr),
+		stopped("stop typed loads", loadsErr),
+		stopped("close git reader", p.reader.Close(ctx)),
+	)
 
-	if err := p.session.Close(ctx); err != nil {
-		closeErr = errors.Join(closeErr, fmt.Errorf("close language server: %w", err))
+	if keep := errors.Join(sessionErr, loadsErr); keep != nil {
+		return errors.Join(closeErr, fmt.Errorf("keep checkout %s: %w", p.snapshot.Root, keep))
 	}
 
-	if err := p.reader.Close(ctx); err != nil {
-		closeErr = errors.Join(closeErr, fmt.Errorf("close git reader: %w", err))
+	return errors.Join(closeErr, stopped("remove checkout", p.checkout.Close(ctx)))
+}
+
+func stopped(name string, err error) error {
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
 	}
 
-	if err := p.checkout.Close(ctx); err != nil {
-		closeErr = errors.Join(closeErr, fmt.Errorf("remove checkout: %w", err))
-	}
-
-	return closeErr
+	return nil
 }
 
 // finalTree is what the Dart and web packs resolve an import against: which
@@ -424,14 +352,14 @@ type treeReader interface {
 func specificLanguages(
 	configSyntax config.Syntax,
 	tree finalTree,
-	tags []string,
+	source *typed.Source,
 ) []indexing.Language {
 	return []indexing.Language{
 		{
 			Name:       goLanguage,
 			Extensions: []string{".go"},
 			Syntax:     golang.NewSyntax(),
-			Rules:      golang.NewRulePack(tags),
+			Rules:      golang.NewRulePackWith(source),
 			Resolved:   true,
 		},
 		{

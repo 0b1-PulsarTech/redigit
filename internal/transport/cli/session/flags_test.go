@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -21,6 +22,7 @@ func testSet(t *testing.T, args ...string) (*flag.FlagSet, bootstrap.Config) {
 	set.StringVar(&cfg.Repo, "repo", "", "")
 	set.StringVar(&cfg.Rev, "rev", cfg.Rev, "")
 	set.StringVar(&cfg.ServerCommand, "server", cfg.ServerCommand, "")
+	set.StringVar(&cfg.Resolver, "resolver", cfg.Resolver, "")
 	set.Func("virtual", "", func(value string) error {
 		if cfg.Virtual == nil {
 			cfg.Virtual = map[string]string{}
@@ -59,6 +61,7 @@ func TestClassifyFlag(t *testing.T) {
 	}{
 		{"tags", ClassKey},
 		{"virtual", ClassKey},
+		{"resolver", ClassKey},
 		{"layers", ClassFile},
 		{"features", ClassFile},
 		{"chunk-map", ClassFile},
@@ -107,9 +110,49 @@ func TestCacheFlagsLeaveOutRunOnlyFlags(t *testing.T) {
 	want := []plancache.Flag{
 		{Name: "layers", Value: layers, IsFile: true},
 		{Name: "repo", Value: "/src"},
+		{Name: "resolver", Value: "typed"},
 		{Name: "tags", Value: "a,b"},
 	}
 	if got := Flags(set, nil); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Flags() = %+v, want %+v", got, want)
+	}
+}
+
+func TestCacheFlagsKeyTheEffectiveResolver(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"the default is typed", []string{"--repo", "/src"}, "typed"},
+		{"typed spelled out", []string{"--repo", "/src", "--resolver", "typed"}, "typed"},
+		{"lsp", []string{"--repo", "/src", "--resolver", "lsp"}, "lsp"},
+	}
+
+	keyed := map[string][]plancache.Flag{}
+
+	for _, testCase := range testCases {
+		set, _ := testSet(t, testCase.args...)
+		got := Flags(set, nil)
+		keyed[testCase.name] = got
+
+		index := slices.IndexFunc(
+			got,
+			func(flag plancache.Flag) bool { return flag.Name == "resolver" },
+		)
+		if index < 0 || got[index].Value != testCase.want {
+			t.Fatalf("%s: Flags() = %+v, want resolver %q", testCase.name, got, testCase.want)
+		}
+	}
+
+	if !reflect.DeepEqual(keyed["the default is typed"], keyed["typed spelled out"]) {
+		t.Fatalf("default %+v and explicit typed %+v key differently",
+			keyed["the default is typed"], keyed["typed spelled out"])
+	}
+
+	if reflect.DeepEqual(keyed["typed spelled out"], keyed["lsp"]) {
+		t.Fatalf("lsp and typed key alike: %+v", keyed["lsp"])
 	}
 }

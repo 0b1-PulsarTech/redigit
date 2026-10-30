@@ -2,6 +2,7 @@ package session
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -83,6 +84,32 @@ func TestWarnShortfalls(t *testing.T) {
 					want,
 				)
 			}
+		}
+	}
+}
+
+func TestWarnClosed(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"a clean close", nil, ""},
+		{
+			"a checkout kept because the session did not stop",
+			errors.New("keep checkout /tmp/redigit-co123: close language server: killed"),
+			`msg="the pipeline did not close cleanly; a throwaway checkout may remain" ` +
+				`error="keep checkout /tmp/redigit-co123: close language server: killed"`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		logged := captureWarnings(t)
+
+		WarnClosed(testCase.err)
+
+		if got := strings.TrimSpace(logged.String()); got != testCase.want {
+			t.Fatalf("%s: logged %q, want %q", testCase.name, got, testCase.want)
 		}
 	}
 }
