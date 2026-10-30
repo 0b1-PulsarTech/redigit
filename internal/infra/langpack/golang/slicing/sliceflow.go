@@ -1,9 +1,11 @@
 package slicing
 
 import (
+	"cmp"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
 	"slices"
 )
 
@@ -133,11 +135,7 @@ func (flow bodyFlow) objectOf(ident *ast.Ident) types.Object {
 func (flow bodyFlow) needs(index int) []int {
 	var out []int
 
-	touched := map[types.Object]bool{}
-	for obj := range flow.writes[index] {
-		touched[obj] = true
-	}
-
+	touched := maps.Clone(flow.writes[index])
 	for obj := range flow.reads[index] {
 		touched[obj] = true
 	}
@@ -163,9 +161,11 @@ func (flow bodyFlow) needs(index int) []int {
 	return slices.Compact(out)
 }
 
+func byPos(left, right types.Object) int { return cmp.Compare(left.Pos(), right.Pos()) }
+
 func (flow bodyFlow) joinDeclarations(groups groups) {
 	for index := range flow.declares {
-		for obj := range flow.declares[index] {
+		for _, obj := range slices.SortedFunc(maps.Keys(flow.declares[index]), byPos) {
 			flow.joinReader(groups, index, obj)
 		}
 	}
