@@ -570,3 +570,173 @@ func TestBuildFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestRunHooks(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("boom")
+	replaced := errors.New("replaced")
+	kept := []string{"kept"}
+
+	testCases := []struct {
+		name          string
+		hooks         []hookSpec
+		wantTrace     []string
+		wantErr       error
+		wantPrefix    string
+		wantLanguages []string
+		wantReplaced  bool
+	}{
+		{
+			name:          "hooks run in order",
+			hooks:         []hookSpec{{name: "rules"}, {name: "shaping"}, {name: "lineage"}},
+			wantTrace:     []string{"rules", "shaping", "lineage"},
+			wantLanguages: kept,
+		},
+		{name: "no hooks leave the stages alone", wantLanguages: kept},
+		{
+			name: "the first error short-circuits and names the hook",
+			hooks: []hookSpec{
+				{name: "rules"}, {name: "shaping", err: boom}, {name: "lineage"},
+			},
+			wantTrace:     []string{"rules", "shaping"},
+			wantErr:       boom,
+			wantPrefix:    "shaping: ",
+			wantLanguages: kept,
+		},
+		{
+			name:          "a hook can replace the planner, the orderer and the languages",
+			hooks:         []hookSpec{{name: "shaping", replace: true}},
+			wantTrace:     []string{"shaping"},
+			wantLanguages: []string{"kept", "added"},
+			wantReplaced:  true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var trace []string
+
+			cfg := Defaults()
+			built := identityStages(nil)
+
+			hooks := buildHooks(&trace, testCase.hooks, replaced)
+			err := runHooks(t.Context(), &cfg, stageEnv{}, built, hooks)
+
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("runHooks() err = %v, want %v", err, testCase.wantErr)
+			}
+
+			if err != nil && !strings.HasPrefix(err.Error(), testCase.wantPrefix) {
+				t.Fatalf("runHooks() err = %q, want prefix %q", err, testCase.wantPrefix)
+			}
+
+			if !slices.Equal(trace, testCase.wantTrace) {
+				t.Fatalf("trace = %v, want %v", trace, testCase.wantTrace)
+			}
+
+			names, swapped := summarise(built, replaced)
+
+			if !slices.Equal(names, testCase.wantLanguages) {
+				t.Fatalf("languages = %v, want %v", names, testCase.wantLanguages)
+			}
+
+			if swapped != testCase.wantReplaced {
+				t.Fatalf("stages replaced = %v, want %v", swapped, testCase.wantReplaced)
+			}
+		})
+	}
+}
+
+type hookSpec struct {
+	name    string
+	err     error
+	replace bool
+}
+
+func buildHooks(trace *[]string, specs []hookSpec, replaced error) []namedHook {
+	hooks := make([]namedHook, 0, len(specs))
+
+	for _, spec := range specs {
+		hooks = append(hooks, namedHook{name: spec.name, run: func(
+			_ context.Context, _ *Config, _ stageEnv, built *stages,
+		) error {
+			*trace = append(*trace, spec.name)
+
+			if spec.replace {
+				built.planner = fakePlanner{err: replaced}
+				built.orderer = fakeOrderer{err: replaced}
+				built.languages = append(built.languages, indexing.Language{Name: "added"})
+			}
+
+			return spec.err
+		}})
+	}
+
+	return hooks
+}
+
+func summarise(built *stages, replaced error) ([]string, bool) {
+	names := make([]string, 0, len(built.languages))
+	for _, language := range built.languages {
+		names = append(names, language.Name)
+	}
+
+	_, orderErr := built.orderer.Order(entities.Graph{}, entities.Snapshot{})
+	_, planErr := built.planner.Plan(entities.Graph{}, entities.Ordering{})
+
+	return names, errors.Is(orderErr, replaced) && errors.Is(planErr, replaced)
+}
+
+func TestStageHooksRunInTheFixedOrder(t *testing.T) {
+	t.Parallel()
+
+	hooks := stageHooks()
+	names := make([]string, 0, len(hooks))
+
+	for _, hook := range hooks {
+		names = append(names, hook.name)
+	}
+
+	want := []string{"rules", "shaping", "lineage"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("stageHooks() = %v, want %v", names, want)
+	}
+}
+
+func identityStages(failure error) *stages {
+	return &stages{
+		languages: []indexing.Language{{Name: "kept"}},
+		orderer:   fakeOrderer{err: failure},
+		planner:   fakePlanner{err: failure},
+	}
+}
+
+func hookLeavesTheStagesUnchanged(t *testing.T, hook stageHook) {
+	t.Helper()
+
+	kept := errors.New("kept")
+	cfg := Defaults()
+	built := identityStages(kept)
+
+	if err := hook(t.Context(), &cfg, stageEnv{}, built); err != nil {
+		t.Fatalf("hook() = %v, want nil", err)
+	}
+
+	if len(built.languages) != 1 || built.languages[0].Name != "kept" {
+		t.Fatalf("languages = %v, want the one kept language", built.languages)
+	}
+
+	_, orderErr := built.orderer.Order(entities.Graph{}, entities.Snapshot{})
+	_, planErr := built.planner.Plan(entities.Graph{}, entities.Ordering{})
+
+	if !errors.Is(orderErr, kept) || !errors.Is(planErr, kept) {
+		t.Fatalf("orderer err = %v, planner err = %v, want both kept", orderErr, planErr)
+	}
+
+	if cfg.Rev != Defaults().Rev {
+		t.Fatalf("cfg.Rev = %q, want %q", cfg.Rev, Defaults().Rev)
+	}
+}

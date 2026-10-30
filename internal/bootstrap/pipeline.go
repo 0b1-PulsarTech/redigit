@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
@@ -105,6 +106,10 @@ var (
 // on the first fallback for typed), and wires each stage to the ports it consumes. This is the
 // only place that names a concrete adapter.
 func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
+	return start(ctx, cfg, stageHooks())
+}
+
+func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error) {
 	root, err := filepath.Abs(cfg.Repo)
 	if err != nil {
 		return nil, fmt.Errorf("resolve repository path: %w", err)
@@ -117,12 +122,6 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 
 	reader, snapshot, checkout := opened.reader, opened.snapshot, opened.checkout
 	gitReader := readerCloser{reader: reader}
-
-	// The snapshot describes a REVISION, so its root is where that revision was materialised, not
-	// the repository whose working tree holds whatever happens to be checked out. A language pack
-	// that reads a sibling file from disk (a generator directive, a mock header) would otherwise
-	// read the wrong bytes, or fail on a file the revision has and the checkout does not.
-	snapshot.Root = checkout.Dir()
 	goSource := typed.NewSource(cfg.BuildTags)
 
 	wired, err := wireResolver(ctx, cfg, snapshot, goSource, serverStarter(cfg, checkout.Dir()))
@@ -132,21 +131,18 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, err
 	}
 
-	indexCfg := cfg.Indexing
 	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
-	specific := specificLanguages(
-		configSyntax,
-		finalTree{snapshot.Files, reader, cfg.Virtual},
-		goSource,
-	)
+	tree := finalTree{snapshot.Files, reader, cfg.Virtual}
+	specific := specificLanguages(configSyntax, tree, goSource)
 
-	if err = validateChunkMap(cfg.ChunkMap, snapshot, specific); err != nil {
+	env := stageEnv{root: root, opened: opened, specific: specific, goSource: goSource, tree: tree}
+
+	indexCfg, built, err := shapeStages(ctx, &cfg, env, configSyntax, hooks)
+	if err != nil {
 		release(ctx, goSource, wired.session, gitReader, checkout)
 
-		return nil, fmt.Errorf("validate chunk map: %w", err)
+		return nil, err
 	}
-
-	indexCfg.Languages = append(specific, opaqueLanguage(configSyntax))
 
 	source, err := newTreeSource(ctx, reader)
 	if err != nil {
@@ -179,8 +175,8 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		reader:    gitReader,
 		indexer:   wired.guard(indexing.New(wired.resolver, reader, indexCfg)),
 		scanner:   scanner,
-		orderer:   ordering.New(cfg.Ordering),
-		planner:   planning.New(cfg.Planning),
+		orderer:   built.orderer,
+		planner:   built.planner,
 		auditor:   auditing.New(cfg.Auditing),
 		unseen:    cfg.Auditing.Unseen,
 		unclaimed: cfg.Auditing.Unclaimed,
@@ -188,6 +184,78 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 		source:    source,
 		renderer:  newRenderer(configSyntax, renderersByExtension(specific)),
 	}, nil
+}
+
+type (
+	stageHook func(context.Context, *Config, stageEnv, *stages) error
+
+	namedHook struct {
+		name string
+		run  stageHook
+	}
+
+	stageEnv struct {
+		root     string
+		opened   revision
+		specific []indexing.Language
+		goSource *typed.Source
+		tree     finalTree
+	}
+
+	stages struct {
+		languages []indexing.Language
+		orderer   orderer
+		planner   planner
+	}
+)
+
+func stageHooks() []namedHook {
+	return []namedHook{
+		{name: "rules", run: ruleHook},
+		{name: "shaping", run: shapeHook},
+		{name: "lineage", run: lineageHook},
+	}
+}
+
+func shapeStages(
+	ctx context.Context,
+	cfg *Config,
+	env stageEnv,
+	configSyntax config.Syntax,
+	hooks []namedHook,
+) (indexing.Config, *stages, error) {
+	if err := validateChunkMap(cfg.ChunkMap, env.opened.snapshot, env.specific); err != nil {
+		return indexing.Config{}, nil, fmt.Errorf("validate chunk map: %w", err)
+	}
+
+	built := &stages{orderer: ordering.New(cfg.Ordering), planner: planning.New(cfg.Planning)}
+
+	if err := runHooks(ctx, cfg, env, built, hooks); err != nil {
+		return indexing.Config{}, nil, err
+	}
+
+	indexCfg := cfg.Indexing
+	indexCfg.Languages = slices.Concat(
+		env.specific, built.languages, []indexing.Language{opaqueLanguage(configSyntax)},
+	)
+
+	return indexCfg, built, nil
+}
+
+func runHooks(
+	ctx context.Context,
+	cfg *Config,
+	env stageEnv,
+	built *stages,
+	hooks []namedHook,
+) error {
+	for _, hook := range hooks {
+		if err := hook.run(ctx, cfg, env, built); err != nil {
+			return fmt.Errorf("%s: %w", hook.name, err)
+		}
+	}
+
+	return nil
 }
 
 type revision struct {
@@ -223,6 +291,12 @@ func openRevision(ctx context.Context, root string, cfg Config) (revision, error
 
 		return revision{}, fmt.Errorf("materialise revision: %w", err)
 	}
+
+	// The snapshot describes a REVISION, so its root is where that revision was materialised, not
+	// the repository whose working tree holds whatever happens to be checked out. A language pack
+	// that reads a sibling file from disk (a generator directive, a mock header) would otherwise
+	// read the wrong bytes, or fail on a file the revision has and the checkout does not.
+	snapshot.Root = checkout.Dir()
 
 	return revision{reader: reader, snapshot: snapshot, checkout: checkout}, nil
 }

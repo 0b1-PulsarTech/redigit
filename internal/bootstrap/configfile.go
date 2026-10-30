@@ -33,7 +33,7 @@ type ConfigFile struct {
 }
 
 func compiledRegistry() rules.Registry {
-	return rules.NewRegistry(map[string]rules.Constructor{})
+	return rules.NewRegistry(ruleConstructors())
 }
 
 func LoadConfigFile(path string) (ConfigFile, error) {

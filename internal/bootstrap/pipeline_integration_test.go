@@ -231,3 +231,44 @@ func TestStartRefusesAnUnmatchedGlobBeforeCheckout(t *testing.T) {
 		t.Fatalf("worktree count = %d, want 1 (the repo's own): a checkout was made", got)
 	}
 }
+
+func TestStartHooksSeeTheCheckoutRoot(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+	}{
+		{name: "a hook reads the snapshot root the checkout gave"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			writeFixtureModule(t, dir)
+			initFixtureRepo(t, dir)
+
+			var seen string
+
+			hooks := []namedHook{{name: "probe", run: func(
+				_ context.Context, _ *Config, env stageEnv, _ *stages,
+			) error {
+				seen = env.opened.snapshot.Root
+
+				return nil
+			}}}
+
+			pipeline, err := start(t.Context(), Config{Repo: dir, Rev: "HEAD"}, hooks)
+			if err != nil {
+				t.Fatalf("start() = %v", err)
+			}
+
+			defer func() { _ = pipeline.Close(context.WithoutCancel(t.Context())) }()
+
+			if seen == "" || seen == dir || seen != pipeline.Snapshot().Root {
+				t.Fatalf("hook saw root %q, want the checkout %q", seen, pipeline.Snapshot().Root)
+			}
+		})
+	}
+}
