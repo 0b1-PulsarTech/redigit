@@ -175,6 +175,6 @@ func (g Graph) ExternalConsumers(key DeclKey) (out []Edge) {
 	return out
 }
 
-func (g Graph) Anchors() []Anchor { return g.anchors }
+func (g Graph) Anchors() []Anchor { return g.anchors } // Shared and read-only: callers must not write.
 
-func (g Graph) Edges() []Edge { return g.edges }
+func (g Graph) Edges() []Edge { return g.edges } // Shared with Needs: read-only.
