@@ -75,3 +75,55 @@ func prose(name string) entities.Decl {
 
 	return found
 }
+
+func tiedFeatures() (entities.Graph, entities.Ordering) {
+	helper := decl("kernel/helper.go", "Helper", "kernel")
+	decls := []entities.Decl{helper}
+	at := map[entities.DeclKey]entities.Position{helper.Key: 0}
+
+	edges := make([]entities.Edge, 0, 16)
+
+	features := []struct {
+		name string
+		spot entities.Position
+	}{{"lead", 3}, {"bill", 5}}
+
+	for _, feature := range features {
+		entry := decl(
+			feature.name+"/api/handler.go",
+			"Handle",
+			entities.UnitID(feature.name+"/api"),
+		)
+		block := make([]entities.Decl, 0, 6)
+
+		for index := range 6 {
+			member := decl(
+				fmt.Sprintf("%s/usecases/part%d.go", feature.name, index%3),
+				fmt.Sprintf("Step%d", index),
+				entities.UnitID(feature.name+"/usecases"),
+			)
+			member.IsInterface = index == 5
+			block = append(block, member)
+			at[member.Key] = feature.spot
+		}
+
+		decls = append(append(decls, entry), block...)
+		at[entry.Key] = feature.spot + 1
+		entryEdges := []entities.Edge{
+			needs(entry, block[0]),
+			needs(block[0], helper),
+			needs(block[4], helper),
+		}
+		edges = append(edges, entryEdges...)
+
+		for index := range 4 {
+			edges = append(edges, needs(block[index], block[index+1]))
+		}
+
+		edges = append(edges, entities.Edge{
+			Dependent: block[2].Key, Provider: block[5].Key, Reason: entities.ReasonImplements,
+		})
+	}
+
+	return entities.NewGraph(decls, edges, nil), entities.Ordering{At: at}
+}

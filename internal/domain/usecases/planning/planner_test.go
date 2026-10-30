@@ -2,6 +2,7 @@ package planning
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -304,5 +305,59 @@ func TestPlannerBearsTheTitleWithTheFirstEntry(t *testing.T) {
 		if bornAt[entry.entry.Key] < bornAt[entry.route.Key] {
 			t.Fatalf("%s is born before the route it records", entry.entry.Key)
 		}
+	}
+}
+
+func reversedGraph(graph entities.Graph) entities.Graph {
+	decls := graph.Decls()
+	edges := slices.Clone(graph.Edges())
+	anchors := slices.Clone(graph.Anchors())
+
+	slices.Reverse(decls)
+	slices.Reverse(edges)
+	slices.Reverse(anchors)
+
+	return entities.NewGraph(decls, edges, anchors)
+}
+
+func TestPlanIgnoresInputOrder(t *testing.T) {
+	t.Parallel()
+
+	synthetic, syntheticOrder := syntheticGraph(8, 12)
+	two, twoOrder, _ := twoFeatures()
+	root, rootOrder, _ := rooted()
+	tied, tiedOrder := tiedFeatures()
+
+	testCases := []struct {
+		name  string
+		graph entities.Graph
+		order entities.Ordering
+	}{
+		{"a synthetic graph of many features", synthetic, syntheticOrder},
+		{"two vertical slices and a kernel", two, twoOrder},
+		{"a composition root over both", root, rootOrder},
+		{"features sharing a position and a helper", tied, tiedOrder},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			forward, err := New(Config{}).Plan(testCase.graph, testCase.order)
+			if err != nil {
+				t.Fatalf("Plan() = %v", err)
+			}
+
+			for run := range 32 {
+				backward, err := New(Config{}).Plan(reversedGraph(testCase.graph), testCase.order)
+				if err != nil {
+					t.Fatalf("Plan() reversed = %v", err)
+				}
+
+				if !reflect.DeepEqual(forward, backward) {
+					t.Fatalf("run %d: reversed graph gave plan %v, want %v", run, backward, forward)
+				}
+			}
+		})
 	}
 }
