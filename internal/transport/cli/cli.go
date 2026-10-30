@@ -10,11 +10,12 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/infra/profiling"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/write"
 )
 
 // ErrUsage reports a command line the tool cannot act on. It is separate from
 // a run failure so a caller can print usage instead of a stack of wrapping.
-var ErrUsage = errors.New("usage")
+var ErrUsage = write.ErrUsage
 
 // The command names dispatch recognises, named once so the switch below and
 // its tests never drift from each other on a typo.
@@ -25,7 +26,10 @@ const (
 	cmdReport = "report"
 	cmdEmit   = "emit"
 	cmdChunks = "chunks"
+	cmdWrite  = "write"
 )
+
+const fullUsage = usage + runUsage + write.Usage
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	return dispatch(ctx, args, stdout, stderr, realEnv())
@@ -41,9 +45,13 @@ type invocation struct {
 
 func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, env runEnv) error {
 	if len(args) < 1 {
-		_, _ = fmt.Fprint(stderr, usage+runUsage)
+		_, _ = fmt.Fprint(stderr, fullUsage)
 
 		return fmt.Errorf("%w: no command given", ErrUsage)
+	}
+
+	if args[0] == cmdWrite {
+		return runWrite(ctx, args[1:], stdout, stderr)
 	}
 
 	set := newFlagSet()
@@ -53,7 +61,7 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, env 
 	if err != nil {
 		// A config error already names the file and the key; the flag list buries it.
 		if !errors.Is(err, bootstrap.ErrConfig) {
-			_, _ = fmt.Fprint(stderr, usage+runUsage)
+			_, _ = fmt.Fprint(stderr, fullUsage)
 		}
 
 		return err
@@ -116,7 +124,7 @@ func usesCache(command string) bool {
 func isCommand(command string) bool { return usesCache(command) || command == cmdChunks }
 
 func unknownCommand(stderr io.Writer, command string) error {
-	_, _ = fmt.Fprint(stderr, usage+runUsage)
+	_, _ = fmt.Fprint(stderr, fullUsage)
 
 	return fmt.Errorf("%w: unknown command %q", ErrUsage, command)
 }
@@ -138,4 +146,13 @@ func route(ctx context.Context, call invocation) error {
 	}
 
 	return unknownCommand(call.stderr, call.command)
+}
+
+func runWrite(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	err := write.Run(ctx, args, stdout)
+	if errors.Is(err, ErrUsage) {
+		_, _ = fmt.Fprint(stderr, fullUsage)
+	}
+
+	return err //nolint:wrapcheck // the write command names its own failures
 }
