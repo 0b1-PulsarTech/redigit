@@ -8,13 +8,16 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
-const kinReach = 12
+const (
+	kinReach = 12
+	tieScale = 27720
+)
 
 func joinProducts(
 	reachedBy map[entities.DeclKey]map[reach.FeatureID]bool,
 	roots map[reach.FeatureID]bool,
 ) map[reach.FeatureID]reach.FeatureID {
-	tie := map[reach.FeatureID]map[reach.FeatureID]float64{}
+	tie := map[reach.FeatureID]map[reach.FeatureID]int{}
 
 	// A shared declaration ties its readers with weight 1/(readers-1); a feature
 	// joins the root it is tied to most, else stands alone.
@@ -26,7 +29,9 @@ func joinProducts(
 			continue
 		}
 
-		weight := 1 / float64(len(features)-1)
+		// tieScale is lcm(1..kinReach-1): every weight is whole, so sums are exact and
+		// neither map order nor key order can split a real tie.
+		weight := tieScale / (len(features) - 1)
 
 		for feature := range features {
 			for root := range features {
@@ -35,7 +40,7 @@ func joinProducts(
 				}
 
 				if tie[feature] == nil {
-					tie[feature] = map[reach.FeatureID]float64{}
+					tie[feature] = map[reach.FeatureID]int{}
 				}
 
 				tie[feature][root] += weight
@@ -56,7 +61,7 @@ func joinProducts(
 	return out
 }
 
-func strongest(ties map[reach.FeatureID]float64) reach.FeatureID {
+func strongest(ties map[reach.FeatureID]int) reach.FeatureID {
 	candidates := make([]reach.FeatureID, 0, len(ties))
 	for root := range ties {
 		candidates = append(candidates, root)

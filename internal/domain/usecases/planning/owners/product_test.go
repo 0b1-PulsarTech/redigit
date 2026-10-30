@@ -85,10 +85,74 @@ func TestJoinProducts(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := joinProducts(testCase.reached, readers("crm", "chat"))
-			if !maps.Equal(got, testCase.want) {
-				t.Fatalf("joinProducts() = %v, want %v", got, testCase.want)
+			for range 64 {
+				got := joinProducts(testCase.reached, readers("crm", "chat"))
+				if !maps.Equal(got, testCase.want) {
+					t.Fatalf("joinProducts() = %v, want %v", got, testCase.want)
+				}
 			}
 		})
+	}
+}
+
+func TestJoinProductsSumOrder(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		reached map[entities.DeclKey]map[reach.FeatureID]bool
+		want    map[reach.FeatureID]reach.FeatureID
+	}{
+		{
+			"a real tie is settled by name whatever the summing order",
+			map[entities.DeclKey]map[reach.FeatureID]bool{
+				{Name: "a1"}: readers("crm", "worker"),
+				{Name: "a2"}: readers("crm", "worker"),
+				{Name: "a3"}: readers("crm", "worker", "x1", "x2"),
+				{Name: "b1"}: readers("chat", "worker"),
+				{Name: "b2"}: readers("chat", "worker"),
+				{Name: "b3"}: readers("chat", "worker", "x3", "x4"),
+			},
+			map[reach.FeatureID]reach.FeatureID{
+				"worker": "chat", "x1": "crm", "x2": "crm", "x3": "chat", "x4": "chat",
+			},
+		},
+		{
+			"a tie whose sums would round apart by key order goes to the first name",
+			map[entities.DeclKey]map[reach.FeatureID]bool{
+				{Name: "a1"}: readers("crm", "worker"),
+				{Name: "a2"}: readers("crm", "worker"),
+				{Name: "a3"}: readers("crm", "worker", "x1", "x2"),
+				{Name: "b1"}: readers("chat", "worker", "x3", "x4"),
+				{Name: "b2"}: readers("chat", "worker"),
+				{Name: "b3"}: readers("chat", "worker"),
+			},
+			map[reach.FeatureID]reach.FeatureID{
+				"worker": "chat", "x1": "crm", "x2": "crm", "x3": "chat", "x4": "chat",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			for range 64 {
+				got := joinProducts(testCase.reached, readers("crm", "chat"))
+				if !maps.Equal(got, testCase.want) {
+					t.Fatalf("joinProducts() = %v, want %v", got, testCase.want)
+				}
+			}
+		})
+	}
+}
+
+func TestTieScaleDividesEveryWeight(t *testing.T) {
+	t.Parallel()
+
+	for readersMinusOne := 1; readersMinusOne < kinReach; readersMinusOne++ {
+		if tieScale%readersMinusOne != 0 {
+			t.Fatalf("tieScale %% %d = %d, want 0", readersMinusOne, tieScale%readersMinusOne)
+		}
 	}
 }
