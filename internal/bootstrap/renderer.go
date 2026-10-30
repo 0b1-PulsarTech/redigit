@@ -9,6 +9,11 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/dart"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/web"
 )
 
 // renderer is what byExtension dispatches to: the same Render the indexing
@@ -84,4 +89,76 @@ func renderersByExtension(languages []indexing.Language) map[string]renderer {
 	}
 
 	return out
+}
+
+// finalTree is what the Dart and web packs resolve an import against: which
+// files the tree holds, how to read one, and where each virtual module a
+// bundler plugin makes up is compiled from.
+type finalTree struct {
+	files   []string
+	reader  treeReader
+	virtual map[string]string
+}
+
+type treeReader interface {
+	Read(ctx context.Context, path string) ([]byte, error)
+}
+
+// specificLanguages is what the indexer reads a known format with. The config
+// entry covers the files a build needs and no language server reads: without
+// them a plan holds no go.mod, so every tree it describes has source and
+// nothing to compile it.
+//
+// Kept apart from opaqueLanguage so validateChunkMap can check a supplied
+// chunk map against real ownership before the catch-all pack - which would
+// otherwise also claim every path - is added.
+//
+// Dart and the web files are not Resolved: the one language server a run
+// starts is gopls, so their rule packs carry the reference edges themselves.
+func specificLanguages(
+	configSyntax config.Syntax,
+	tree finalTree,
+	source *typed.Source,
+) []indexing.Language {
+	return []indexing.Language{
+		{
+			Name:       goLanguage,
+			Extensions: []string{".go"},
+			Syntax:     golang.NewSyntax(),
+			Rules:      golang.NewRulePackWith(source),
+			Resolved:   true,
+		},
+		{
+			Name:       dartLanguage,
+			Extensions: []string{".dart"},
+			Syntax:     dart.NewSyntax(tree.files, tree.reader),
+			Rules:      dart.NewRulePack(),
+		},
+		{
+			Name:       webLanguage,
+			Extensions: web.Extensions(),
+			Syntax:     web.NewSyntax(tree.files, tree.reader),
+			Rules:      web.NewRulePack(tree.virtual),
+		},
+		{
+			Name:       configLanguage,
+			Extensions: configExtensions(),
+			Syntax:     configSyntax,
+			Rules:      config.NewRulePack(),
+		},
+	}
+}
+
+// opaqueLanguage claims every final-tree path neither "go" nor "config" owns.
+// It shares configSyntax's own chunker list, so it reads such a path
+// whole-file by default (chunk.WholeFile) unless a chunk map entry refines
+// the cut - see docs/PLANO-EMISSAO.md:113-133. Without it, a format this tool
+// has no reader for - .tmpl, a golden fixture - vanishes from the graph
+// in silence and a plan built from this run can never reproduce it.
+func opaqueLanguage(configSyntax config.Syntax) indexing.Language {
+	return indexing.Language{
+		Name:       opaqueName,
+		Extensions: []string{indexing.AnyExtension},
+		Syntax:     configSyntax,
+	}
 }
