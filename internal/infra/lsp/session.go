@@ -355,7 +355,7 @@ func (s *Session) waitOrKill(ctx context.Context) error {
 
 	select {
 	case err := <-waitDone:
-		return err
+		return cleanExit(err)
 	case <-ctx.Done():
 		_ = s.kill()
 
