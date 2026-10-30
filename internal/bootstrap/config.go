@@ -20,6 +20,17 @@ import (
 
 var ErrConfig = errors.New("invalid config")
 
+// ErrChunkMapUnknownPath reports a chunk map entry naming a path outside the
+// tree being read. A wrong map is worse than no map, and a path that is not
+// there at all is the plainest way a map can be wrong.
+var ErrChunkMapUnknownPath = errors.New("chunk map names a path outside the tree")
+
+// ErrChunkMapConflict reports a chunk map entry naming a path a language pack
+// already claims structurally. The map only refines the opaque pack's
+// whole-file default (docs/PLANO-EMISSAO.md:113-133); it does not override a
+// pack that already reads the format.
+var ErrChunkMapConflict = errors.New("chunk map path is already claimed by a language pack")
+
 type Config struct {
 	// Neither is tied to where this binary was built.
 	Repo string

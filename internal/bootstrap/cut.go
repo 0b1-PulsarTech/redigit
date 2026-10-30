@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -133,4 +134,43 @@ func unclaimed(snap entities.Snapshot, langs []indexing.Language) []auditing.Unc
 	}
 
 	return out
+}
+
+// validateChunkMap refuses a chunk map naming a path outside snap, or a path
+// a specific (non-opaque) language pack already claims - both cross what the
+// tree holds and what every OTHER pack owns, answerable only here.
+// chunk.MapApplier already enforces non-overlap and in-range spans on its own
+// (internal/infra/chunk/chunkmap.go).
+func validateChunkMap(
+	chunkMap entities.ChunkMap,
+	snap entities.Snapshot,
+	specific []indexing.Language,
+) error {
+	files := make(map[string]bool, len(snap.Files))
+	for _, file := range snap.Files {
+		files[file] = true
+	}
+
+	for _, path := range slices.Sorted(maps.Keys(chunkMap)) {
+		if !files[path] {
+			return fmt.Errorf("%w: %q", ErrChunkMapUnknownPath, path)
+		}
+
+		if lang, claimed := ownerOf(specific, path); claimed {
+			return fmt.Errorf("%w: %q by the %s pack", ErrChunkMapConflict, path, lang.Name)
+		}
+	}
+
+	return nil
+}
+
+// ownerOf reports the first specific language pack that owns path.
+func ownerOf(specific []indexing.Language, path string) (indexing.Language, bool) {
+	for _, lang := range specific {
+		if lang.Owns(path) {
+			return lang, true
+		}
+	}
+
+	return indexing.Language{}, false
 }
