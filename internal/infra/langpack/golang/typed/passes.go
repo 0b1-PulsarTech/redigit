@@ -86,9 +86,12 @@ func packageOfFile(modules []module, file string) (string, bool) {
 		return "", false
 	}
 
-	rel := strings.TrimPrefix(path.Dir(file), owner.dir)
+	dir := path.Dir(file)
+	if owner.dir != "." {
+		dir = strings.TrimPrefix(dir, owner.dir)
+	}
 
-	return owner.path + strings.TrimSuffix(rel, "/"), true
+	return path.Join(owner.path, dir), true
 }
 
 func showingTags(line string, tags []string) ([]string, bool) {
