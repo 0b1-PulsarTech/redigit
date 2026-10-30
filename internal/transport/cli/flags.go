@@ -110,48 +110,6 @@ func addServerFlags(set *flag.FlagSet, cfg *bootstrap.Config) {
 	)
 }
 
-// loadSlicing reads the two files that decide how a layer may reorder: the
-// layers themselves, and the features they act inside.
-func loadSlicing(cfg *bootstrap.Config, layerFile, featureFile string) error {
-	if layerFile != "" {
-		layers, err := inputs.LoadLayers(layerFile)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrUsage, err)
-		}
-
-		cfg.Ordering.Layers = layers
-	}
-
-	if featureFile != "" {
-		features, err := inputs.LoadFeatures(featureFile)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrUsage, err)
-		}
-
-		cfg.Ordering.Features = features
-	}
-
-	return nil
-}
-
-// loadChunkMap reads the operator-supplied chunk map named by --chunk-map, if
-// any. A malformed or missing file is a usage error: the tool cannot guess
-// where the operator meant the cuts to go (see docs/PLANO-EMISSAO.md:113-133).
-func loadChunkMap(cfg *bootstrap.Config, chunkMapFile string) error {
-	if chunkMapFile == "" {
-		return nil
-	}
-
-	chunkMap, err := inputs.LoadChunkMap(chunkMapFile)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrUsage, err)
-	}
-
-	cfg.ChunkMap = chunkMap
-
-	return nil
-}
-
 func addVirtual(cfg *bootstrap.Config, refused *error) func(string) error {
 	// The flag repeats. A refusal is kept, not returned: flag flattens it to text.
 	return func(value string) error {
