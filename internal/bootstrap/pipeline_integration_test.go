@@ -50,12 +50,10 @@ func TestStart(t *testing.T) {
 
 	// Close's own error-folding is pinned deterministically in
 	// pipeline_test.go; a real gopls process can exit on its own the instant
-	// shutdown/exit lands, racing the wait that follows and reporting a
-	// broken pipe that carries no information about the checkout this
-	// assertion cares about. What must hold here is the real-world
-	// consequence: the checkout is gone, session error or not.
+	// shutdown/exit lands, and that broken pipe after a clean handshake is a
+	// clean close, so Close must succeed and the checkout must be gone.
 	if err := pipeline.Close(context.WithoutCancel(t.Context())); err != nil {
-		t.Logf("Close() = %v (non-fatal: only the checkout cleanup is asserted below)", err)
+		t.Fatalf("Close() = %v, want nil", err)
 	}
 
 	if got := fixtureWorktreeCount(t, dir); got != 1 {
