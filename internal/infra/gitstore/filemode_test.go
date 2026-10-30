@@ -46,12 +46,17 @@ func encodeOne(t *testing.T, write FileWrite) (string, error) {
 	when := time.Unix(1000000000, 0).UTC()
 	id := Identity{Name: "T", Email: "t@example.com", When: when}
 
-	err := encodeCommit(w, "refs/heads/main", 1, 0, WriteCommit{
+	commit := WriteCommit{
 		Author:    id,
 		Committer: id,
 		Message:   "m",
 		Writes:    []FileWrite{write},
-	})
+	}
+	if err := validateCommit(commit); err != nil {
+		return "", err
+	}
+
+	err := encodeCommit(w, "refs/heads/main", 1, 0, commit)
 	if err != nil {
 		return "", err
 	}
@@ -132,9 +137,9 @@ func TestUnsupportedModeErrorNamesThePath(t *testing.T) {
 		t.Fatalf("Path = %q, want %q", modeErr.Path, "vendor/lib")
 	}
 
-	// The message stays low-cardinality; the path travels as a field so a log
-	// site can attach it without destroying grouping.
-	if strings.Contains(modeErr.Error(), "vendor/lib") {
-		t.Fatalf("message %q carries variable data", modeErr.Error())
+	for _, want := range []string{`"vendor/lib"`, `"160000"`} {
+		if !strings.Contains(modeErr.Error(), want) {
+			t.Fatalf("message %q does not carry %s", modeErr.Error(), want)
+		}
 	}
 }

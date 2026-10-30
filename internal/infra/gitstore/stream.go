@@ -2,9 +2,10 @@ package gitstore
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"time"
+
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/rewriting"
 )
 
 // Identity is one author or committer line's value. When is preserved as
@@ -48,6 +49,7 @@ type FileWrite struct {
 	Path    string
 	Mode    FileMode
 	Content []byte
+	Oid     string
 }
 
 func (f FileWrite) mode() FileMode {
@@ -67,55 +69,6 @@ type WriteCommit struct {
 	Message   string
 	Writes    []FileWrite
 	Deletes   []string
-}
-
-// PathConflictError is a commit whose Writes and Deletes name the same path.
-type PathConflictError struct {
-	Path string
-}
-
-// UnsupportedModeError is a write whose mode git will not accept for a blob.
-// It is refused at encode time rather than handed to fast-import, which would
-// reject the whole stream with a parse error naming no path.
-type UnsupportedModeError struct {
-	Path string
-	Mode FileMode
-}
-
-func (e *UnsupportedModeError) Error() string { return "unsupported file mode" }
-
-func (e *UnsupportedModeError) Unwrap() error { return errUnsupportedMode }
-
-func (e *PathConflictError) Error() string {
-	return "path both written and deleted in the same commit"
-}
-
-var (
-	errPathConflict    = errors.New("path conflict")
-	errUnsupportedMode = errors.New("unsupported file mode")
-)
-
-// Unwrap lets a caller match this family of error with errors.Is without
-// depending on the exact Path it carries.
-func (e *PathConflictError) Unwrap() error { return errPathConflict }
-
-func validateCommit(commit WriteCommit) error {
-	deleted := make(map[string]bool, len(commit.Deletes))
-	for _, path := range commit.Deletes {
-		deleted[path] = true
-	}
-
-	for _, write := range commit.Writes {
-		if deleted[write.Path] {
-			return &PathConflictError{Path: write.Path}
-		}
-
-		if !write.mode().Valid() {
-			return &UnsupportedModeError{Path: write.Path, Mode: write.Mode}
-		}
-	}
-
-	return nil
 }
 
 // formatIdentity renders one author/committer line's value: name, the email
@@ -169,11 +122,13 @@ func (e *streamEncoder) writeData(content []byte) {
 // Deletes are written before writes, per commit.Deletes/commit.Writes order,
 // so the same input always renders the identical byte stream.
 func encodeCommit(w *bufio.Writer, ref string, mark, parentMark int, commit WriteCommit) error {
-	if err := validateCommit(commit); err != nil {
-		return err
+	enc := &streamEncoder{w: w}
+
+	// A reset pins the first commit as a root whatever the ref held before.
+	if parentMark == 0 {
+		enc.writef("reset %s\n", ref)
 	}
 
-	enc := &streamEncoder{w: w}
 	enc.writef("commit %s\n", ref)
 	enc.writef("mark :%d\n", mark)
 	enc.writef("author %s\n", formatIdentity(commit.Author))
@@ -189,9 +144,26 @@ func encodeCommit(w *bufio.Writer, ref string, mark, parentMark int, commit Writ
 	}
 
 	for _, write := range commit.Writes {
+		if write.Oid != "" {
+			enc.writef("M %s %s %s\n", write.mode(), write.Oid, quotePath(write.Path))
+
+			continue
+		}
+
 		enc.writef("M %s inline %s\n", write.mode(), quotePath(write.Path))
 		enc.writeData(write.Content)
 	}
 
 	return enc.err
+}
+
+func stampTime(stamp rewriting.Stamp) (time.Time, error) {
+	zone, err := time.Parse("-0700", stamp.Zone)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse zone: %w", err)
+	}
+
+	_, offset := zone.Zone()
+
+	return time.Unix(stamp.Unix, 0).In(time.FixedZone("", offset)), nil
 }

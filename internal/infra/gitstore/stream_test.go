@@ -60,7 +60,12 @@ func identityAt(unixSeconds int64) Identity {
 // every encodeCommit test case shares, so a case only has to spell out its
 // mark, timestamps, message, and fileop tail.
 func commitHeader(mark int, authorTS, committerTS int64, message string) string {
-	return fmt.Sprintf(
+	prefix := ""
+	if mark == 1 {
+		prefix = "reset refs/heads/out\n"
+	}
+
+	return prefix + fmt.Sprintf(
 		"commit refs/heads/out\nmark :%d\n"+
 			"author Orig Author <orig@example.com> %d +0000\n"+
 			"committer Orig Author <orig@example.com> %d +0000\n"+
@@ -73,6 +78,10 @@ func runEncodeCommit(t *testing.T, mark, parentMark int, commit WriteCommit) (st
 	t.Helper()
 
 	var buf bytes.Buffer
+
+	if err := validateCommit(commit); err != nil {
+		return "", err
+	}
 
 	w := bufio.NewWriter(&buf)
 	if err := encodeCommit(w, "refs/heads/out", mark, parentMark, commit); err != nil {
@@ -271,5 +280,48 @@ func TestPathConflictError(t *testing.T) {
 
 	if err.Error() == "" {
 		t.Fatalf("PathConflictError.Error() is empty")
+	}
+}
+
+func TestEncodeCommitDataref(t *testing.T) {
+	t.Parallel()
+
+	const oid = "0123456789abcdef0123456789abcdef01234567"
+
+	testCases := []struct {
+		name  string
+		write FileWrite
+		want  string
+	}{
+		{
+			"executable oid write has no data block",
+			FileWrite{Path: "run.sh", Mode: ModeExecutable, Oid: oid},
+			"M 100755 " + oid + " run.sh\n",
+		},
+		{
+			"oid wins over content and the path is quoted",
+			FileWrite{Path: "a b.go", Content: []byte("x"), Oid: oid},
+			"M 100644 " + oid + ` "a b.go"` + "\n",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			commit := WriteCommit{
+				Author: identityAt(1000000000), Committer: identityAt(1000000000), Message: "m",
+				Writes: []FileWrite{testCase.write},
+			}
+
+			got, err := runEncodeCommit(t, 1, 0, commit)
+			if err != nil {
+				t.Fatalf("encodeCommit() unexpected err = %v", err)
+			}
+
+			if want := commitHeader(1, 1000000000, 1000000000, "m") + testCase.want; got != want {
+				t.Fatalf("encodeCommit() =\n%q\nwant\n%q", got, want)
+			}
+		})
 	}
 }

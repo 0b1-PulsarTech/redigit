@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore/batch"
@@ -50,6 +50,19 @@ func runGitCapped(
 	limit int64,
 	args ...string,
 ) ([]byte, error) {
+	return runGitCmd(gitCommand(ctx, repoPath, args), limit, args)
+}
+
+func runGitDetached(ctx context.Context, repoPath string, args ...string) ([]byte, error) {
+	cmd := gitCommand(ctx, repoPath, args)
+	// An interrupted update-ref leaves the outcome ambiguous; isolating it lets the move
+	// finish and be reported.
+	batch.Isolate(cmd)
+
+	return runGitCmd(cmd, math.MaxInt64, args)
+}
+
+func gitCommand(ctx context.Context, repoPath string, args []string) *exec.Cmd {
 	const waitDelay = 2 * time.Second
 
 	fullArgs := append([]string{"-C", repoPath}, args...)
@@ -61,9 +74,13 @@ func runGitCapped(
 	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	cmd.WaitDelay = waitDelay
 
+	return cmd
+}
+
+func runGitCmd(cmd *exec.Cmd, limit int64, args []string) ([]byte, error) {
 	stdout := cappedBuffer{limit: limit}
 
-	var stderr bytes.Buffer
+	var stderr batch.TailBuffer
 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -113,13 +130,26 @@ func revParse(ctx context.Context, repoPath, rev string) (string, error) {
 	return string(bytes.TrimSpace(out)), nil
 }
 
-func ResolveCommit(ctx context.Context, repoPath, rev string) (string, error) {
-	if strings.HasPrefix(rev, "-") {
-		return "", fmt.Errorf("%w: a rev may not start with a dash", ErrBadRev)
+func closeToCancel(stdin io.Closer) error {
+	// A stdin already closed means the stream ended on its own: the process is not killed.
+	err := stdin.Close()
+	if err == nil {
+		return nil
 	}
 
-	// The commit oid, never the tree: a rebuilt history shares its source tree.
-	return revParse(ctx, repoPath, rev+"^{commit}")
+	if errors.Is(err, os.ErrClosed) {
+		return os.ErrProcessDone
+	}
+
+	return fmt.Errorf("close fast-import stdin: %w", err)
+}
+
+func withCtxErr(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return errors.Join(ctxErr, err)
+	}
+
+	return err
 }
 
 // splitNUL splits a NUL-separated git output (built with git's own -z flag)

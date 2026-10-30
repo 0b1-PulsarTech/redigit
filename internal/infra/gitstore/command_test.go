@@ -2,6 +2,8 @@ package gitstore
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 )
 
@@ -36,6 +38,42 @@ func TestSplitNUL(t *testing.T) {
 				if entry != testCase.want[i] {
 					t.Fatalf("splitNUL()[%d] = %q, want %q", i, entry, testCase.want[i])
 				}
+			}
+		})
+	}
+}
+
+type errCloser struct{ err error }
+
+func (closer errCloser) Close() error { return closer.err }
+
+func TestCloseToCancel(t *testing.T) {
+	t.Parallel()
+
+	errOther := errors.New("broken pipe")
+
+	testCases := []struct {
+		name    string
+		closeIn error
+		wantErr error
+	}{
+		{"open stdin closes cleanly", nil, nil},
+		{"already closed stdin is a finished process", os.ErrClosed, os.ErrProcessDone},
+		{
+			"wrapped already closed",
+			fmt.Errorf("close: %w", os.ErrClosed),
+			os.ErrProcessDone,
+		},
+		{"another failure passes through", errOther, errOther},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := closeToCancel(errCloser{err: testCase.closeIn})
+			if !errors.Is(err, testCase.wantErr) || (err == nil) != (testCase.wantErr == nil) {
+				t.Fatalf("closeToCancel() err = %v, want %v", err, testCase.wantErr)
 			}
 		})
 	}
