@@ -66,8 +66,10 @@ type RulePack struct {
 
 func NewRulePack(tags []string) RulePack {
 	// Loaded lazily once, under the run tags, and shared by the four type-check rules.
-	source := typed.NewSource(tags)
+	return NewRulePackWith(typed.NewSource(tags))
+}
 
+func NewRulePackWith(source *typed.Source) RulePack {
 	return RulePack{source: source, rules: append(slices.Clone(rules),
 		typecheck.MethodSet{Source: source},
 		typecheck.Conversion{Source: source},

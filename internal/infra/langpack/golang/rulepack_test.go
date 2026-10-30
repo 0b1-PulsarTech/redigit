@@ -8,6 +8,7 @@ import (
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 func TestRulePackName(t *testing.T) {
@@ -217,5 +218,47 @@ func TestRulePackReportsNoPartialPassBeforeALoad(t *testing.T) {
 
 	if got := (RulePack{}).Partial(); len(got) != 0 {
 		t.Fatalf("zero RulePack Partial() = %+v, want none", got)
+	}
+}
+
+func TestNewRulePackWithSharesTheSource(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		files map[string]string
+	}{
+		{
+			"a call between two functions",
+			map[string]string{"a.go": "package fixture\n\nfunc One() {}\n\nfunc Run() { One() }\n"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap, decls := testkit.Fixture(t, testCase.files)
+			source := typed.NewSource(nil)
+
+			before, err := source.Packages(context.Background(), snap)
+			if err != nil || len(before) == 0 {
+				t.Fatalf("Packages() = %v, %v", before, err)
+			}
+
+			pack := NewRulePackWith(source)
+			if pack.source != source {
+				t.Fatal("NewRulePackWith() did not keep the source it was given")
+			}
+
+			if _, err = pack.Edges(context.Background(), snap, decls); err != nil {
+				t.Fatalf("Edges() error = %v", err)
+			}
+
+			after, err := source.Packages(context.Background(), snap)
+			if err != nil || after[0] != before[0] {
+				t.Fatalf("the rules loaded the packages again: %v", err)
+			}
+		})
 	}
 }
