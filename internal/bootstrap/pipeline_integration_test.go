@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -268,6 +269,65 @@ func TestStartHooksSeeTheCheckoutRoot(t *testing.T) {
 
 			if seen == "" || seen == dir || seen != pipeline.Snapshot().Root {
 				t.Fatalf("hook saw root %q, want the checkout %q", seen, pipeline.Snapshot().Root)
+			}
+		})
+	}
+}
+
+func TestStartClosesWhatAHookOpened(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		failLater  bool
+		closeAfter bool
+	}{
+		{name: "a later step fails, so Start closes it once", failLater: true},
+		{name: "Start succeeds, so Close closes it once", closeAfter: true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			writeFixtureModule(t, dir)
+			initFixtureRepo(t, dir)
+
+			var order []string
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			hooks := []namedHook{{name: "probe", run: func(
+				_ context.Context, _ *Config, _ stageEnv, built *stages,
+			) error {
+				built.closers = append(built.closers, orderedCloser{"hook", &order})
+
+				if testCase.failLater {
+					cancel()
+				}
+
+				return nil
+			}}}
+
+			pipeline, err := start(ctx, Config{Repo: dir, Rev: "HEAD"}, hooks)
+			if testCase.failLater != (err != nil) {
+				t.Fatalf("start() = %v, want failure %v", err, testCase.failLater)
+			}
+
+			if len(order) != 0 && !testCase.failLater {
+				t.Fatalf("closed %v before Close", order)
+			}
+
+			if testCase.closeAfter {
+				if err = pipeline.Close(context.WithoutCancel(t.Context())); err != nil {
+					t.Fatalf("Close() = %v", err)
+				}
+			}
+
+			if !slices.Equal(order, []string{"hook"}) {
+				t.Fatalf("closed %v, want the hook closer once", order)
 			}
 		})
 	}

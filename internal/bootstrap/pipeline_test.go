@@ -740,3 +740,163 @@ func hookLeavesTheStagesUnchanged(t *testing.T, hook stageHook) {
 		t.Fatalf("cfg.Rev = %q, want %q", cfg.Rev, Defaults().Rev)
 	}
 }
+
+func TestClosersCloseInReverseAndJoinEveryError(t *testing.T) {
+	t.Parallel()
+
+	errFirst := errors.New("first would not close")
+	errLast := errors.New("last would not close")
+
+	testCases := []struct {
+		name      string
+		build     func(order *[]string) closers
+		wantOrder []string
+		wantErrs  []error
+	}{
+		{name: "none held", build: func(*[]string) closers { return nil }},
+		{
+			name: "closed last to first",
+			build: func(order *[]string) closers {
+				return closers{orderedCloser{"a", order}, orderedCloser{"b", order}}
+			},
+			wantOrder: []string{"b", "a"},
+		},
+		{
+			name: "one failure does not stop the rest",
+			build: func(order *[]string) closers {
+				return closers{
+					failingCloser{orderedCloser{"a", order}, errFirst},
+					orderedCloser{"b", order},
+					failingCloser{orderedCloser{"c", order}, errLast},
+				}
+			},
+			wantOrder: []string{"c", "b", "a"},
+			wantErrs:  []error{errFirst, errLast},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var order []string
+
+			err := testCase.build(&order).Close(t.Context())
+
+			if !slices.Equal(order, testCase.wantOrder) {
+				t.Fatalf("Close() stopped %v, want %v", order, testCase.wantOrder)
+			}
+
+			for _, target := range testCase.wantErrs {
+				if !errors.Is(err, target) {
+					t.Fatalf("Close() = %v, want %v wrapped", err, target)
+				}
+			}
+
+			if len(testCase.wantErrs) == 0 && err != nil {
+				t.Fatalf("Close() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestRunHooksReleasesWhatEarlierHooksOpenedWhenOneFails(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("hook failed")
+
+	testCases := []struct {
+		name       string
+		failing    error
+		wantClosed []string
+	}{
+		{
+			name:       "a failing hook closes the earlier hooks' closers once",
+			failing:    boom,
+			wantClosed: []string{"b", "a"},
+		},
+		{name: "no failure leaves them open for the pipeline", wantClosed: nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var order []string
+
+			opening := func(name string, err error) namedHook {
+				return namedHook{name: name, run: func(
+					_ context.Context, _ *Config, _ stageEnv, built *stages,
+				) error {
+					built.closers = append(built.closers, orderedCloser{name, &order})
+
+					return err
+				}}
+			}
+
+			cfg := Defaults()
+			hooks := []namedHook{opening("a", nil), opening("b", nil), {name: "last", run: func(
+				context.Context, *Config, stageEnv, *stages,
+			) error {
+				return testCase.failing
+			}}}
+
+			err := runHooks(t.Context(), &cfg, stageEnv{}, identityStages(nil), hooks)
+			if !errors.Is(err, testCase.failing) {
+				t.Fatalf("runHooks() = %v, want %v", err, testCase.failing)
+			}
+
+			if !slices.Equal(order, testCase.wantClosed) {
+				t.Fatalf("closed %v, want %v", order, testCase.wantClosed)
+			}
+		})
+	}
+}
+
+func TestPipelineCloseStopsTheHookResourcesFirst(t *testing.T) {
+	t.Parallel()
+
+	errHook := errors.New("hook process would not stop")
+
+	testCases := []struct {
+		name      string
+		hookErr   error
+		wantOrder []string
+	}{
+		{
+			name:      "before the session and the checkout they may read",
+			wantOrder: []string{"hook", "session", "loads", "reader", "checkout"},
+		},
+		{
+			name:      "a hook closer's error surfaces",
+			hookErr:   errHook,
+			wantOrder: []string{"hook", "session", "loads", "reader", "checkout"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var order []string
+
+			pipeline := &Pipeline{
+				hooked:   closers{failingCloser{orderedCloser{"hook", &order}, testCase.hookErr}},
+				loads:    orderedCloser{"loads", &order},
+				session:  orderedCloser{"session", &order},
+				reader:   orderedCloser{"reader", &order},
+				checkout: orderedCloser{"checkout", &order},
+			}
+
+			err := pipeline.Close(t.Context())
+
+			if !errors.Is(err, testCase.hookErr) {
+				t.Fatalf("Close() = %v, want %v", err, testCase.hookErr)
+			}
+
+			if !slices.Equal(order, testCase.wantOrder) {
+				t.Fatalf("Close() stopped %v, want %v", order, testCase.wantOrder)
+			}
+		})
+	}
+}

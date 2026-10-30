@@ -31,6 +31,7 @@ type Pipeline struct {
 	loads     closer
 	session   closer
 	reader    closer
+	hooked    closers
 	indexer   indexer
 	scanner   scanner
 	orderer   orderer
@@ -78,16 +79,6 @@ type planner interface {
 
 type auditor interface {
 	Audit(graph entities.Graph, order entities.Ordering) (auditing.Result, error)
-}
-
-type readerCloser struct{ reader gitstore.Reader }
-
-func (adapter readerCloser) Close(context.Context) error {
-	if err := adapter.reader.Close(); err != nil {
-		return fmt.Errorf("stop cat-file: %w", err)
-	}
-
-	return nil
 }
 
 var (
@@ -144,26 +135,27 @@ func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error
 		return nil, err
 	}
 
+	// A hook's resources read the session and the checkout, so they close before them.
+	fail := func(err error) error {
+		release(ctx, built.closers, goSource, wired.session, gitReader, checkout)
+
+		return err
+	}
+
 	source, err := newTreeSource(ctx, reader)
 	if err != nil {
-		release(ctx, goSource, wired.session, gitReader, checkout)
-
-		return nil, err
+		return nil, fail(err)
 	}
 
 	scanner := indexing.NewScanner(reader, indexCfg)
 
 	if err = loadCapabilities(ctx, &cfg, scanner, snapshot); err != nil {
-		release(ctx, goSource, wired.session, gitReader, checkout)
-
-		return nil, err
+		return nil, fail(err)
 	}
 
 	cfg.Auditing.Unseen, err = unseen(snapshot, cfg.BuildTags)
 	if err != nil {
-		release(ctx, goSource, wired.session, gitReader, checkout)
-
-		return nil, err
+		return nil, fail(err)
 	}
 
 	cfg.Auditing.Unclaimed = unclaimed(snapshot, indexCfg.Languages)
@@ -173,6 +165,7 @@ func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error
 		loads:     goSource,
 		session:   wired.session,
 		reader:    gitReader,
+		hooked:    built.closers,
 		indexer:   wired.guard(indexing.New(wired.resolver, reader, indexCfg)),
 		scanner:   scanner,
 		orderer:   built.orderer,
@@ -206,6 +199,7 @@ type (
 		languages []indexing.Language
 		orderer   orderer
 		planner   planner
+		closers   closers
 	}
 )
 
@@ -251,6 +245,8 @@ func runHooks(
 ) error {
 	for _, hook := range hooks {
 		if err := hook.run(ctx, cfg, env, built); err != nil {
+			release(ctx, built.closers)
+
 			return fmt.Errorf("%s: %w", hook.name, err)
 		}
 	}
@@ -299,14 +295,6 @@ func openRevision(ctx context.Context, root string, cfg Config) (revision, error
 	snapshot.Root = checkout.Dir()
 
 	return revision{reader: reader, snapshot: snapshot, checkout: checkout}, nil
-}
-
-// release closes what a failed start already opened. The start's own error is
-// the one worth reporting, so a close error is dropped.
-func release(ctx context.Context, opened ...closer) {
-	for _, c := range opened {
-		_ = c.Close(ctx)
-	}
 }
 
 func (p *Pipeline) Snapshot() entities.Snapshot { return p.snapshot }
@@ -364,7 +352,7 @@ func (p *Pipeline) Audit(graph entities.Graph, order entities.Ordering) (auditin
 	return result, nil
 }
 
-// Close stops the language server, the typed loads and the git reader, then
+// Close stops what the hooks opened, the language server, the typed loads and the git reader, then
 // removes the throwaway checkout, folding every failure so one does not hide
 // another; the checkout is kept when the session or the loads fail to stop.
 // It is registered by the caller right after Start, so a failure later still
@@ -373,9 +361,11 @@ func (p *Pipeline) Close(ctx context.Context) error {
 	// The session and typed loads read the checkout and stop first; one that fails keeps it.
 	// The resolver goes before them: its index build reads the loads, so closing them under it
 	// would log a skipped ad hoc pass that was only cancelled.
+	hooksErr := p.hooked.Close(ctx)
 	sessionErr := p.session.Close(ctx)
 	loadsErr := p.loads.Close(ctx)
 	closeErr := errors.Join(
+		stopped("close hook resources", hooksErr),
 		stopped("close language server", sessionErr),
 		stopped("stop typed loads", loadsErr),
 		stopped("close git reader", p.reader.Close(ctx)),

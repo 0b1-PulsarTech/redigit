@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
@@ -18,6 +19,36 @@ import (
 type treeSource struct {
 	reader gitstore.Reader
 	modes  map[string]gitstore.FileMode
+}
+
+type readerCloser struct{ reader gitstore.Reader }
+
+func (adapter readerCloser) Close(context.Context) error {
+	if err := adapter.reader.Close(); err != nil {
+		return fmt.Errorf("stop cat-file: %w", err)
+	}
+
+	return nil
+}
+
+type closers []closer
+
+func (all closers) Close(ctx context.Context) error {
+	var err error
+
+	for _, one := range slices.Backward(all) {
+		err = errors.Join(err, one.Close(ctx))
+	}
+
+	return err
+}
+
+// release closes what a failed start already opened. The start's own error is
+// the one worth reporting, so a close error is dropped.
+func release(ctx context.Context, opened ...closer) {
+	for _, c := range opened {
+		_ = c.Close(ctx)
+	}
 }
 
 func newTreeSource(ctx context.Context, reader gitstore.Reader) (treeSource, error) {
