@@ -1,6 +1,10 @@
 package ordering
 
-import "github.com/wrapped-owls/redigit/internal/domain/entities"
+import (
+	"maps"
+
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+)
 
 // seed computes each declaration's base position and whether it is newly
 // inserted (its file carries no evidence in the source history), which is
@@ -40,6 +44,46 @@ func seed(
 	}
 
 	return base, inserted
+}
+
+func seedFloored(
+	decls []entities.Decl,
+	snap entities.Snapshot,
+	floor map[entities.DeclKey]entities.Position,
+) (base map[entities.DeclKey]entities.Position, inserted map[entities.DeclKey]bool) {
+	if floor == nil {
+		return seed(decls, snap)
+	}
+
+	base = make(map[entities.DeclKey]entities.Position, len(decls))
+	inserted = make(map[entities.DeclKey]bool, len(decls))
+
+	// A declaration the floor never saw (a statement piece of a function) seeds
+	// as in history mode: marking it inserted pinned 185 of them at the limit.
+	fallback, fallbackInserted := seed(decls, snap)
+
+	for _, decl := range decls {
+		if at, born := floor[decl.Key]; born {
+			base[decl.Key] = at
+
+			continue
+		}
+
+		base[decl.Key] = fallback[decl.Key]
+		inserted[decl.Key] = fallbackInserted[decl.Key]
+	}
+
+	return base, inserted
+}
+
+func (eng *engine) reseed(snap entities.Snapshot, config Config) {
+	eng.base, eng.inserted = seedFloored(eng.decls, snap, config.Floor)
+	// newEngine built layers and anchors on the first-touch seeds: redo them.
+	applyLayers(eng.decls, eng.base, config.Layers, config.Features)
+	applyAnchors(eng.graph, eng.base)
+
+	eng.assign = make(map[entities.DeclKey]entities.Position, len(eng.base))
+	maps.Copy(eng.assign, eng.base)
 }
 
 // limitFor is the highest position the fixed point may assign. The order

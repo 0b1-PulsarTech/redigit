@@ -28,6 +28,11 @@ type Config struct {
 	// the whole history and builds the repository horizontally; with it, a
 	// layer only orders the pieces of one vertical slice.
 	Features entities.Features
+
+	// Floor seeds each declaration at the position it was born (see
+	// lineage.Floor) instead of at its file's first touch. A declaration
+	// missing from it keeps the first-touch seed. Nil changes nothing.
+	Floor map[entities.DeclKey]entities.Position
 }
 
 // defaultSlack and defaultRoundLimit are the values the previous rebuild
@@ -93,6 +98,9 @@ func (e *UnresolvedError) Unwrap() error { return apperr.ErrIncomplete }
 // on, not merely a reason to discard the result.
 func (o Orderer) Order(graph entities.Graph, snap entities.Snapshot) (entities.Ordering, error) {
 	eng := newEngine(graph, snap, o.config.Slack, o.config.Layers, o.config.Features)
+	if o.config.Floor != nil {
+		eng.reseed(snap, o.config)
+	}
 
 	rounds, err := eng.converge(o.config.RoundLimit)
 	if err != nil {

@@ -348,3 +348,72 @@ func TestOrderWithZeroConfigStillSettles(t *testing.T) {
 		t.Fatalf("Rounds = %d, want the fixed point to have actually run", got.Rounds)
 	}
 }
+
+func TestOrderFloor(t *testing.T) {
+	t.Parallel()
+
+	first := entities.DeclKey{File: "x.go", Name: "A"}
+	second := entities.DeclKey{File: "x.go", Name: "B"}
+	other := entities.DeclKey{File: "y.go", Name: "C"}
+	reads := []entities.Edge{
+		{Dependent: second, Provider: first, Reason: entities.ReasonReference},
+	}
+
+	testCases := []struct {
+		name  string
+		floor map[entities.DeclKey]entities.Position
+		edges []entities.Edge
+		want  map[entities.DeclKey]entities.Position
+	}{
+		{
+			"a nil floor keeps the first touch of the file",
+			nil, nil,
+			map[entities.DeclKey]entities.Position{first: 5, second: 5, other: 9},
+		},
+		{
+			"a floor places each declaration at its own birth",
+			map[entities.DeclKey]entities.Position{first: 2, second: 7, other: 9},
+			nil,
+			map[entities.DeclKey]entities.Position{first: 2, second: 7, other: 9},
+		},
+		{
+			"a reader floored before its provider still waits for it",
+			map[entities.DeclKey]entities.Position{first: 6, second: 2, other: 9},
+			reads,
+			map[entities.DeclKey]entities.Position{first: 6, second: 6, other: 9},
+		},
+		{
+			"a key missing from the floor keeps its file's first touch",
+			map[entities.DeclKey]entities.Position{first: 3, other: 9},
+			reads,
+			map[entities.DeclKey]entities.Position{first: 3, second: 5, other: 9},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decls := []entities.Decl{
+				{Key: first, Unit: "x"}, {Key: second, Unit: "x"}, {Key: other, Unit: "y"},
+			}
+			snap := entities.Snapshot{History: []entities.SourceTouch{
+				{Position: 5, Touched: []string{"x.go"}},
+				{Position: 9, Touched: []string{"y.go"}},
+			}}
+
+			graph := entities.NewGraph(decls, testCase.edges, nil)
+
+			got, err := New(Config{Floor: testCase.floor}).Order(graph, snap)
+			if err != nil {
+				t.Fatalf("Order() err = %v, want nil", err)
+			}
+
+			for key, want := range testCase.want {
+				if at := got.Of(key); at != want {
+					t.Fatalf("%s at %d, want %d", key, at, want)
+				}
+			}
+		})
+	}
+}
