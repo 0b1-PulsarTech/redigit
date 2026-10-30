@@ -53,7 +53,7 @@ func (i Indexer) resolve(
 		})
 	}
 
-	if err := group.Wait(); err != nil {
+	if err := cmp.Or(group.Wait(), ctx.Err()); err != nil {
 		return nil, nil, fmt.Errorf("resolve edges: %w", err)
 	}
 

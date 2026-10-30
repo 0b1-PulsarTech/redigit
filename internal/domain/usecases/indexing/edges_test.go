@@ -2,6 +2,7 @@ package indexing
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -105,6 +106,55 @@ func TestIndexerResolveDeduplicates(t *testing.T) {
 
 	if edges[0].Dependent != one.Key || edges[0].Provider != two.Key {
 		t.Fatalf("edge = %v, want %s needing %s", edges[0], one.Key, two.Key)
+	}
+}
+
+func TestIndexerResolveStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
+	one := entities.Decl{
+		Key:      entities.DeclKey{File: "a.go", Kind: entities.KindFunc, Name: "One"},
+		Span:     entities.Span{Start: 11, End: 20},
+		Selector: entities.Location{File: "a.go", Line: 2, Char: 5},
+	}
+
+	testCases := []struct {
+		name      string
+		cancelled bool
+		wantErr   error
+	}{
+		{"a cancelled run is not an answer", true, context.Canceled},
+		{"a live run answers", false, nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if testCase.cancelled {
+				cancel()
+			}
+
+			resolver := NewMockResolver(gomock.NewController(t))
+			resolver.EXPECT().References(gomock.Any(), one.Selector).DoAndReturn(
+				func(ctx context.Context, _ entities.Location) ([]entities.Location, error) {
+					return nil, ctx.Err()
+				},
+			)
+
+			where := newLocator()
+			where.add("a.go", []byte("package a\n\nfunc One() {}\n"), []entities.Decl{one})
+
+			_, _, err := New(resolver, nil, Config{Concurrency: 1}).resolve(
+				ctx, []entities.Decl{one}, where,
+			)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("resolve() error = %v, want %v", err, testCase.wantErr)
+			}
+		})
 	}
 }
 
