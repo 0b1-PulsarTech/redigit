@@ -1,9 +1,6 @@
 package plancache
 
 import (
-	"cmp"
-	"slices"
-
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
@@ -24,17 +21,8 @@ type Entry struct {
 }
 
 func Pack(result indexing.Result) Entry {
-	decls := result.Graph.Decls()
-	slices.SortFunc(decls, func(left, right entities.Decl) int {
-		return cmp.Or(
-			cmp.Compare(left.Key.File, right.Key.File),
-			cmp.Compare(left.Key.Kind, right.Key.Kind),
-			cmp.Compare(left.Key.Name, right.Key.Name),
-		)
-	})
-
 	return Entry{
-		Decls:   decls,
+		Decls:   result.Graph.Decls(),
 		Edges:   result.Graph.Edges(),
 		Anchors: result.Graph.Anchors(),
 		Blind:   result.Blind,

@@ -92,6 +92,39 @@ func TestPackIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestPackKeepsTheGraphDeclOrder(t *testing.T) {
+	t.Parallel()
+
+	nested := entities.DeclKey{File: "x", Kind: entities.KindFunc, Name: "F"}
+	sibling := entities.DeclKey{File: "x.go", Kind: entities.KindFunc, Name: "F"}
+	other := entities.DeclKey{File: "a.go", Kind: entities.KindType, Name: "T"}
+
+	testCases := []struct {
+		name  string
+		decls []entities.Decl
+	}{
+		{"a file that prefixes another", []entities.Decl{{Key: nested}, {Key: sibling}}},
+		{"unrelated files", []entities.Decl{{Key: sibling}, {Key: other}}},
+		{
+			"three files in any arrival",
+			[]entities.Decl{{Key: sibling}, {Key: nested}, {Key: other}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(testCase.decls, nil, nil)
+
+			got := Pack(indexing.Result{Graph: graph}).Decls
+			if !reflect.DeepEqual(got, graph.Decls()) {
+				t.Fatalf("Pack().Decls = %v, want %v", got, graph.Decls())
+			}
+		})
+	}
+}
+
 func TestSampleEntryFillsEveryField(t *testing.T) {
 	t.Parallel()
 
