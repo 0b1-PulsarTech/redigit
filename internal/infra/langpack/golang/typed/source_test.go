@@ -2,12 +2,88 @@ package typed
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/loadonce"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
+
+func TestSourceClose(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		loaded  bool
+		wantErr error
+	}{
+		{"before any load nothing starts afterwards", false, loadonce.ErrClosed},
+		{"after a load the answer stays", true, nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap, _ := testkit.Fixture(t, map[string]string{"a.go": "package fixture\n"})
+			source := NewSource(nil)
+
+			if testCase.loaded {
+				if _, err := source.Packages(context.Background(), snap); err != nil {
+					t.Fatalf("Packages() error = %v", err)
+				}
+			}
+
+			if err := source.Close(context.Background()); err != nil {
+				t.Fatalf("Close() error = %v", err)
+			}
+
+			_, err := source.Packages(context.Background(), snap)
+			if !errors.Is(err, testCase.wantErr) || (testCase.wantErr == nil && err != nil) {
+				t.Fatalf("Packages() after Close error = %v, want %v", err, testCase.wantErr)
+			}
+		})
+	}
+}
+
+func TestSourceTypeChecksARecompiledVariant(t *testing.T) {
+	t.Parallel()
+
+	snap, _ := testkit.Fixture(t, map[string]string{
+		"p/p.go":      "package p\n",
+		"p/p_test.go": "package p\n",
+		"p/x_test.go": "package p_test\n\nimport _ \"example.test/fixture/q\"\n",
+		"q/q.go":      "package q\n\nimport _ \"example.test/fixture/p\"\n",
+	})
+
+	roots, err := NewSource(nil).Packages(context.Background(), snap)
+	if err != nil {
+		t.Fatalf("Packages() error = %v", err)
+	}
+
+	variants := 0
+
+	packages.Visit(roots, func(pkg *packages.Package) bool {
+		if strings.HasSuffix(pkg.PkgPath, "/q") && pkg.ID != pkg.PkgPath {
+			variants++
+
+			if pkg.TypesInfo == nil {
+				t.Errorf("variant %s has no TypesInfo", pkg.ID)
+			}
+		}
+
+		return true
+	}, nil)
+
+	if variants == 0 {
+		t.Fatal("the fixture produced no recompiled variant of q")
+	}
+}
 
 func TestTypedSourceAttributesUsesToTheDeclarationsAsked(t *testing.T) {
 	t.Parallel()

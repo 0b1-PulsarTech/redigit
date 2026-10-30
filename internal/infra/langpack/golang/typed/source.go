@@ -2,26 +2,23 @@ package typed
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
-	"path"
-	"slices"
 	"strings"
 	"sync"
 
-	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
-	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/loadonce"
 )
 
 type Source struct {
 	tags []string
 
-	once   sync.Once
-	loaded [][]*packages.Package
-	err    error
+	loaded loadonce.Once[[][]*packages.Package]
+	adhoc  loadonce.Once[[][]*packages.Package]
 
 	guard sync.Mutex
 	facts map[uint64]Facts
@@ -37,13 +34,9 @@ func (source *Source) Facts(
 	snap entities.Snapshot,
 	decls []entities.Decl,
 ) (Facts, error) {
-	// Loading once is sound only because one run indexes one snapshot.
-	source.once.Do(func() {
-		source.loaded, source.err = source.check(ctx, snap)
-	})
-
-	if source.err != nil {
-		return Facts{}, source.err
+	loaded, err := source.load(ctx, snap)
+	if err != nil {
+		return Facts{}, err
 	}
 
 	source.guard.Lock()
@@ -59,13 +52,27 @@ func (source *Source) Facts(
 
 	var facts Facts
 
-	for _, pkgs := range source.loaded {
+	for _, pkgs := range loaded {
 		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
 	}
 
 	source.facts[shape] = facts.sorted()
 
 	return source.facts[shape], nil
+}
+
+func (source *Source) Close(ctx context.Context) error {
+	var closeErr error
+
+	if err := source.loaded.Close(ctx); err != nil {
+		closeErr = errors.Join(closeErr, fmt.Errorf("stop typed load: %w", err))
+	}
+
+	if err := source.adhoc.Close(ctx); err != nil {
+		closeErr = errors.Join(closeErr, fmt.Errorf("stop ad hoc load: %w", err))
+	}
+
+	return closeErr
 }
 
 func shapeOf(decls []entities.Decl) uint64 {
@@ -130,13 +137,17 @@ func typeCheck(
 		Context: ctx,
 		Dir:     root,
 		Tests:   true,
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports |
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
+			packages.NeedImports |
 			packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo |
 			packages.NeedTypesSizes,
 	}
 
+	// Under -trimpath export data names files by module-relative paths no position maps back.
+	cfg.BuildFlags = []string{"-trimpath=false"}
+
 	if len(pass.tags) > 0 {
-		cfg.BuildFlags = []string{"-tags=" + strings.Join(pass.tags, ",")}
+		cfg.BuildFlags = append(cfg.BuildFlags, "-tags="+strings.Join(pass.tags, ","))
 	}
 
 	pkgs, err := packages.Load(cfg, pass.patterns...)
@@ -157,41 +168,4 @@ func brokenPackages(pkgs []*packages.Package) int {
 	}
 
 	return broken
-}
-
-type module struct {
-	dir  string
-	path string
-}
-
-func modulesOf(snap entities.Snapshot) ([]module, error) {
-	var modules []module
-
-	for _, file := range snap.Files {
-		if path.Base(file) != "go.mod" {
-			continue
-		}
-
-		source, err := declsource.ReadSource(snap, file)
-		if err != nil {
-			return nil, fmt.Errorf("go.mod source: %w", err)
-		}
-
-		if name := modfile.ModulePath(source); name != "" {
-			modules = append(modules, module{dir: path.Dir(file), path: name})
-		}
-	}
-
-	return modules, nil
-}
-
-func allPatterns(modules []module) []string {
-	patterns := make([]string, 0, len(modules))
-	for _, found := range modules {
-		patterns = append(patterns, found.path+"/...")
-	}
-
-	slices.Sort(patterns)
-
-	return patterns
 }

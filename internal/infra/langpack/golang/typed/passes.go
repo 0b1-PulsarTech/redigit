@@ -1,6 +1,7 @@
 package typed
 
 import (
+	"context"
 	"fmt"
 	"go/build/constraint"
 	"maps"
@@ -8,6 +9,8 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/buildtags"
@@ -60,7 +63,7 @@ func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]lo
 	return passes, nil
 }
 
-func packageOfFile(modules []module, file string) (string, bool) {
+func ownerOf(modules []module, file string) (module, bool) {
 	best := -1
 
 	for index, found := range modules {
@@ -71,12 +74,21 @@ func packageOfFile(modules []module, file string) (string, bool) {
 	}
 
 	if best < 0 {
+		return module{}, false
+	}
+
+	return modules[best], true
+}
+
+func packageOfFile(modules []module, file string) (string, bool) {
+	owner, inside := ownerOf(modules, file)
+	if !inside {
 		return "", false
 	}
 
-	rel := strings.TrimPrefix(path.Dir(file), modules[best].dir)
+	rel := strings.TrimPrefix(path.Dir(file), owner.dir)
 
-	return modules[best].path + strings.TrimSuffix(rel, "/"), true
+	return owner.path + strings.TrimSuffix(rel, "/"), true
 }
 
 func showingTags(line string, tags []string) ([]string, bool) {
@@ -121,4 +133,34 @@ func satisfies(expr constraint.Expr, tags []string) bool {
 		return slices.Contains(tags, name) || name == runtime.GOOS || name == runtime.GOARCH ||
 			(name == "unix" && buildtags.IsUnix(runtime.GOOS))
 	})
+}
+
+func (source *Source) Packages(
+	ctx context.Context,
+	snap entities.Snapshot,
+) ([]*packages.Package, error) {
+	loaded, err := source.load(ctx, snap)
+	if err != nil || len(loaded) == 0 {
+		return nil, err
+	}
+
+	return loaded[0], nil
+}
+
+func (source *Source) load(
+	ctx context.Context,
+	snap entities.Snapshot,
+) ([][]*packages.Package, error) {
+	// Loading once is sound only because one run indexes one snapshot.
+	loaded, err := source.loaded.Do(
+		ctx,
+		func(loadCtx context.Context) ([][]*packages.Package, error) {
+			return source.check(loadCtx, snap)
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("typed load: %w", err)
+	}
+
+	return loaded, nil
 }
