@@ -67,14 +67,18 @@ func collectFacts(pkgs []*packages.Package, root string, locator DeclLocator) Fa
 }
 
 func (facts Facts) sorted() Facts {
-	slices.SortStableFunc(facts.Forced, compareRequirements)
-	slices.SortStableFunc(facts.Converted, compareRequirements)
-	slices.SortStableFunc(facts.Escaped, compareRequirements)
+	for _, group := range [][]Requirement{facts.Forced, facts.Converted, facts.Escaped} {
+		for _, req := range group {
+			slices.SortFunc(req.Methods, entities.CompareKeys)
+		}
+
+		slices.SortFunc(group, compareRequirements)
+	}
 
 	slices.SortFunc(facts.Uses, func(left, right Use) int {
 		return cmp.Or(
-			cmp.Compare(left.Dependent.String(), right.Dependent.String()),
-			cmp.Compare(left.Provider.String(), right.Provider.String()),
+			entities.CompareKeys(left.Dependent, right.Dependent),
+			entities.CompareKeys(left.Provider, right.Provider),
 		)
 	})
 
@@ -85,8 +89,9 @@ func (facts Facts) sorted() Facts {
 
 func compareRequirements(left, right Requirement) int {
 	return cmp.Or(
-		cmp.Compare(left.Dependent.String(), right.Dependent.String()),
-		cmp.Compare(left.Owner.String(), right.Owner.String()),
+		entities.CompareKeys(left.Dependent, right.Dependent),
+		entities.CompareKeys(left.Owner, right.Owner),
+		slices.CompareFunc(left.Methods, right.Methods, entities.CompareKeys),
 	)
 }
 
