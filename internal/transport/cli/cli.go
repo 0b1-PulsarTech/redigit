@@ -10,6 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/infra/profiling"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/verify"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/write"
 )
 
@@ -27,9 +28,10 @@ const (
 	cmdEmit   = "emit"
 	cmdChunks = "chunks"
 	cmdWrite  = "write"
+	cmdVerify = "verify"
 )
 
-const fullUsage = usage + runUsage + write.Usage
+const fullUsage = usage + runUsage + write.Usage + verify.Usage
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	return dispatch(ctx, args, stdout, stderr, realEnv())
@@ -52,6 +54,10 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, env 
 
 	if args[0] == cmdWrite {
 		return runWrite(ctx, args[1:], stdout, stderr)
+	}
+
+	if args[0] == cmdVerify {
+		return runVerify(ctx, args[1:], stdout, stderr)
 	}
 
 	set := newFlagSet()
@@ -155,4 +161,13 @@ func runWrite(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	}
 
 	return err //nolint:wrapcheck // the write command names its own failures
+}
+
+func runVerify(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	err := verify.Run(ctx, args, stdout)
+	if errors.Is(err, ErrUsage) {
+		_, _ = fmt.Fprint(stderr, fullUsage)
+	}
+
+	return err //nolint:wrapcheck // the verify command names its own failures
 }

@@ -185,3 +185,55 @@ func TestDispatchWriteRoutesWithoutAPipeline(t *testing.T) {
 		})
 	}
 }
+
+func TestDispatchVerifyRoutesWithoutAPipeline(t *testing.T) {
+	t.Parallel()
+
+	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
+		t.Fatal("verify must never start a pipeline")
+
+		return nil, nil
+	}
+
+	testCases := []struct {
+		name        string
+		args        []string
+		wantUsage   bool
+		wantMessage string
+	}{
+		{"unknown flag prints the usage", []string{cmdVerify, "--nope"}, true, ""},
+		{"zero stride prints the usage", []string{cmdVerify, "--stride", "0"}, true, ""},
+		{
+			"a run failure prints no usage",
+			[]string{cmdVerify, "--repo", "/nonexistent/redigit/repo"},
+			false,
+			"find git dir",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+
+			err := dispatch(
+				context.Background(), testCase.args, &stdout, &stderr, runEnv{Start: unreachable},
+			)
+			if err == nil || errors.Is(err, ErrUsage) != testCase.wantUsage {
+				t.Fatalf("err = %v, want usage = %v", err, testCase.wantUsage)
+			}
+
+			if got := strings.Contains(
+				stderr.String(),
+				"redigit verify",
+			); got != testCase.wantUsage {
+				t.Fatalf("stderr = %q, want verify usage = %v", stderr.String(), testCase.wantUsage)
+			}
+
+			if !strings.Contains(err.Error(), testCase.wantMessage) || stdout.Len() != 0 {
+				t.Fatalf("err = %v, stdout = %q", err, stdout.String())
+			}
+		})
+	}
+}
