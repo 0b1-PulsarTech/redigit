@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockRenderer is a mock of Renderer interface.
@@ -147,4 +146,124 @@ func (m *MockHistory) Write(ctx context.Context, ref string, commits []Commit) (
 func (mr *MockHistoryMockRecorder) Write(ctx, ref, commits any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockHistory)(nil).Write), ctx, ref, commits)
+}
+
+// MockDateSource is a mock of DateSource interface.
+type MockDateSource struct {
+	ctrl     *gomock.Controller
+	recorder *MockDateSourceMockRecorder
+	isgomock struct{}
+}
+
+// MockDateSourceMockRecorder is the mock recorder for MockDateSource.
+type MockDateSourceMockRecorder struct {
+	mock *MockDateSource
+}
+
+// NewMockDateSource creates a new mock instance.
+func NewMockDateSource(ctrl *gomock.Controller) *MockDateSource {
+	mock := &MockDateSource{ctrl: ctrl}
+	mock.recorder = &MockDateSourceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDateSource) EXPECT() *MockDateSourceMockRecorder {
+	return m.recorder
+}
+
+// AuthorDates mocks base method.
+func (m *MockDateSource) AuthorDates(ctx context.Context, ref string) ([]Stamp, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AuthorDates", ctx, ref)
+	ret0, _ := ret[0].([]Stamp)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AuthorDates indicates an expected call of AuthorDates.
+func (mr *MockDateSourceMockRecorder) AuthorDates(ctx, ref any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthorDates", reflect.TypeOf((*MockDateSource)(nil).AuthorDates), ctx, ref)
+}
+
+// MockReplayHistory is a mock of ReplayHistory interface.
+type MockReplayHistory struct {
+	ctrl     *gomock.Controller
+	recorder *MockReplayHistoryMockRecorder
+	isgomock struct{}
+}
+
+// MockReplayHistoryMockRecorder is the mock recorder for MockReplayHistory.
+type MockReplayHistoryMockRecorder struct {
+	mock *MockReplayHistory
+}
+
+// NewMockReplayHistory creates a new mock instance.
+func NewMockReplayHistory(ctrl *gomock.Controller) *MockReplayHistory {
+	mock := &MockReplayHistory{ctrl: ctrl}
+	mock.recorder = &MockReplayHistoryMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockReplayHistory) EXPECT() *MockReplayHistoryMockRecorder {
+	return m.recorder
+}
+
+// Discard mocks base method.
+func (m *MockReplayHistory) Discard(ctx context.Context, staged Staged) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Discard", ctx, staged)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Discard indicates an expected call of Discard.
+func (mr *MockReplayHistoryMockRecorder) Discard(ctx, staged any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Discard", reflect.TypeOf((*MockReplayHistory)(nil).Discard), ctx, staged)
+}
+
+// Publish mocks base method.
+func (m *MockReplayHistory) Publish(ctx context.Context, ref string, staged Staged) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Publish", ctx, ref, staged)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Publish indicates an expected call of Publish.
+func (mr *MockReplayHistoryMockRecorder) Publish(ctx, ref, staged any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockReplayHistory)(nil).Publish), ctx, ref, staged)
+}
+
+// Replay mocks base method.
+func (m *MockReplayHistory) Replay(ctx context.Context, ref string, commits []Replayed) (Staged, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Replay", ctx, ref, commits)
+	ret0, _ := ret[0].(Staged)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Replay indicates an expected call of Replay.
+func (mr *MockReplayHistoryMockRecorder) Replay(ctx, ref, commits any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replay", reflect.TypeOf((*MockReplayHistory)(nil).Replay), ctx, ref, commits)
+}
+
+// Verify mocks base method.
+func (m *MockReplayHistory) Verify(ctx context.Context, gotRef, wantRef string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Verify", ctx, gotRef, wantRef)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Verify indicates an expected call of Verify.
+func (mr *MockReplayHistoryMockRecorder) Verify(ctx, gotRef, wantRef any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockReplayHistory)(nil).Verify), ctx, gotRef, wantRef)
 }
