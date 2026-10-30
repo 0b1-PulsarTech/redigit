@@ -245,7 +245,7 @@ func reportStart(
 	ctrl *gomock.Controller,
 	graphErr, birthsErr error,
 ) starter {
-	pl := NewMockpipeline(ctrl)
+	pl := NewMockPipeline(ctrl)
 	pl.EXPECT().Unseen().Return(nil).AnyTimes()
 	pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
 	pl.EXPECT().Close(gomock.Any()).Return(nil)

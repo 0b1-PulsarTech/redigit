@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -134,5 +135,42 @@ func TestRunChunksFailsWhenCuttingFails(t *testing.T) {
 
 	if !errors.Is(err, errCut) {
 		t.Fatalf("err = %v, want it to wrap %v", err, errCut)
+	}
+}
+
+func TestDispatchBuildsACacheKeyOnlyForTheCommandsThatUseOne(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		command   string
+		wantKeyed bool
+	}{
+		{cmdAudit, true},
+		{cmdEmit, true},
+		{cmdGraph, true},
+		{cmdPlan, true},
+		{cmdReport, true},
+		{cmdChunks, false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.command, func(t *testing.T) {
+			t.Parallel()
+
+			var keyed bool
+
+			args := []string{testCase.command, "--repo", t.TempDir(), "--from-cache"}
+
+			env := keyForbiddenEnv(t.TempDir(), &keyed)
+			err := dispatch(t.Context(), args, io.Discard, io.Discard, env)
+
+			if errors.Is(err, ErrUsage) {
+				t.Fatalf("%s is a command: err = %v", testCase.command, err)
+			}
+
+			if keyed != testCase.wantKeyed {
+				t.Fatalf("%s keyed = %v, want %v", testCase.command, keyed, testCase.wantKeyed)
+			}
+		})
 	}
 }

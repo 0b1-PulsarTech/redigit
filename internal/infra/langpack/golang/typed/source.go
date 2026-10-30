@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
-	"log/slog"
 	"path"
 	"slices"
 	"strings"
@@ -26,6 +25,7 @@ type Source struct {
 
 	guard sync.Mutex
 	facts map[uint64]Facts
+	short []Shortfall
 }
 
 func NewSource(tags []string) *Source {
@@ -106,6 +106,10 @@ func (source *Source) check(
 			return nil, loadErr
 		}
 
+		// A package that does not type-check still yields what was checked before
+		// the error, so one broken package costs its own edges and not the run's.
+		// Kept as data, because a tree full of them answers almost nothing.
+		source.noteBroken(pkgs, pass.tags)
 		loaded = append(loaded, pkgs)
 	}
 
@@ -138,14 +142,6 @@ func typeCheck(
 	pkgs, err := packages.Load(cfg, pass.patterns...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
-	}
-
-	// A package that does not type-check still yields what was checked before
-	// the error, so one broken package costs its own edges and not the run's.
-	// Said out loud, because a tree full of them answers almost nothing.
-	if broken := brokenPackages(pkgs); broken > 0 {
-		slog.Warn("some packages did not type-check; their type facts are partial",
-			"count", broken, "of", len(pkgs), "tags", pass.tags)
 	}
 
 	return pkgs, nil

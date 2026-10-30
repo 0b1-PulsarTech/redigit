@@ -86,3 +86,24 @@ Flags:
                   17,258,575   tags de lead   # schema, domain, use case
                   243-245      agendamento    # engine and module together
 `
+
+const runUsage = `
+Run flags (every command):
+  --cpuprofile FILE  write a CPU profile of the whole run; read it with
+                     go tool pprof
+  --memprofile FILE  write a heap profile when the run ends
+  --trace FILE       write a runtime execution trace; read it with
+                     go tool trace
+  --mem-limit SIZE   soft memory limit for the Go runtime, in GOMEMLIMIT
+                     syntax: 512MiB, 2GiB, or off
+  --timings          print one JSON line on stderr with the milliseconds each
+                     stage took, {"timings":{"graph":48912.5}}; the stages are
+                     start, key, births, graph, order, plan, audit, emit, close
+                     and total
+  --from-cache       reuse the graph, ordering and plan an earlier run saved for
+                     the same commit, flags, binary and language server, and
+                     save them after a run that found none. graph and plan then
+                     start nothing; emit, audit and report start the pipeline
+                     only when they need it. A corrupt entry is ignored.
+                     Entries live under the user cache dir, redigit/plancache.
+`

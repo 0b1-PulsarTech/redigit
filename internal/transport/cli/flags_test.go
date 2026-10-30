@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"flag"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -228,5 +230,25 @@ func TestSettingFlagsAreDefined(t *testing.T) {
 		if set.Lookup(name) == nil {
 			t.Fatalf("a setting names the flag %q, which newFlagSet() does not define", name)
 		}
+	}
+}
+
+func TestDispatchHandsTheFarFlagToTheAuditor(t *testing.T) {
+	t.Parallel()
+
+	var got bootstrap.Config
+
+	errStop := errors.New("stop here")
+	start := func(_ context.Context, cfg bootstrap.Config) (pipeline, error) {
+		got = cfg
+
+		return nil, errStop
+	}
+
+	args := []string{cmdAudit, "--repo", ".", "--far", "7"}
+
+	err := dispatch(t.Context(), args, io.Discard, io.Discard, runEnv{Start: start})
+	if !errors.Is(err, errStop) || got.Auditing.FarApart != 7 {
+		t.Fatalf("err = %v, FarApart = %d, want the stop and 7", err, got.Auditing.FarApart)
 	}
 }

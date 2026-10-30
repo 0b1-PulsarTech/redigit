@@ -60,14 +60,15 @@ var rules = []rule{
 }
 
 type RulePack struct {
-	rules []rule
+	source *typed.Source
+	rules  []rule
 }
 
 func NewRulePack(tags []string) RulePack {
 	// Loaded lazily once, under the run tags, and shared by the four type-check rules.
 	source := typed.NewSource(tags)
 
-	return RulePack{rules: append(slices.Clone(rules),
+	return RulePack{source: source, rules: append(slices.Clone(rules),
 		typecheck.MethodSet{Source: source},
 		typecheck.Conversion{Source: source},
 		typecheck.Escaped{Source: source},
@@ -76,8 +77,9 @@ func NewRulePack(tags []string) RulePack {
 }
 
 var (
-	_ indexing.RulePack = RulePack{}
-	_ indexing.Atomizer = RulePack{}
+	_ indexing.RulePack  = RulePack{}
+	_ indexing.Atomizer  = RulePack{}
+	_ indexing.Shortfall = RulePack{}
 )
 
 func (RulePack) Name() string { return "go" }
@@ -143,4 +145,20 @@ func (pack RulePack) Atoms(
 	}
 
 	return atoms, nil
+}
+
+func (pack RulePack) Partial() []indexing.Partial {
+	if pack.source == nil {
+		return nil
+	}
+
+	var partial []indexing.Partial
+
+	for _, shortfall := range pack.source.Shortfalls() {
+		partial = append(partial, indexing.Partial{
+			Broken: shortfall.Broken, Of: shortfall.Of, Tags: shortfall.Tags,
+		})
+	}
+
+	return partial
 }

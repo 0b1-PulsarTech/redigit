@@ -207,3 +207,15 @@ func TestGoScope(t *testing.T) {
 		})
 	}
 }
+
+func TestRulePackReportsNoPartialPassBeforeALoad(t *testing.T) {
+	t.Parallel()
+
+	if got := NewRulePack(nil).Partial(); len(got) != 0 {
+		t.Fatalf("Partial() = %+v, want none before any type-check", got)
+	}
+
+	if got := (RulePack{}).Partial(); len(got) != 0 {
+		t.Fatalf("zero RulePack Partial() = %+v, want none", got)
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
 
 // settled runs the two stages every command needs. The ordering is returned
@@ -218,21 +219,7 @@ func warnUnclaimed(unclaimed []auditing.Unclaimed) {
 	)
 }
 
-// warnBlind names what the resolver could not answer. It goes to the log
-// rather than the output stream so a report stays machine-readable, but it is
-// never dropped: a graph missing edges looks exactly like code with fewer
-// edges, and only this line tells them apart.
 func warnBlind(result indexing.Result) {
-	if len(result.Blind) == 0 {
-		return
-	}
-
-	slog.Warn(
-		"the resolver could not answer for some declarations",
-		slog.Int("count", len(result.Blind)),
-		slog.Int("of", result.Graph.Len()),
-		slog.String("first", result.Blind[0].Decl.String()),
-		slog.String("query", result.Blind[0].Query),
-		slog.String("reason", result.Blind[0].Reason),
-	)
+	// A graph missing edges or type facts looks complete; both are replayed from a cache.
+	session.WarnShortfalls(result)
 }

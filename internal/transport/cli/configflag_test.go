@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -330,6 +333,101 @@ func TestParseRefusesAnEmptyConfigPath(t *testing.T) {
 
 			if err == nil && testCase.wantErr {
 				t.Fatal("parse() = nil, want an error")
+			}
+		})
+	}
+}
+
+func TestDispatchFromCacheKeysTheConfigBytes(t *testing.T) {
+	t.Parallel()
+
+	const original = `{"languages":{"go":{"tags":["integration"]}}}`
+
+	testCases := []struct {
+		name       string
+		rewrite    string
+		wantStarts int
+	}{
+		{name: "identical file hits", rewrite: original, wantStarts: 1},
+		{
+			name: "changed file misses", rewrite: `{"languages":{"go":{"tags":["other"]}}}`,
+			wantStarts: 2,
+		},
+		{name: "trailing newline misses", rewrite: original + "\n", wantStarts: 2},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			path := writeIn(t, t.TempDir(), "c.json", original)
+			counter := &startCounter{live: settledLive(t)}
+			env := cacheTestEnv(t.TempDir(), counter.start)
+			args := []string{cmdGraph, "--repo", ".", "--config", path, "--from-cache"}
+
+			cachedRun(t, env, args...)
+
+			if err := os.WriteFile(path, []byte(testCase.rewrite), 0o600); err != nil {
+				t.Fatalf("rewrite config: %v", err)
+			}
+
+			cachedRun(t, env, args...)
+
+			if counter.count != testCase.wantStarts {
+				t.Fatalf("%d pipeline starts, want %d", counter.count, testCase.wantStarts)
+			}
+		})
+	}
+}
+
+func TestDispatchPrintsAConfigErrorAlone(t *testing.T) {
+	t.Parallel()
+
+	errStart := fmt.Errorf("%w: config file c.json: rules[0]", bootstrap.ErrConfig)
+	absent := filepath.Join(t.TempDir(), "absent.json")
+
+	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
+		t.Fatal("a load-time config error must never start a pipeline")
+
+		return nil, nil
+	}
+
+	testCases := []struct {
+		name  string
+		args  []string
+		start starter
+		want  string
+	}{
+		{
+			name:  "refused while parsing",
+			args:  []string{cmdGraph, "--repo", ".", "--config", absent},
+			start: unreachable,
+			want:  "config file ",
+		},
+		{
+			name:  "refused when the pipeline starts",
+			args:  []string{cmdGraph, "--repo", "."},
+			start: func(context.Context, bootstrap.Config) (pipeline, error) { return nil, errStart },
+			want:  errStart.Error(),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+
+			env := runEnv{Start: testCase.start}
+
+			err := dispatch(t.Context(), testCase.args, &stdout, &stderr, env)
+			if !errors.Is(err, bootstrap.ErrConfig) ||
+				!strings.HasPrefix(err.Error(), testCase.want) {
+				t.Fatalf("err = %v, want ErrConfig starting %q", err, testCase.want)
+			}
+
+			if stderr.Len() != 0 {
+				t.Fatalf("stderr = %q, want no usage dump over a config error", stderr.String())
 			}
 		})
 	}
