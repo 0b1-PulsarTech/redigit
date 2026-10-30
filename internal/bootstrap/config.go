@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -19,6 +20,13 @@ import (
 )
 
 var ErrConfig = errors.New("invalid config")
+
+const (
+	ModeHistory = "history"
+	ModeLineage = "lineage"
+)
+
+var ErrMode = errors.New("unknown mode")
 
 // ErrChunkMapUnknownPath reports a chunk map entry naming a path outside the
 // tree being read. A wrong map is worse than no map, and a path that is not
@@ -42,6 +50,7 @@ type Config struct {
 	ServerCommand string
 	ServerArgs    []string
 	Resolver      string // ResolverLSP, or ResolverTyped; "" (the zero value) means typed
+	Mode          string // ModeHistory, or ModeLineage; "" (the zero value) means history
 
 	Indexing indexing.Config
 	Ordering ordering.Config
@@ -80,6 +89,7 @@ type AuthorConfig struct {
 func Defaults() Config {
 	return Config{
 		Rev:           "HEAD",
+		Mode:          ModeHistory,
 		ServerCommand: "gopls",
 		ServerArgs:    []string{"-mode=stdio"},
 		Planning:      planning.Config{MinCommitLines: entities.DefaultMinCommitLines},
@@ -89,6 +99,14 @@ func Defaults() Config {
 			Start: time.Unix(0, 0).UTC(),
 		},
 	}
+}
+
+func CheckMode(name string) error {
+	if name != ModeHistory && name != ModeLineage {
+		return fmt.Errorf("%w: %q, want %s or %s", ErrMode, name, ModeHistory, ModeLineage)
+	}
+
+	return nil
 }
 
 type setting struct {

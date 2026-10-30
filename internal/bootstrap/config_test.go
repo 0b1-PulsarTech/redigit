@@ -30,6 +30,7 @@ func TestDefaults(t *testing.T) {
 	}{
 		{"rev defaults to HEAD", got.Rev, "HEAD"},
 		{"the server command is gopls", got.ServerCommand, "gopls"},
+		{"the mode is the published history's", got.Mode, ModeHistory},
 		{"the author name is redigit", got.Author.Name, "redigit"},
 		{"the author email is redigit@localhost", got.Author.Email, "redigit@localhost"},
 	}
@@ -60,6 +61,32 @@ func TestDefaults(t *testing.T) {
 
 	if got.BuildTags != nil {
 		t.Fatalf("BuildTags = %v, want nil", got.BuildTags)
+	}
+}
+
+func TestCheckMode(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		mode    string
+		wantErr error
+	}{
+		{"history", ModeHistory, nil},
+		{"lineage", ModeLineage, nil},
+		{"empty is refused", "", ErrMode},
+		{"unknown is refused", "fold", ErrMode},
+		{"case matters", "Lineage", ErrMode},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if err := CheckMode(testCase.mode); !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("CheckMode(%q) = %v, want %v", testCase.mode, err, testCase.wantErr)
+			}
+		})
 	}
 }
 
