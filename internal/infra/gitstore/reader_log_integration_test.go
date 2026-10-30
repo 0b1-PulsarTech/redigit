@@ -22,6 +22,7 @@ func TestReaderChangesAndBlobs(t *testing.T) {
 	runTestGit(t, dir, "commit", "-q", "-m", "third")
 
 	reader := NewReader(dir, "main")
+
 	t.Cleanup(func() { _ = reader.Close() })
 
 	var changes []indexing.RevisionChange
@@ -78,21 +79,24 @@ func TestReaderReadFailures(t *testing.T) {
 	commitTestFiles(t, dir, "first", map[string][]byte{"a.go": []byte("one\n")})
 
 	reader := NewReader(dir, "main")
+
 	t.Cleanup(func() { _ = reader.Close() })
 
-	if _, err := reader.ReadAt(t.Context(), "main", "gone.go"); !errors.Is(err, ErrAbsentAtRevision) {
+	_, err := reader.ReadAt(t.Context(), "main", "gone.go")
+	if !errors.Is(err, ErrAbsentAtRevision) {
 		t.Fatalf("ReadAt(missing) err = %v, want ErrAbsentAtRevision", err)
 	}
 
-	if _, err := reader.ReadBlob(t.Context(), strings.Repeat("0", 40)); !errors.Is(err, indexing.ErrBlobMissing) {
+	_, err = reader.ReadBlob(t.Context(), strings.Repeat("0", 40))
+	if !errors.Is(err, indexing.ErrBlobMissing) {
 		t.Fatalf("ReadBlob(missing) err = %v, want ErrBlobMissing", err)
 	}
 
-	if err := reader.Close(); err != nil {
+	if err = reader.Close(); err != nil {
 		t.Fatalf("Close() = %v", err)
 	}
 
-	if _, err := reader.Read(t.Context(), "a.go"); !errors.Is(err, batch.ErrClosed) {
+	if _, err = reader.Read(t.Context(), "a.go"); !errors.Is(err, batch.ErrClosed) {
 		t.Fatalf("Read() after Close err = %v, want ErrClosed", err)
 	}
 }
@@ -109,6 +113,7 @@ func TestReaderReadBlobTreatsNonBlobAsUnreadable(t *testing.T) {
 	}
 
 	reader := NewReader(dir, "main")
+
 	t.Cleanup(func() { _ = reader.Close() })
 
 	_, err = reader.ReadBlob(t.Context(), commitOID)

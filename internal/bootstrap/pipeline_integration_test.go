@@ -115,7 +115,7 @@ func fixtureWorktreeCount(t testing.TB, dir string) int {
 
 	count := 0
 
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		if strings.HasPrefix(line, "worktree ") {
 			count++
 		}

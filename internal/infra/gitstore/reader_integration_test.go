@@ -91,9 +91,15 @@ func TestReaderReadsPathWithLineBreak(t *testing.T) {
 	const name = "odd\nname.go"
 
 	dir := newTestRepo(t)
-	commitTestFiles(t, dir, "first", map[string][]byte{name: []byte("odd\n"), "a.go": []byte("a\n")})
+	commitTestFiles(
+		t,
+		dir,
+		"first",
+		map[string][]byte{name: []byte("odd\n"), "a.go": []byte("a\n")},
+	)
 
 	reader := NewReader(dir, "main")
+
 	t.Cleanup(func() { _ = reader.Close() })
 
 	read, err := reader.Read(t.Context(), name)
@@ -106,7 +112,8 @@ func TestReaderReadsPathWithLineBreak(t *testing.T) {
 		t.Fatalf("ReadAt() = %q, %v", readAt, err)
 	}
 
-	if _, err = reader.ReadAt(t.Context(), "main", "gone\nname.go"); !errors.Is(err, ErrAbsentAtRevision) {
+	_, err = reader.ReadAt(t.Context(), "main", "gone\nname.go")
+	if !errors.Is(err, ErrAbsentAtRevision) {
 		t.Fatalf("ReadAt(missing) err = %v, want ErrAbsentAtRevision", err)
 	}
 
@@ -126,6 +133,7 @@ func TestReaderOneShotVerdicts(t *testing.T) {
 	})
 
 	reader := NewReader(dir, "main")
+
 	t.Cleanup(func() { _ = reader.Close() })
 
 	testCases := []struct {
@@ -135,8 +143,14 @@ func TestReaderOneShotVerdicts(t *testing.T) {
 		wantErr error
 		notErr  error
 	}{
-		{name: "path absent at the revision", rev: "main", path: "gone\nname", wantErr: ErrAbsentAtRevision},
-		{name: "revision unknown", rev: "nonsense", path: "odd\nname", wantErr: ErrAbsentAtRevision},
+		{
+			name: "path absent at the revision", rev: "main", path: "gone\nname",
+			wantErr: ErrAbsentAtRevision,
+		},
+		{
+			name: "revision unknown", rev: "nonsense", path: "odd\nname",
+			wantErr: ErrAbsentAtRevision,
+		},
 		{
 			name: "absent path naming an ambiguity", rev: "main", path: "gone is ambiguous\nname",
 			wantErr: ErrAbsentAtRevision, notErr: batch.ErrAmbiguous,
@@ -174,6 +188,7 @@ func TestReaderOneShotRepoVanished(t *testing.T) {
 	commitTestFiles(t, dir, "first", map[string][]byte{"odd\nname": []byte("odd\n")})
 
 	reader := NewReader(dir, "main")
+
 	t.Cleanup(func() { _ = reader.Close() })
 
 	if err := os.RemoveAll(dir); err != nil {

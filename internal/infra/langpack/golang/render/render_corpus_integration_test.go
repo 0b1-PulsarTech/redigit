@@ -4,6 +4,7 @@ package render
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,12 +39,12 @@ func TestRenderRoundTripsRealSource(t *testing.T) {
 
 		source, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return fmt.Errorf("read %s: %w", path, err)
 		}
 
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("relative %s: %w", path, err)
 		}
 
 		decls, err := syntax.Declarations(ctx, rel, source)

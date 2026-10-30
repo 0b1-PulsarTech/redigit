@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -61,6 +62,7 @@ func (r spanRenderer) Render(
 	})
 
 	var out bytes.Buffer
+
 	for _, k := range ordered {
 		span := r.spans[k]
 		out.Write(source[span.Start:span.End])
@@ -116,31 +118,40 @@ func declFile(
 	return content.Bytes(), spans
 }
 
-// TestEmitterReproducesRealFilesEndToEnd builds a plan by hand from real files
-// on disk - 3 files, 10 declarations, 4 commits - with two forward references
-// planted on purpose, and proves the three guarantees this package exists
-// for: nothing is lost, nothing is misplaced, and every forward reference the
-// tool can see without compiling is reported, and only those.
-func TestEmitterReproducesRealFilesEndToEnd(t *testing.T) {
-	t.Parallel()
+func compareRisks(left, right Risk) int {
+	return cmp.Or(
+		entities.CompareKeys(left.Chunk, right.Chunk),
+		entities.CompareKeys(left.Target, right.Target),
+	)
+}
 
-	root := t.TempDir()
+func assertFinalBlobs(
+	t *testing.T,
+	lastBlob map[string]Handle,
+	store *contentStore,
+	originals map[string][]byte,
+) {
+	t.Helper()
 
-	file1, spans1 := declFile(t, root, "file1.go", []string{"A", "B", "C", "D"})
-	file2, spans2 := declFile(t, root, "file2.go", []string{"E", "F", "G"})
-	file3, spans3 := declFile(t, root, "file3.go", []string{"H", "I", "J"})
+	for path, want := range originals {
+		handle, found := lastBlob[path]
+		if !found {
+			t.Fatalf("%s never got a final blob", path)
+		}
 
-	spans := make(map[entities.DeclKey]entities.Span)
-	for k, v := range spans1 {
-		spans[k] = v
+		got := store.blobs[string(handle)]
+		if !bytes.Equal(got, want) {
+			t.Fatalf(
+				"%s final blob does not reproduce the original byte for byte\ngot:  %q\nwant: %q",
+				path,
+				got,
+				want,
+			)
+		}
 	}
-	for k, v := range spans2 {
-		spans[k] = v
-	}
-	for k, v := range spans3 {
-		spans[k] = v
-	}
+}
 
+func plantedPlan(spans map[entities.DeclKey]entities.Span) (entities.Plan, entities.Graph, []Risk) {
 	a := key("file1.go", "A")
 	b := key("file1.go", "B")
 	c := key("file1.go", "C")
@@ -170,14 +181,41 @@ func TestEmitterReproducesRealFilesEndToEnd(t *testing.T) {
 		{Dependent: h, Provider: j, Reason: entities.ReasonReference}, // forward: planted risk
 	}
 
-	graph := entities.NewGraph(decls, edges, nil)
-
 	plan := entities.Plan{Commits: []entities.PlannedCommit{
 		{Position: 0, Subject: "feat: seed A-C", Decls: []entities.DeclKey{a, b, c}},
 		{Position: 1, Subject: "feat: grow D, add E-F", Decls: []entities.DeclKey{d, e, f}},
 		{Position: 2, Subject: "feat: close file2, add H-I", Decls: []entities.DeclKey{g, h, i}},
 		{Position: 3, Subject: "feat: close file3", Decls: []entities.DeclKey{j}},
 	}}
+
+	wantRisks := []Risk{
+		{Chunk: b, Target: e, BornAt: 1},
+		{Chunk: h, Target: j, BornAt: 3},
+	}
+
+	return plan, entities.NewGraph(decls, edges, nil), wantRisks
+}
+
+// TestEmitterReproducesRealFilesEndToEnd builds a plan by hand from real files
+// on disk - 3 files, 10 declarations, 4 commits - with two forward references
+// planted on purpose, and proves the three guarantees this package exists
+// for: nothing is lost, nothing is misplaced, and every forward reference the
+// tool can see without compiling is reported, and only those.
+func TestEmitterReproducesRealFilesEndToEnd(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	file1, spans1 := declFile(t, root, "file1.go", []string{"A", "B", "C", "D"})
+	file2, spans2 := declFile(t, root, "file2.go", []string{"E", "F", "G"})
+	file3, spans3 := declFile(t, root, "file3.go", []string{"H", "I", "J"})
+
+	spans := make(map[entities.DeclKey]entities.Span)
+	maps.Copy(spans, spans1)
+	maps.Copy(spans, spans2)
+	maps.Copy(spans, spans3)
+
+	plan, graph, wantRisks := plantedPlan(spans)
 
 	store := &contentStore{blobs: map[string][]byte{}}
 
@@ -217,46 +255,20 @@ func TestEmitterReproducesRealFilesEndToEnd(t *testing.T) {
 		}
 	}
 
-	originals := map[string][]byte{"file1.go": file1, "file2.go": file2, "file3.go": file3}
-	for path, want := range originals {
-		handle, found := lastBlob[path]
-		if !found {
-			t.Fatalf("%s never got a final blob", path)
-		}
-
-		got := store.blobs[string(handle)]
-		if !bytes.Equal(got, want) {
-			t.Fatalf(
-				"%s final blob does not reproduce the original byte for byte\ngot:  %q\nwant: %q",
-				path,
-				got,
-				want,
-			)
-		}
-	}
-
-	wantRisks := []Risk{
-		{Chunk: b, Target: e, BornAt: 1},
-		{Chunk: h, Target: j, BornAt: 3},
-	}
+	assertFinalBlobs(
+		t,
+		lastBlob,
+		store,
+		map[string][]byte{"file1.go": file1, "file2.go": file2, "file3.go": file3},
+	)
 
 	var gotRisks []Risk
 	for _, commit := range commits {
 		gotRisks = append(gotRisks, commit.Risks...)
 	}
 
-	slices.SortFunc(gotRisks, func(x, y Risk) int {
-		return cmp.Or(
-			cmp.Compare(x.Chunk.String(), y.Chunk.String()),
-			cmp.Compare(x.Target.String(), y.Target.String()),
-		)
-	})
-	slices.SortFunc(wantRisks, func(x, y Risk) int {
-		return cmp.Or(
-			cmp.Compare(x.Chunk.String(), y.Chunk.String()),
-			cmp.Compare(x.Target.String(), y.Target.String()),
-		)
-	})
+	slices.SortFunc(gotRisks, compareRisks)
+	slices.SortFunc(wantRisks, compareRisks)
 
 	if !slices.Equal(gotRisks, wantRisks) {
 		t.Fatalf(
