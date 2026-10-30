@@ -112,7 +112,7 @@ func implementorsOf(
 			continue
 		}
 
-		if satisfies(candidate, target) {
+		if Satisfies(candidate.named, candidate.fset, target) {
 			already = append(already, candidate.where)
 		}
 	}
@@ -120,14 +120,14 @@ func implementorsOf(
 	return already
 }
 
-func satisfies(candidate namedType, target *types.Interface) bool {
+func Satisfies(named *types.Named, fset *token.FileSet, target *types.Interface) bool {
 	// Every pair goes through the unifier: a type from another test variant is a different object
 	// for the same declaration, which types.Implements would not match. A constraint interface
 	// is read by its methods alone, as gopls does, so its type-set terms are ignored.
-	receiver := types.Type(types.NewPointer(candidate.named))
+	receiver := types.Type(types.NewPointer(named))
 	// A pointer to an interface has no methods, so an interface candidate is looked into itself.
-	if types.IsInterface(candidate.named) {
-		receiver = candidate.named
+	if types.IsInterface(named) {
+		receiver = named
 	}
 
 	for want := range target.Methods() {
@@ -135,7 +135,7 @@ func satisfies(candidate namedType, target *types.Interface) bool {
 
 		// A type parameter is held to what it met within one method; the next starts afresh.
 		have, isFunc := found.(*types.Func)
-		if !isFunc || !newUnifier(candidate.fset).match(want.Type(), have.Type()) {
+		if !isFunc || !newUnifier(fset).match(want.Type(), have.Type()) {
 			return false
 		}
 	}
