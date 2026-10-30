@@ -80,7 +80,7 @@ func buildAtomicGroup(
 				Key:       entities.DeclKey{File: path, Kind: kind, Name: name.Name},
 				Unit:      unit,
 				Span:      span,
-				Selector:  locationOf(fset, path, source, name.Pos()),
+				Selector:  LocationOf(fset, path, source, name.Pos()),
 				GroupSize: size,
 			})
 		}
@@ -129,7 +129,7 @@ func buildTypeSpecs(
 			Key:         entities.DeclKey{File: path, Kind: entities.KindType, Name: ts.Name.Name},
 			Unit:        unit,
 			Span:        spanOf(fset, start, ts.End()),
-			Selector:    locationOf(fset, path, source, ts.Name.Pos()),
+			Selector:    LocationOf(fset, path, source, ts.Name.Pos()),
 			IsInterface: isInterface,
 		})
 	}
@@ -169,7 +169,7 @@ func buildValueSpecs(
 				},
 				Unit:      unit,
 				Span:      spanOf(fset, start, vs.End()),
-				Selector:  locationOf(fset, path, source, name.Pos()),
+				Selector:  LocationOf(fset, path, source, name.Pos()),
 				GroupSize: size,
 			})
 		}

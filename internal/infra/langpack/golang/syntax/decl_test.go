@@ -432,36 +432,75 @@ func TestSelectorCountsUTF16Units(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			decls, err := Declarations(
-				context.Background(),
-				"a.go",
-				[]byte(testCase.source),
-			)
-			if err != nil {
-				t.Fatalf("Declarations() = %v", err)
-			}
-
-			var found entities.Decl
-
-			for _, decl := range decls {
-				if decl.Key.Name == testCase.declName {
-					found = decl
-				}
-			}
-
-			if found.Key.Name == "" {
-				t.Fatalf("no declaration named %q among %d", testCase.declName, len(decls))
-			}
-
-			if found.Selector.Line != testCase.wantLine {
-				t.Fatalf("selector line = %d, want %d", found.Selector.Line, testCase.wantLine)
-			}
-
-			if found.Selector.Char != testCase.wantChar {
-				t.Fatalf("selector char = %d, want %d", found.Selector.Char, testCase.wantChar)
+			got := selectorOf(t, testCase.source, testCase.declName)
+			if got.Line != testCase.wantLine || got.Char != testCase.wantChar {
+				t.Fatalf(
+					"selector = %d:%d, want %d:%d",
+					got.Line, got.Char, testCase.wantLine, testCase.wantChar,
+				)
 			}
 		})
 	}
+}
+
+func TestSelectorIgnoresLineDirectives(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		source   string
+		declName string
+		wantLine int
+		wantChar int
+	}{
+		{
+			"a directive with no column",
+			"package a\n\n//line other.go:100\nfunc Add() {}\n",
+			"Add",
+			3,
+			5,
+		},
+		{
+			"a directive with a column",
+			"package a\n\nfunc Z() {}\n\n/*line other.go:7:30*/ func Add() {}\n",
+			"Add",
+			4,
+			28,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := selectorOf(t, testCase.source, testCase.declName)
+			if got.Line != testCase.wantLine || got.Char != testCase.wantChar {
+				t.Fatalf(
+					"selector = %d:%d, want %d:%d",
+					got.Line, got.Char, testCase.wantLine, testCase.wantChar,
+				)
+			}
+		})
+	}
+}
+
+func selectorOf(t *testing.T, source, declName string) entities.Location {
+	t.Helper()
+
+	decls, err := Declarations(context.Background(), "a.go", []byte(source))
+	if err != nil {
+		t.Fatalf("Declarations() = %v", err)
+	}
+
+	for _, decl := range decls {
+		if decl.Key.Name == declName {
+			return decl.Selector
+		}
+	}
+
+	t.Fatalf("no declaration named %q among %d", declName, len(decls))
+
+	return entities.Location{}
 }
 
 func TestInterfaceIsMarked(t *testing.T) {

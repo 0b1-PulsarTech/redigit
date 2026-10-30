@@ -72,7 +72,7 @@ func wholeFile(
 		Key:      entities.DeclKey{File: path, Kind: entities.KindOther, Name: FileDeclName},
 		Unit:     unit,
 		Span:     entities.Span{Start: 0, End: len(source)},
-		Selector: locationOf(fset, path, source, file.Name.Pos()),
+		Selector: LocationOf(fset, path, source, file.Name.Pos()),
 		IsTest:   strings.HasSuffix(path, "_test.go"),
 	}
 }
@@ -132,7 +132,7 @@ func buildFuncDecl(
 		Key:      entities.DeclKey{File: path, Kind: kind, Name: name},
 		Unit:     unit,
 		Span:     spanOf(fset, start, decl.End()),
-		Selector: locationOf(fset, path, source, decl.Name.Pos()),
+		Selector: LocationOf(fset, path, source, decl.Name.Pos()),
 		IsTest:   isTestFile && decl.Recv == nil && isTestName(decl.Name.Name),
 	}
 }
@@ -195,13 +195,13 @@ func spanOf(fset *token.FileSet, start, end token.Pos) entities.Span {
 	}
 }
 
-func locationOf(
+func LocationOf(
 	fset *token.FileSet,
 	path string,
 	source []byte,
 	pos token.Pos,
 ) entities.Location {
-	position := fset.Position(pos)
+	position := fset.PositionFor(pos, false)
 	start := position.Offset - (position.Column - 1)
 
 	return entities.Location{
