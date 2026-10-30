@@ -29,6 +29,7 @@ type ConfigFile struct {
 	Path  string
 	File  rules.File
 	Rules []rules.Rule
+	Bytes []byte
 }
 
 func compiledRegistry() rules.Registry {
@@ -64,7 +65,7 @@ func loadConfigFile(path string, registry rules.Registry) (ConfigFile, error) {
 		return ConfigFile{}, fileError(path, err)
 	}
 
-	return ConfigFile{Path: path, File: file, Rules: built}, nil
+	return ConfigFile{Path: path, File: file, Rules: built, Bytes: content}, nil
 }
 
 func checkLanguages(languages map[string]map[string]json.RawMessage) error {
@@ -151,6 +152,7 @@ func ApplyConfigFile(cfg Config, file ConfigFile, explicit func(string) bool) (C
 
 	cfg.Rules = file.Rules
 	cfg.ConfigPath = file.Path
+	cfg.ConfigBytes = file.Bytes
 
 	return cfg, nil
 }

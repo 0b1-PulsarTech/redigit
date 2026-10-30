@@ -440,3 +440,29 @@ func TestApplyConfigFileKeepsRulesAndPath(t *testing.T) {
 		t.Fatalf("Rules[0] = %#v, want %#v", cfg.Rules[0], rule)
 	}
 }
+
+func TestLoadConfigFileKeepsTheBytesItParsed(t *testing.T) {
+	t.Parallel()
+
+	const content = `{"languages":{"go":{"tags":["integration"]}}}` + "\n"
+
+	path := writeConfigFile(t, content)
+
+	file, err := LoadConfigFile(path)
+	if err != nil {
+		t.Fatalf("LoadConfigFile() = %v", err)
+	}
+
+	if err = os.WriteFile(path, []byte(`{}`), 0o600); err != nil {
+		t.Fatalf("rewrite config: %v", err)
+	}
+
+	cfg, err := ApplyConfigFile(Config{}, file, func(string) bool { return false })
+	if err != nil {
+		t.Fatalf("ApplyConfigFile() = %v", err)
+	}
+
+	if string(cfg.ConfigBytes) != content {
+		t.Fatalf("ConfigBytes = %q, want %q", cfg.ConfigBytes, content)
+	}
+}

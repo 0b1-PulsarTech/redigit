@@ -56,9 +56,9 @@ type Config struct {
 	Virtual map[string]string
 
 	// Built at load time, so a bad entry fails before any stage starts.
-	Rules []rules.Rule
-
-	ConfigPath string
+	Rules       []rules.Rule
+	ConfigPath  string
+	ConfigBytes []byte // what ConfigPath was parsed from; the plan cache keys these
 }
 
 type AuthorConfig struct {
