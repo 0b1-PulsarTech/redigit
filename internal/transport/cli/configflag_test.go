@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/infra/inputs"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
@@ -146,7 +147,7 @@ func virtualCases() []virtualCase {
 		notUTF8  = "languages.web.virtual: text holds U+FFFD or invalid UTF-8"
 	)
 
-	empty := bootstrap.ErrVirtual
+	empty := inputs.ErrVirtual
 
 	return []virtualCase{
 		{
@@ -178,27 +179,27 @@ func virtualCases() []virtualCase {
 			"an id twice once trimmed",
 			[]virtualPair{{"a", "x"}, {" a ", "y"}},
 			nil,
-			bootstrap.ErrDuplicateVirtual, twice,
+			inputs.ErrDuplicateVirtual, twice,
 		},
 		{
 			"a replacement character in the id",
 			[]virtualPair{{"a�", "x"}},
 			nil,
-			bootstrap.ErrNotUTF8,
+			inputs.ErrNotUTF8,
 			notUTF8,
 		},
 		{
 			"a replacement character in the path",
 			[]virtualPair{{"a", "�"}},
 			nil,
-			bootstrap.ErrNotUTF8,
+			inputs.ErrNotUTF8,
 			notUTF8,
 		},
 		{
 			"a byte that is no UTF-8",
 			[]virtualPair{{"a", "x\xff"}},
 			nil,
-			bootstrap.ErrNotUTF8,
+			inputs.ErrNotUTF8,
 			notUTF8,
 		},
 	}
@@ -270,8 +271,8 @@ func TestTagsFlagAndFileAgree(t *testing.T) {
 	}{
 		{"one tag", []string{"integration"}, []string{"integration"}, nil},
 		{"blanks are trimmed", []string{" a ", "b"}, []string{"a", "b"}, nil},
-		{"a replacement character", []string{"a�"}, nil, bootstrap.ErrNotUTF8},
-		{"a byte that is no UTF-8", []string{"a\xff"}, nil, bootstrap.ErrNotUTF8},
+		{"a replacement character", []string{"a�"}, nil, inputs.ErrNotUTF8},
+		{"a byte that is no UTF-8", []string{"a\xff"}, nil, inputs.ErrNotUTF8},
 	}
 
 	for _, testCase := range testCases {

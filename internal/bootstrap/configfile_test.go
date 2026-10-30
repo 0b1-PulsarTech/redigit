@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/inputs"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
@@ -189,15 +190,15 @@ func TestLoadConfigFileLanguages(t *testing.T) {
 		},
 		{
 			"a lone surrogate tag", `{"languages":{"go":{"tags":["\ud800"]}}}`,
-			ErrNotUTF8, `languages.go.tags: text holds U+FFFD or invalid UTF-8`,
+			inputs.ErrNotUTF8, `languages.go.tags: text holds U+FFFD or invalid UTF-8`,
 		},
 		{
 			"a lone surrogate virtual path", `{"languages":{"web":{"virtual":{"a":"\ud800"}}}}`,
-			ErrNotUTF8, `languages.web.virtual: text holds U+FFFD or invalid UTF-8`,
+			inputs.ErrNotUTF8, `languages.web.virtual: text holds U+FFFD or invalid UTF-8`,
 		},
 		{
 			"a lone surrogate virtual id", `{"languages":{"web":{"virtual":{"\udfff":"x"}}}}`,
-			ErrNotUTF8, `languages.web.virtual: text holds U+FFFD or invalid UTF-8`,
+			inputs.ErrNotUTF8, `languages.web.virtual: text holds U+FFFD or invalid UTF-8`,
 		},
 	}
 	for _, testCase := range testCases {

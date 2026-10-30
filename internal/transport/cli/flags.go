@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/infra/inputs"
 )
 
 func newFlagSet() *flag.FlagSet {
@@ -113,7 +114,7 @@ func addServerFlags(set *flag.FlagSet, cfg *bootstrap.Config) {
 // layers themselves, and the features they act inside.
 func loadSlicing(cfg *bootstrap.Config, layerFile, featureFile string) error {
 	if layerFile != "" {
-		layers, err := bootstrap.LoadLayers(layerFile)
+		layers, err := inputs.LoadLayers(layerFile)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrUsage, err)
 		}
@@ -122,7 +123,7 @@ func loadSlicing(cfg *bootstrap.Config, layerFile, featureFile string) error {
 	}
 
 	if featureFile != "" {
-		features, err := bootstrap.LoadFeatures(featureFile)
+		features, err := inputs.LoadFeatures(featureFile)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrUsage, err)
 		}
@@ -141,7 +142,7 @@ func loadChunkMap(cfg *bootstrap.Config, chunkMapFile string) error {
 		return nil
 	}
 
-	chunkMap, err := bootstrap.LoadChunkMap(chunkMapFile)
+	chunkMap, err := inputs.LoadChunkMap(chunkMapFile)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrUsage, err)
 	}
@@ -159,7 +160,7 @@ func addVirtual(cfg *bootstrap.Config, refused *error) func(string) error {
 		}
 
 		id, file, _ := strings.Cut(value, "=")
-		if err := bootstrap.AddVirtual(cfg.Virtual, id, file); err != nil && *refused == nil {
+		if err := inputs.AddVirtual(cfg.Virtual, id, file); err != nil && *refused == nil {
 			*refused = err
 		}
 
@@ -168,7 +169,7 @@ func addVirtual(cfg *bootstrap.Config, refused *error) func(string) error {
 }
 
 func applyTags(cfg *bootstrap.Config, tags string) error {
-	parsed, err := bootstrap.ParseTags(tags)
+	parsed, err := inputs.ParseTags(tags)
 	if err != nil {
 		return fmt.Errorf("%w: --tags: %w", ErrUsage, err)
 	}

@@ -160,16 +160,3 @@ func ApplyConfigFile(cfg Config, file ConfigFile, explicit func(string) bool) (C
 func settingError(entry setting, err error) error {
 	return fmt.Errorf("languages.%s.%s: %w", entry.language, entry.key, err)
 }
-
-func SplitTags(tags string) []string {
-	// The one rule for build tags, whether they come from --tags or the file.
-	var out []string
-
-	for part := range strings.SplitSeq(tags, ",") {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-
-	return out
-}
