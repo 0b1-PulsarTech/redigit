@@ -3,6 +3,7 @@ package indexing
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -377,5 +378,49 @@ func TestIndexAsksNothingAboutAnUnresolvedLanguage(t *testing.T) {
 
 	if result.Graph.Len() != 1 {
 		t.Fatalf("the declaration did not reach the graph: %d", result.Graph.Len())
+	}
+}
+
+type shortfallRules struct {
+	*MockRulePack
+
+	partial []Partial
+}
+
+func (rules shortfallRules) Partial() []Partial { return rules.partial }
+
+func TestIndexerCarriesThePartialPassesOfItsRules(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	decl := goDecl("a.go", "Repo", 11, 24)
+
+	tree := NewMockTree(ctrl)
+	tree.EXPECT().Read(gomock.Any(), gomock.Any()).Return([]byte(goSource), nil).AnyTimes()
+
+	syntax := NewMockSyntax(ctrl)
+	syntax.EXPECT().
+		Declarations(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return([]entities.Decl{decl}, nil).
+		AnyTimes()
+
+	rules := NewMockRulePack(ctrl)
+	rules.EXPECT().Edges(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+	rules.EXPECT().Anchors(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+
+	want := []Partial{{Broken: 2, Of: 9, Tags: []string{"integration"}}}
+
+	result, err := New(quietResolver(ctrl), tree, Config{Languages: []Language{{
+		Name:       "go",
+		Extensions: []string{".go"},
+		Syntax:     syntax,
+		Rules:      shortfallRules{MockRulePack: rules, partial: want},
+	}}}).Index(context.Background(), entities.Snapshot{Files: []string{"a.go"}})
+	if err != nil {
+		t.Fatalf("Index() = %v", err)
+	}
+
+	if !reflect.DeepEqual(result.Partial, want) {
+		t.Fatalf("Partial = %+v, want %+v", result.Partial, want)
 	}
 }

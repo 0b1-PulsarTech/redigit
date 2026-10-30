@@ -122,7 +122,7 @@ func (i Indexer) Index(ctx context.Context, snap entities.Snapshot) (Result, err
 		}
 	}
 
-	result := Result{Graph: graph, Blind: blind}
+	result := Result{Graph: graph, Blind: blind, Partial: i.partials()}
 
 	if ratio := result.BlindRatio(); ratio > maxBlindRatio {
 		return result, fmt.Errorf(
