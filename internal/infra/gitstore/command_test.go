@@ -77,3 +77,28 @@ func TestCommandError(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveCommitRefusesAnOption(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		rev  string
+	}{
+		{"a long option", "--all"},
+		{"a short option", "-n1"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := ResolveCommit(t.Context(), t.TempDir(), testCase.rev); !errors.Is(
+				err,
+				ErrBadRev,
+			) {
+				t.Fatalf("ResolveCommit() err = %v, want ErrBadRev", err)
+			}
+		})
+	}
+}

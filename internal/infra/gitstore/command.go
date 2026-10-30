@@ -3,14 +3,18 @@ package gitstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore/batch"
 )
+
+var ErrBadRev = errors.New("bad revision")
 
 // commandError is one git invocation that exited non-zero. git's own stderr
 // is often the only useful diagnostic, so it is kept as a field rather than
@@ -107,6 +111,15 @@ func revParse(ctx context.Context, repoPath, rev string) (string, error) {
 	}
 
 	return string(bytes.TrimSpace(out)), nil
+}
+
+func ResolveCommit(ctx context.Context, repoPath, rev string) (string, error) {
+	if strings.HasPrefix(rev, "-") {
+		return "", fmt.Errorf("%w: a rev may not start with a dash", ErrBadRev)
+	}
+
+	// The commit oid, never the tree: a rebuilt history shares its source tree.
+	return revParse(ctx, repoPath, rev+"^{commit}")
 }
 
 // splitNUL splits a NUL-separated git output (built with git's own -z flag)
