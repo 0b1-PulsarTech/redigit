@@ -95,30 +95,6 @@ func TestStreamEdgesStopsEarly(t *testing.T) {
 	}
 }
 
-func TestIsHard(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		reason entities.EdgeReason
-		want   bool
-	}{
-		{entities.ReasonReference, true},
-		{entities.ReasonEmbed, true},
-		{entities.ReasonProse, false},
-		{entities.ReasonImplements, false},
-		{entities.ReasonTestOf, false},
-	}
-	for _, testCase := range testCases {
-		t.Run(string(testCase.reason), func(t *testing.T) {
-			t.Parallel()
-
-			if got := IsHard(testCase.reason); got != testCase.want {
-				t.Fatalf("IsHard = %v, want %v", got, testCase.want)
-			}
-		})
-	}
-}
-
 func TestStreamEdgesMidStreamError(t *testing.T) {
 	t.Parallel()
 

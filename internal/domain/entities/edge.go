@@ -110,3 +110,16 @@ func FillsInterface(graph Graph, edge Edge) bool {
 
 	return found && provider.IsInterface
 }
+
+func IsHard(reason EdgeReason) bool {
+	switch reason {
+	case ReasonReference, ReasonImport, ReasonModule,
+		ReasonQuery, ReasonSchema, ReasonEncloses,
+		ReasonMethodSet, ReasonHosts, ReasonBody,
+		ReasonMirrors, ReasonChecksum, ReasonWorkspace,
+		ReasonEmbed:
+		return true
+	default:
+		return false
+	}
+}

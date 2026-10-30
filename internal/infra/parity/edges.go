@@ -19,19 +19,6 @@ const edgeFields = 3
 
 type rawEdge struct{ dependent, provider, reason []byte }
 
-func IsHard(reason entities.EdgeReason) bool {
-	switch reason {
-	case entities.ReasonReference, entities.ReasonImport, entities.ReasonModule,
-		entities.ReasonQuery, entities.ReasonSchema, entities.ReasonEncloses,
-		entities.ReasonMethodSet, entities.ReasonHosts, entities.ReasonBody,
-		entities.ReasonMirrors, entities.ReasonChecksum, entities.ReasonWorkspace,
-		entities.ReasonEmbed:
-		return true
-	default:
-		return false
-	}
-}
-
 func splitEdge(text []byte) (rawEdge, error) {
 	if fields := bytes.Count(text, []byte{'\t'}) + 1; fields != edgeFields {
 		return rawEdge{}, fmt.Errorf(
@@ -63,7 +50,7 @@ func (raw rawEdge) isHard() bool {
 		return implementsHard(raw.edge())
 	}
 
-	return IsHard(entities.EdgeReason(raw.reason))
+	return entities.IsHard(entities.EdgeReason(raw.reason))
 }
 
 func StreamEdges(path string) iter.Seq2[Edge, error] {
