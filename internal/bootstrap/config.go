@@ -65,6 +65,8 @@ type Config struct {
 	Rules       []rules.Rule
 	ConfigPath  string
 	ConfigBytes []byte // what ConfigPath was parsed from; the plan cache keys these
+	// Every later stage decodes its own raw section from here.
+	Sections rules.File
 }
 
 type AuthorConfig struct {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -439,6 +440,60 @@ func TestApplyConfigFileKeepsRulesAndPath(t *testing.T) {
 
 	if got, ok := cfg.Rules[0].(globRule); !ok || got.Type() != rule.Type() {
 		t.Fatalf("Rules[0] = %#v, want %#v", cfg.Rules[0], rule)
+	}
+}
+
+func TestApplyConfigFileKeepsTheRawSections(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		content string
+		want    map[string]string
+	}{
+		{
+			name: "every raw section is kept",
+			content: `{"slice":{"a":1},"passes":{"b":2},"format":{"c":3},` +
+				`"write":{"d":4},"verify":{"e":5},"lineage":{"f":6}}`,
+			want: map[string]string{
+				"slice": `{"a":1}`, "passes": `{"b":2}`, "format": `{"c":3}`,
+				"write": `{"d":4}`, "verify": `{"e":5}`, "lineage": `{"f":6}`,
+			},
+		},
+		{
+			name:    "a missing section is empty",
+			content: `{"verify":{"e":5}}`,
+			want: map[string]string{
+				"slice": "", "passes": "", "format": "",
+				"write": "", "verify": `{"e":5}`, "lineage": "",
+			},
+		},
+		{
+			name:    "a file with no section keeps none",
+			content: `{}`,
+			want: map[string]string{
+				"slice": "", "passes": "", "format": "",
+				"write": "", "verify": "", "lineage": "",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := loadAndApply(t, testCase.content, Config{}, nil)
+
+			got := map[string]string{
+				"slice": string(cfg.Sections.Slice), "passes": string(cfg.Sections.Passes),
+				"format": string(cfg.Sections.Format), "write": string(cfg.Sections.Write),
+				"verify": string(cfg.Sections.Verify), "lineage": string(cfg.Sections.Lineage),
+			}
+
+			if !maps.Equal(got, testCase.want) {
+				t.Fatalf("Sections = %v, want %v", got, testCase.want)
+			}
+		})
 	}
 }
 

@@ -153,6 +153,7 @@ func ApplyConfigFile(cfg Config, file ConfigFile, explicit func(string) bool) (C
 	cfg.Rules = file.Rules
 	cfg.ConfigPath = file.Path
 	cfg.ConfigBytes = file.Bytes
+	cfg.Sections = file.File
 
 	return cfg, nil
 }
