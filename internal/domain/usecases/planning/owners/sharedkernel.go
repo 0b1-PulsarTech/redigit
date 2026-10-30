@@ -1,7 +1,6 @@
 package owners
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -147,10 +146,7 @@ func SortedKeys(set map[entities.DeclKey]bool) []entities.DeclKey {
 		out = append(out, key)
 	}
 
-	slices.SortFunc(
-		out,
-		func(first, second entities.DeclKey) int { return cmp.Compare(first.String(), second.String()) },
-	)
+	slices.SortFunc(out, entities.CompareKeys)
 
 	return out
 }

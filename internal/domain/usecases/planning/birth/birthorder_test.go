@@ -1,10 +1,44 @@
 package birth
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
+
+func TestSortForBirthOrdersKeysWhoseTextIsEqualWhateverTheArrival(t *testing.T) {
+	t.Parallel()
+
+	fileTie := entities.Decl{Key: entities.DeclKey{
+		File: "x:func", Kind: entities.KindType, Name: "T",
+	}}
+	nameTie := entities.Decl{Key: entities.DeclKey{
+		File: "x", Kind: entities.KindFunc, Name: "type:T",
+	}}
+	graph := entities.NewGraph([]entities.Decl{fileTie, nameTie}, nil, nil)
+
+	testCases := []struct {
+		name string
+		keys []entities.DeclKey
+	}{
+		{"shorter file arrives first", []entities.DeclKey{nameTie.Key, fileTie.Key}},
+		{"longer file arrives first", []entities.DeclKey{fileTie.Key, nameTie.Key}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := SortForBirth(graph, entities.Ordering{}, testCase.keys, nil)
+			want := []entities.DeclKey{nameTie.Key, fileTie.Key}
+
+			if !slices.Equal(got, want) {
+				t.Fatalf("order = %v, want %v", got, want)
+			}
+		})
+	}
+}
 
 func TestSortForBirthKeepsAnAtomContiguousWithinAPosition(t *testing.T) {
 	t.Parallel()

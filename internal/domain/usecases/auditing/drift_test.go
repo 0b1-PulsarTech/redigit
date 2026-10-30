@@ -1,6 +1,9 @@
 package auditing
 
 import (
+	"cmp"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -129,6 +132,115 @@ func TestDriftsThreshold(t *testing.T) {
 
 			if got := len(drifts(graph, order, testCase.farApart)); got != testCase.want {
 				t.Fatalf("drifts = %d, want %d", got, testCase.want)
+			}
+		})
+	}
+}
+
+func tiedPairs(unit entities.UnitID, count int) []entities.Decl {
+	out := make([]entities.Decl, 0, 2*count)
+
+	for index := range count {
+		file := fmt.Sprintf("p%03d", index)
+
+		out = append(
+			out,
+			entities.Decl{
+				Key:  entities.DeclKey{File: file + ":func", Kind: entities.KindType, Name: "T"},
+				Unit: unit,
+			},
+			entities.Decl{
+				Key:  entities.DeclKey{File: file, Kind: entities.KindFunc, Name: "type:T"},
+				Unit: unit,
+			},
+		)
+	}
+
+	return out
+}
+
+func TestFirstReaderBreaksATieByKey(t *testing.T) {
+	t.Parallel()
+
+	provider := decl("lib/a.go", "A", "lib")
+
+	testCases := []struct {
+		name  string
+		pairs int
+	}{
+		{"one pair of readers", 1},
+		{"many pairs of readers", 64},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			readers := tiedPairs("app", testCase.pairs)
+			at := map[entities.DeclKey]entities.Position{provider.Key: 1}
+			edges := make([]entities.Edge, 0, len(readers))
+
+			for _, reader := range readers {
+				at[reader.Key] = 10
+
+				edges = append(edges, needs(reader, provider, entities.ReasonMethodSet))
+			}
+
+			graph := entities.NewGraph(append(slices.Clone(readers), provider), edges, nil)
+			want := slices.MinFunc(readers, func(left, right entities.Decl) int {
+				return entities.CompareKeys(left.Key, right.Key)
+			}).Key
+
+			edge, _, found := firstReader(graph, entities.Ordering{At: at}, provider.Key)
+			if !found || edge.Dependent != want {
+				t.Fatalf("reader = %v, want %v", edge.Dependent, want)
+			}
+		})
+	}
+}
+
+func TestDriftsBreaksATieByKey(t *testing.T) {
+	t.Parallel()
+
+	reader := decl("cmd/main.go", "main", "app")
+
+	testCases := []struct {
+		name  string
+		pairs int
+	}{
+		{"one pair of providers", 1},
+		{"many pairs of providers", 64},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			providers := tiedPairs("lib", testCase.pairs)
+			at := map[entities.DeclKey]entities.Position{reader.Key: 100}
+			edges := make([]entities.Edge, 0, len(providers))
+
+			for index, provider := range providers {
+				at[provider.Key] = entities.Position(1 + index/2%3)
+
+				edges = append(edges, needs(reader, provider, entities.ReasonReference))
+			}
+
+			graph := entities.NewGraph(append(providers, reader), edges, nil)
+			found := drifts(graph, entities.Ordering{At: at}, 25)
+
+			if len(found) != len(providers) {
+				t.Fatalf("found %d drifts, want %d", len(found), len(providers))
+			}
+
+			isOrdered := slices.IsSortedFunc(found, func(left, right Drift) int {
+				return cmp.Or(
+					cmp.Compare(right.Gap(), left.Gap()),
+					entities.CompareKeys(left.Decl, right.Decl),
+				)
+			})
+			if !isOrdered {
+				t.Fatalf("drifts are not ordered by gap, then key: %v", found)
 			}
 		})
 	}

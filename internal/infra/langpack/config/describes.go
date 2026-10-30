@@ -131,9 +131,7 @@ func sortedDecls(set map[entities.DeclKey]bool) []entities.DeclKey {
 		out = append(out, key)
 	}
 
-	slices.SortFunc(out, func(a, b entities.DeclKey) int {
-		return strings.Compare(a.String(), b.String())
-	})
+	slices.SortFunc(out, entities.CompareKeys)
 
 	return out
 }

@@ -9,6 +9,40 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
+func TestSortedKeysOrdersKeysWhoseTextIsEqual(t *testing.T) {
+	t.Parallel()
+
+	fileTie := entities.DeclKey{File: "x:func", Kind: entities.KindType, Name: "T"}
+	nameTie := entities.DeclKey{File: "x", Kind: entities.KindFunc, Name: "type:T"}
+
+	testCases := []struct {
+		name string
+		set  map[entities.DeclKey]bool
+		want []entities.DeclKey
+	}{
+		{
+			"tied keys order by file",
+			map[entities.DeclKey]bool{fileTie: true, nameTie: true},
+			[]entities.DeclKey{nameTie, fileTie},
+		},
+		{"an empty set yields nothing", map[entities.DeclKey]bool{}, []entities.DeclKey{}},
+	}
+
+	const runs = 256
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			for range runs {
+				if got := SortedKeys(testCase.set); !slices.Equal(got, testCase.want) {
+					t.Fatalf("SortedKeys() = %v, want %v", got, testCase.want)
+				}
+			}
+		})
+	}
+}
+
 func TestUnbornProvidersClosesTransitivelyOverTheSharedKernel(t *testing.T) {
 	t.Parallel()
 

@@ -1,7 +1,6 @@
 package planning
 
 import (
-	"cmp"
 	"maps"
 	"slices"
 
@@ -59,9 +58,7 @@ func (p Planner) closeOut(
 		}
 	}
 
-	slices.SortFunc(plan.Unplaced, func(a, b entities.DeclKey) int {
-		return cmp.Compare(a.String(), b.String())
-	})
+	slices.SortFunc(plan.Unplaced, entities.CompareKeys)
 
 	plan.Commits = p.mergeFragments(graph, plan.Commits)
 

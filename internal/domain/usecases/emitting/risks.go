@@ -47,8 +47,8 @@ func risksFor(
 
 	slices.SortFunc(risks, func(a, b Risk) int {
 		return cmp.Or(
-			cmp.Compare(a.Chunk.String(), b.Chunk.String()),
-			cmp.Compare(a.Target.String(), b.Target.String()),
+			entities.CompareKeys(a.Chunk, b.Chunk),
+			entities.CompareKeys(a.Target, b.Target),
 		)
 	})
 

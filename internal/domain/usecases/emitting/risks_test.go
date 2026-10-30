@@ -1,6 +1,7 @@
 package emitting
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -108,6 +109,67 @@ func TestRisksForAggregation(t *testing.T) {
 			got := risksFor(testCase.planned, graph, testCase.positions)
 			if !slices.Equal(got, testCase.want) {
 				t.Fatalf("risksFor() = %+v, want %+v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestRisksForOrdersChunksWhoseTextIsEqual(t *testing.T) {
+	t.Parallel()
+
+	target := key("z.go", "Target")
+
+	testCases := []struct {
+		name      string
+		pairs     int
+		isReverse bool
+	}{
+		{"one pair arriving in order", 1, false},
+		{"one pair arriving reversed", 1, true},
+		{"many pairs arriving in order", 64, false},
+		{"many pairs arriving reversed", 64, true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			chunks := make([]entities.DeclKey, 0, 2*testCase.pairs)
+			edges := make([]entities.Edge, 0, 2*testCase.pairs)
+
+			for index := range testCase.pairs {
+				file := fmt.Sprintf("p%03d", index)
+				chunks = append(
+					chunks,
+					entities.DeclKey{File: file + ":func", Kind: entities.KindType, Name: "T"},
+					entities.DeclKey{File: file, Kind: entities.KindFunc, Name: "type:T"},
+				)
+			}
+
+			for _, chunk := range chunks {
+				edges = append(edges, entities.Edge{
+					Dependent: chunk, Provider: target, Reason: entities.ReasonReference,
+				})
+			}
+
+			if testCase.isReverse {
+				slices.Reverse(chunks)
+			}
+
+			graph := entities.NewGraph(nil, edges, nil)
+			planned := entities.PlannedCommit{Position: 0, Decls: chunks}
+			positions := map[entities.DeclKey]entities.Position{target: 1}
+
+			got := risksFor(planned, graph, positions)
+			if len(got) != len(chunks) {
+				t.Fatalf("risksFor() returned %d risks, want %d", len(got), len(chunks))
+			}
+
+			isOrdered := slices.IsSortedFunc(got, func(left, right Risk) int {
+				return entities.CompareKeys(left.Chunk, right.Chunk)
+			})
+			if !isOrdered {
+				t.Fatalf("risks are not ordered by chunk key: %+v", got)
 			}
 		})
 	}

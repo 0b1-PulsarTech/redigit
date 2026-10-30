@@ -1,7 +1,6 @@
 package config
 
 import (
-	"cmp"
 	"path"
 	"strings"
 
@@ -82,7 +81,7 @@ func earlier(
 		return a < b
 	}
 
-	return cmp.Less(aKey.String(), bKey.String())
+	return entities.CompareKeys(aKey, bKey) < 0
 }
 
 // directoryOf resolves an import path to a repository directory through the

@@ -39,7 +39,7 @@ func firstReader(
 
 	edges := slices.Clone(graph.ExternalConsumers(key))
 	slices.SortFunc(edges, func(a, b entities.Edge) int {
-		return cmp.Compare(a.Dependent.String(), b.Dependent.String())
+		return entities.CompareKeys(a.Dependent, b.Dependent)
 	})
 
 	for _, edge := range edges {
@@ -86,7 +86,7 @@ func drifts(graph entities.Graph, order entities.Ordering, farApart int) []Drift
 			return by
 		}
 
-		return cmp.Compare(a.Decl.String(), b.Decl.String())
+		return entities.CompareKeys(a.Decl, b.Decl)
 	})
 
 	return out

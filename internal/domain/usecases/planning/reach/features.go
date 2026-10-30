@@ -1,7 +1,6 @@
 package reach
 
 import (
-	"cmp"
 	"slices"
 	"strings"
 
@@ -36,7 +35,7 @@ func EntryPoints(graph entities.Graph, roots Wiring) []entities.Decl {
 	}
 
 	slices.SortFunc(out, func(first, second entities.Decl) int {
-		return cmp.Compare(first.Key.String(), second.Key.String())
+		return entities.CompareKeys(first.Key, second.Key)
 	})
 
 	return out

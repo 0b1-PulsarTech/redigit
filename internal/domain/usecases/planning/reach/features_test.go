@@ -1,6 +1,7 @@
 package reach
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -18,6 +19,60 @@ func entryPointNames(graph entities.Graph) []string {
 	slices.Sort(got)
 
 	return got
+}
+
+func TestEntryPointsBreakATieByKey(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		pairs int
+	}{
+		{"one pair", 1},
+		{"many pairs", 64},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decls := make([]entities.Decl, 0, 2*testCase.pairs)
+
+			for index := range testCase.pairs {
+				file := fmt.Sprintf("p%03d", index)
+				decls = append(
+					decls,
+					entities.Decl{Key: entities.DeclKey{
+						File: file + ":func", Kind: entities.KindType, Name: "T",
+					}},
+					entities.Decl{Key: entities.DeclKey{
+						File: file, Kind: entities.KindFunc, Name: "type:T",
+					}},
+				)
+			}
+
+			got := EntryPoints(entities.NewGraph(decls, nil, nil), nil)
+			if len(got) != len(decls) {
+				t.Fatalf("EntryPoints() returned %d, want %d", len(got), len(decls))
+			}
+
+			isOrdered := slices.IsSortedFunc(got, func(left, right entities.Decl) int {
+				return entities.CompareKeys(left.Key, right.Key)
+			})
+			if !isOrdered {
+				t.Fatalf("entry points are not ordered by key: %v", keysOf(got))
+			}
+		})
+	}
+}
+
+func keysOf(decls []entities.Decl) []entities.DeclKey {
+	out := make([]entities.DeclKey, 0, len(decls))
+	for _, item := range decls {
+		out = append(out, item.Key)
+	}
+
+	return out
 }
 
 func TestEntryPoints(t *testing.T) {

@@ -75,5 +75,5 @@ func earlier(order entities.Ordering, left, right entities.Decl) bool {
 		return byPlace < 0
 	}
 
-	return left.Key.String() < right.Key.String()
+	return entities.CompareKeys(left.Key, right.Key) < 0
 }

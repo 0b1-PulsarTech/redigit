@@ -12,6 +12,9 @@ func TestCompareKeys(t *testing.T) {
 	a := entities.DeclKey{File: "a.go", Name: "A"}
 	b := entities.DeclKey{File: "b.go", Name: "B"}
 
+	fileTie := entities.DeclKey{File: "x:func", Kind: entities.KindType, Name: "T"}
+	nameTie := entities.DeclKey{File: "x", Kind: entities.KindFunc, Name: "type:T"}
+
 	testCases := []struct {
 		name string
 		a    entities.DeclKey
@@ -21,6 +24,8 @@ func TestCompareKeys(t *testing.T) {
 		{"earlier sorts before", a, b, -1},
 		{"later sorts after", b, a, 1},
 		{"equal keys compare equal", a, a, 0},
+		{"same text, shorter file first", nameTie, fileTie, -1},
+		{"same text, longer file last", fileTie, nameTie, 1},
 	}
 
 	for _, testCase := range testCases {

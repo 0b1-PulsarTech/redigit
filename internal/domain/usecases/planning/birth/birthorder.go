@@ -22,7 +22,7 @@ func SortForBirth(
 			return cmp.Compare(left, right)
 		}
 
-		return cmp.Compare(first.String(), second.String())
+		return entities.CompareKeys(first, second)
 	})
 
 	out := make([]entities.DeclKey, 0, len(sorted))
