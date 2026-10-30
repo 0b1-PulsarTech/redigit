@@ -42,13 +42,13 @@ func (source *Source) Facts(
 	source.guard.Lock()
 	defer source.guard.Unlock()
 
-	shape := shapeOf(decls)
+	shape := ShapeOf(decls)
 	if known, found := source.facts[shape]; found {
 		return known, nil
 	}
 
 	// Packages stay loaded: the same facts are asked again per statement, each one a dependent.
-	locator := newDeclLocator(decls)
+	locator := NewDeclLocator(decls)
 
 	var facts Facts
 
@@ -75,7 +75,7 @@ func (source *Source) Close(ctx context.Context) error {
 	return closeErr
 }
 
-func shapeOf(decls []entities.Decl) uint64 {
+func ShapeOf(decls []entities.Decl) uint64 {
 	hash := fnv.New64a()
 
 	for _, decl := range decls {

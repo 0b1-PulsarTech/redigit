@@ -18,12 +18,12 @@ func (scan *factScan) uses() {
 			obj = fn.Origin()
 		}
 
-		dependent, inTree := scan.where.declAt(scan.pkg.Fset, ident.Pos())
+		dependent, inTree := scan.where.DeclAt(scan.pkg.Fset, ident.Pos())
 		if !inTree {
 			continue
 		}
 
-		provider, found := scan.where.declAt(scan.pkg.Fset, obj.Pos())
+		provider, found := scan.where.DeclAt(scan.pkg.Fset, obj.Pos())
 		if !found || provider == dependent {
 			continue
 		}

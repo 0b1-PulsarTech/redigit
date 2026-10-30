@@ -45,8 +45,8 @@ type Use struct {
 	Dependent, Provider entities.DeclKey
 }
 
-func collectFacts(pkgs []*packages.Package, root string, locator declLocator) Facts {
-	scan := &factScan{where: newPositions(root, locator), dynamic: dynamicNames(pkgs)}
+func collectFacts(pkgs []*packages.Package, root string, locator DeclLocator) Facts {
+	scan := &factScan{where: NewPositions(root, locator), dynamic: dynamicNames(pkgs)}
 
 	for _, pkg := range pkgs {
 		if pkg.TypesInfo == nil {
@@ -91,7 +91,7 @@ func compareRequirements(left, right Requirement) int {
 }
 
 type factScan struct {
-	where   positions
+	where   Positions
 	pkg     *packages.Package
 	facts   Facts
 	dynamic map[string]bool
@@ -106,7 +106,7 @@ func (scan *factScan) instances() {
 			continue
 		}
 
-		dependent, inTree := scan.where.declAt(scan.pkg.Fset, ident.Pos())
+		dependent, inTree := scan.where.DeclAt(scan.pkg.Fset, ident.Pos())
 		if !inTree {
 			continue
 		}

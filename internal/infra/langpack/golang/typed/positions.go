@@ -5,16 +5,17 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
 )
 
-type declLocator struct {
+type DeclLocator struct {
 	byFile map[string][]entities.Decl
 }
 
-func newDeclLocator(decls []entities.Decl) declLocator {
+func NewDeclLocator(decls []entities.Decl) DeclLocator {
 	byFile := declsource.GroupByFile(decls)
 
 	for _, group := range byFile {
@@ -24,10 +25,10 @@ func newDeclLocator(decls []entities.Decl) declLocator {
 		)
 	}
 
-	return declLocator{byFile: byFile}
+	return DeclLocator{byFile: byFile}
 }
 
-func (locator declLocator) enclosing(file string, offset int) (entities.DeclKey, bool) {
+func (locator DeclLocator) enclosing(file string, offset int) (entities.DeclKey, bool) {
 	group := locator.byFile[file]
 
 	index, exact := slices.BinarySearchFunc(group, offset, func(decl entities.Decl, at int) int {
@@ -44,41 +45,21 @@ func (locator declLocator) enclosing(file string, offset int) (entities.DeclKey,
 	return group[index].Key, true
 }
 
-type positions struct {
+type Positions struct {
 	root    string
-	locator declLocator
-	rel     map[string]string
+	locator DeclLocator
+	rel     *sync.Map
 }
 
-func newPositions(root string, locator declLocator) positions {
+func NewPositions(root string, locator DeclLocator) Positions {
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
 		root = resolved
 	}
 
-	return positions{root: root, locator: locator, rel: map[string]string{}}
+	return Positions{root: root, locator: locator, rel: &sync.Map{}}
 }
 
-func (where positions) relative(name string) string {
-	if cached, known := where.rel[name]; known {
-		return cached
-	}
-
-	resolved := name
-	if target, err := filepath.EvalSymlinks(name); err == nil {
-		resolved = target
-	}
-
-	rel, err := filepath.Rel(where.root, resolved)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		rel = ""
-	}
-
-	where.rel[name] = filepath.ToSlash(rel)
-
-	return where.rel[name]
-}
-
-func (where positions) declAt(fset *token.FileSet, pos token.Pos) (entities.DeclKey, bool) {
+func (where Positions) DeclAt(fset *token.FileSet, pos token.Pos) (entities.DeclKey, bool) {
 	if !pos.IsValid() {
 		return entities.DeclKey{}, false
 	}
@@ -91,4 +72,26 @@ func (where positions) declAt(fset *token.FileSet, pos token.Pos) (entities.Decl
 	}
 
 	return where.locator.enclosing(rel, at.Offset)
+}
+
+func (where Positions) relative(name string) string {
+	if cached, known := where.rel.Load(name); known {
+		return cached.(string)
+	}
+
+	resolved := name
+	if target, err := filepath.EvalSymlinks(name); err == nil {
+		resolved = target
+	}
+
+	rel, err := filepath.Rel(where.root, resolved)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		rel = ""
+	}
+
+	// a miss race recomputes the same value, so a plain Store is enough
+	slashed := filepath.ToSlash(rel)
+	where.rel.Store(name, slashed)
+
+	return slashed
 }
