@@ -3,6 +3,7 @@ package indexing
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -38,19 +39,21 @@ func (i Indexer) cutWiring(
 		byFile[decl.Key.File] = append(byFile[decl.Key.File], decl)
 	}
 
+	// Map order is random and a stable sort keeps equal keys in input order, so fix the input.
+	files := slices.Sorted(maps.Keys(byFile))
 	cut := wiringCut{replaced: map[entities.DeclKey]bool{}, added: map[entities.DeclKey]bool{}}
 
-	for _, file := range sortedFiles(byFile) {
+	for _, file := range files {
 		if err := i.cutFile(ctx, file, byFile, roots, &cut, where); err != nil {
 			return wiringCut{}, err
 		}
 	}
 
-	for _, found := range byFile {
-		cut.decls = append(cut.decls, found...)
+	for _, file := range files {
+		cut.decls = append(cut.decls, byFile[file]...)
 	}
 
-	slices.SortFunc(cut.decls, func(a, b entities.Decl) int { return compareKeys(a.Key, b.Key) })
+	slices.SortStableFunc(cut.decls, compareDeclKeys)
 
 	return cut, nil
 }
@@ -141,16 +144,7 @@ func isCuttable(decl entities.Decl) bool {
 		!entities.IsTestSide(decl) && !decl.Generated
 }
 
-func sortedFiles(byFile map[string][]entities.Decl) []string {
-	files := make([]string, 0, len(byFile))
-	for file := range byFile {
-		files = append(files, file)
-	}
-
-	slices.Sort(files)
-
-	return files
-}
+func compareDeclKeys(a, b entities.Decl) int { return entities.CompareKeys(a.Key, b.Key) }
 
 // reattach asks again who reads what the cut functions read, and keeps the
 // answers that land on a head or a statement. The locator now tells the
@@ -205,7 +199,7 @@ func sortedKeySet(set map[entities.DeclKey]bool) []entities.DeclKey {
 		out = append(out, key)
 	}
 
-	slices.SortFunc(out, compareKeys)
+	slices.SortFunc(out, entities.CompareKeys)
 
 	return out
 }

@@ -2,6 +2,8 @@ package indexing
 
 import (
 	"context"
+	"reflect"
+	"slices"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -165,5 +167,50 @@ func TestReattachGivesEachReaderToTheStatementThatWroteIt(t *testing.T) {
 
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("reattach() = %v, want %v", got, want)
+	}
+}
+
+func TestCutWiringReturnsDeclarationsInAFixedOrder(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		files []string
+	}{
+		{"four files", []string{"a.go", "b.go", "c.go", "d.go"}},
+		{"four files given backwards", []string{"d.go", "c.go", "b.go", "a.go"}},
+		{"three files in a nested directory", []string{"p/x.go", "p/y.go", "q/z.go"}},
+		{"five files", []string{"e.go", "a.go", "d.go", "b.go", "c.go"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			indexer := New(nil, nil, Config{})
+			graph := entities.NewGraph(nil, nil, nil)
+			decls := twinDecls(testCase.files)
+
+			var first []entities.Decl
+
+			for run := range 64 {
+				cut, err := indexer.cutWiring(context.Background(), graph, decls, newLocator())
+				if err != nil {
+					t.Fatalf("cutWiring() = %v", err)
+				}
+
+				if run == 0 {
+					first = cut.decls
+				}
+
+				if !reflect.DeepEqual(cut.decls, first) {
+					t.Fatalf("run %d: decls = %v, want the first run's %v", run, cut.decls, first)
+				}
+			}
+
+			if !slices.IsSortedFunc(first, compareDeclKeys) {
+				t.Fatalf("cutWiring() = %v, want key order", first)
+			}
+		})
 	}
 }

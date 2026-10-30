@@ -139,3 +139,48 @@ func TestCompareEdges(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareBlind(t *testing.T) {
+	t.Parallel()
+
+	key := entities.DeclKey{File: "a.go", Kind: entities.KindFunc, Name: "A"}
+	other := entities.DeclKey{File: "b.go", Kind: entities.KindFunc, Name: "A"}
+
+	testCases := []struct {
+		name  string
+		left  Blind
+		right Blind
+		want  int
+	}{
+		{"identical spots tie", Blind{key, "ab", "c"}, Blind{key, "ab", "c"}, 0},
+		{
+			"characters shifted from query to reason are different spots",
+			Blind{key, "ab", "c"},
+			Blind{key, "a", "bc"},
+			1,
+		},
+		{
+			"the shifted spot sorts first the other way round",
+			Blind{key, "a", "bc"},
+			Blind{key, "ab", "c"},
+			-1,
+		},
+		{
+			"the declaration decides before the text",
+			Blind{other, "a", "a"},
+			Blind{key, "z", "z"},
+			1,
+		},
+		{"the reason breaks a tie on the query", Blind{key, "q", "a"}, Blind{key, "q", "b"}, -1},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := compareBlind(testCase.left, testCase.right); got != testCase.want {
+				t.Fatalf("compareBlind() = %d, want %d", got, testCase.want)
+			}
+		})
+	}
+}

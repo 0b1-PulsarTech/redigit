@@ -12,8 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-func compareKeys(a, b entities.DeclKey) int { return cmp.Compare(a.String(), b.String()) }
-
 // resolve asks the resolver, per declaration, who reads it and what satisfies
 // it. This is the step that replaces identifier matching: searching for the
 // first consumer of 59 declarations by name put 24 of 53 destinations in the
@@ -60,23 +58,25 @@ func (i Indexer) resolve(
 	}
 
 	slices.SortFunc(edges, compareEdges)
-	slices.SortFunc(blind, func(a, b Blind) int { return compareKeys(a.Decl, b.Decl) })
+	slices.SortFunc(blind, compareBlind)
 
-	return slices.CompactFunc(edges, func(a, b entities.Edge) bool {
-		return compareEdges(a, b) == 0
-	}), blind, nil
+	return slices.Compact(edges), blind, nil
+}
+
+func compareBlind(left, right Blind) int {
+	return cmp.Or(
+		entities.CompareKeys(left.Decl, right.Decl),
+		cmp.Compare(left.Query, right.Query),
+		cmp.Compare(left.Reason, right.Reason),
+	)
 }
 
 func compareEdges(a, b entities.Edge) int {
-	if by := compareKeys(a.Dependent, b.Dependent); by != 0 {
-		return by
-	}
-
-	if by := compareKeys(a.Provider, b.Provider); by != 0 {
-		return by
-	}
-
-	return cmp.Compare(string(a.Reason), string(b.Reason))
+	return cmp.Or(
+		entities.CompareKeys(a.Dependent, b.Dependent),
+		entities.CompareKeys(a.Provider, b.Provider),
+		cmp.Compare(a.Reason, b.Reason),
+	)
 }
 
 // edgesOf asks the resolver about one declaration. A query the server cannot
@@ -139,17 +139,10 @@ func dropInterfaceToInterface(
 	edges []entities.Edge,
 	interfaces map[entities.DeclKey]bool,
 ) []entities.Edge {
-	kept := edges[:0:0]
-
-	for _, edge := range edges {
-		if interfaces[edge.Dependent] {
-			continue
-		}
-
-		kept = append(kept, edge)
-	}
-
-	return kept
+	return slices.DeleteFunc(
+		edges,
+		func(edge entities.Edge) bool { return interfaces[edge.Dependent] },
+	)
 }
 
 // edgesFrom turns resolver locations into edges pointing at provider. A
@@ -170,11 +163,10 @@ func (i Indexer) edgesFrom(
 			continue
 		}
 
-		edges = append(edges, entities.Edge{
-			Dependent: dependent,
-			Provider:  provider,
-			Reason:    reason,
-		})
+		edges = append(
+			edges,
+			entities.Edge{Dependent: dependent, Provider: provider, Reason: reason},
+		)
 	}
 
 	return edges

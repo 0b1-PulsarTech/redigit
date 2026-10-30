@@ -3,6 +3,10 @@ package indexing
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
+	"runtime"
+	"slices"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -437,5 +441,243 @@ func TestIndexerLetsTheRulesDropMergedEdges(t *testing.T) {
 	needs := result.Graph.Needs(mock.Key)
 	if len(needs) != 1 || needs[0].Reason != entities.ReasonMirrors {
 		t.Fatalf("mock needs %v, want only the mirrors edge", needs)
+	}
+}
+
+type orderFixture struct {
+	files    []string
+	sources  map[string][]byte
+	decls    map[string][]entities.Decl
+	all      []entities.Decl
+	failures map[entities.Location]bool
+}
+
+func newOrderFixture(fileCount, perFile, failing int) orderFixture {
+	fixture := orderFixture{
+		sources:  map[string][]byte{},
+		decls:    map[string][]entities.Decl{},
+		failures: map[entities.Location]bool{},
+	}
+
+	for file := range fileCount {
+		path := fmt.Sprintf("f%d.go", file)
+		source := "package p\n\n"
+
+		for index := range perFile {
+			name := fmt.Sprintf("F%d_%d", file, index)
+			text := fmt.Sprintf("func %s() {}", name)
+			decl := entities.Decl{
+				Key:      entities.DeclKey{File: path, Kind: entities.KindFunc, Name: name},
+				Unit:     "p",
+				Span:     entities.Span{Start: len(source), End: len(source) + len(text)},
+				Selector: entities.Location{File: path, Line: 2 + 2*index, Char: 5},
+			}
+			decl.IsInterface = len(fixture.all) < failing
+
+			if decl.IsInterface {
+				fixture.failures[decl.Selector] = true
+			}
+
+			source += text + "\n\n"
+
+			fixture.decls[path] = append(fixture.decls[path], decl)
+			fixture.all = append(fixture.all, decl)
+		}
+
+		fixture.files = append(fixture.files, path)
+		fixture.sources[path] = []byte(source)
+	}
+
+	return fixture
+}
+
+func (fixture orderFixture) index(t *testing.T, reverse bool) (Result, error) {
+	t.Helper()
+
+	indexer, snap := fixture.build(t, reverse)
+
+	return indexer.Index(context.Background(), snap)
+}
+
+func (fixture orderFixture) build(t *testing.T, reverse bool) (Indexer, entities.Snapshot) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+
+	tree := NewMockTree(ctrl)
+	tree.EXPECT().Read(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, file string) ([]byte, error) { return fixture.sources[file], nil },
+	).AnyTimes()
+
+	syntax := NewMockSyntax(ctrl)
+	syntax.EXPECT().Declarations(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, file string, _ []byte) ([]entities.Decl, error) {
+			return slices.Clone(fixture.decls[file]), nil
+		},
+	).AnyTimes()
+
+	resolver := NewMockResolver(ctrl)
+	resolver.EXPECT().References(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, at entities.Location) ([]entities.Location, error) {
+			if fixture.failures[at] {
+				return nil, errors.New("references refused")
+			}
+
+			return fixture.readers(at, reverse), nil
+		},
+	).AnyTimes()
+	resolver.EXPECT().Implementations(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, at entities.Location) ([]entities.Location, error) {
+			return nil, errors.New("implementations refused")
+		},
+	).AnyTimes()
+
+	files := slices.Clone(fixture.files)
+	if reverse {
+		slices.Reverse(files)
+	}
+
+	return New(resolver, tree, Config{
+		Concurrency: 8,
+		Languages: []Language{{
+			Name: "go", Extensions: []string{".go"}, Syntax: syntax, Resolved: true,
+		}},
+	}), entities.Snapshot{Files: files}
+}
+
+func (fixture orderFixture) readers(at entities.Location, reverse bool) []entities.Location {
+	position := slices.IndexFunc(fixture.all, func(decl entities.Decl) bool {
+		return decl.Selector == at
+	})
+
+	var out []entities.Location
+
+	for step := 1; step <= 3; step++ {
+		reader := fixture.all[(position+step)%len(fixture.all)]
+		at := entities.Location{File: reader.Key.File, Line: reader.Selector.Line, Char: 1}
+		out = append(out, at)
+	}
+
+	if reverse {
+		slices.Reverse(out)
+	}
+
+	return out
+}
+
+func TestIndexIgnoresInputOrder(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		fixture orderFixture
+	}{
+		{"edges from several files", newOrderFixture(4, 5, 0)},
+		{"declarations that tie on a blind spot", newOrderFixture(8, 25, 8)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			forward, err := testCase.fixture.index(t, false)
+			if err != nil {
+				t.Fatalf("Index() = %v", err)
+			}
+
+			backward, err := testCase.fixture.index(t, true)
+			if err != nil {
+				t.Fatalf("Index() reversed = %v", err)
+			}
+
+			got := []any{backward.Graph.Decls(), backward.Graph.Edges(), backward.Blind}
+			want := []any{forward.Graph.Decls(), forward.Graph.Edges(), forward.Blind}
+
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("reversed inputs gave a different result:\n%v\nwant:\n%v", got, want)
+			}
+		})
+	}
+}
+
+func twinDecls(files []string) []entities.Decl {
+	out := make([]entities.Decl, 0, 5*len(files))
+
+	for fileIndex, file := range files {
+		for twin := range 3 {
+			start := 100*fileIndex + 10*twin
+			out = append(out, goDecl(file, "init", start, start+5))
+		}
+
+		out = append(out, goDecl(file, "Run", 100*fileIndex+50, 100*fileIndex+55))
+		out = append(out, goDecl(file, "Stop", 100*fileIndex+60, 100*fileIndex+65))
+	}
+
+	return out
+}
+
+func TestIndexerReadReturnsDeclarationsInAFixedOrder(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		files []string
+	}{
+		{"four files", []string{"a.go", "b.go", "c.go", "d.go"}},
+		{"four files given backwards", []string{"d.go", "c.go", "b.go", "a.go"}},
+		{"three files in a nested directory", []string{"p/x.go", "p/y.go", "q/z.go"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			byFile := map[string][]entities.Decl{}
+
+			for _, decl := range twinDecls(testCase.files) {
+				byFile[decl.Key.File] = append(byFile[decl.Key.File], decl)
+			}
+
+			tree := NewMockTree(ctrl)
+			tree.EXPECT().Read(gomock.Any(), gomock.Any()).Return([]byte(goSource), nil).AnyTimes()
+
+			syntax := NewMockSyntax(ctrl)
+			syntax.EXPECT().Declarations(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, file string, _ []byte) ([]entities.Decl, error) {
+					runtime.Gosched()
+
+					return slices.Clone(byFile[file]), nil
+				},
+			).AnyTimes()
+
+			indexer := New(NewMockResolver(ctrl), tree, Config{
+				Concurrency: 4,
+				Languages:   []Language{{Name: "go", Extensions: []string{".go"}, Syntax: syntax}},
+			})
+
+			var first []entities.Decl
+
+			for run := range 64 {
+				got, _, err := indexer.read(
+					context.Background(), entities.Snapshot{Files: testCase.files},
+				)
+				if err != nil {
+					t.Fatalf("read() = %v", err)
+				}
+
+				if run == 0 {
+					first = got
+				}
+
+				if !reflect.DeepEqual(got, first) {
+					t.Fatalf("run %d: read() = %v, want the first run's %v", run, got, first)
+				}
+			}
+
+			if !slices.IsSortedFunc(first, compareDeclKeys) {
+				t.Fatalf("read() = %v, want key order", first)
+			}
+		})
 	}
 }

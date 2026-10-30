@@ -185,9 +185,7 @@ func (i Indexer) assembleCut(
 
 	slices.SortFunc(kept, compareEdges)
 
-	return i.assemble(ctx, snap, cut.decls, slices.CompactFunc(kept, func(a, b entities.Edge) bool {
-		return compareEdges(a, b) == 0
-	}))
+	return i.assemble(ctx, snap, cut.decls, slices.Compact(kept))
 }
 
 // read parses every owned file into declarations. Files are independent, so
@@ -199,14 +197,14 @@ func (i Indexer) read(
 ) ([]entities.Decl, locator, error) {
 	var (
 		guard sync.Mutex
-		decls []entities.Decl
+		slots = make([][]entities.Decl, len(snap.Files))
 		where = newLocator()
 	)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(i.limit)
 
-	for _, file := range snap.Files {
+	for slot, file := range snap.Files {
 		lang, owned := i.languageFor(file)
 		if !owned {
 			continue
@@ -228,7 +226,7 @@ func (i Indexer) read(
 			guard.Lock()
 			defer guard.Unlock()
 
-			decls = append(decls, found...)
+			slots[slot] = found
 			where.add(file, source, found)
 
 			return nil
@@ -239,9 +237,8 @@ func (i Indexer) read(
 		return nil, locator{}, fmt.Errorf("read declarations: %w", err)
 	}
 
-	slices.SortFunc(decls, func(a, b entities.Decl) int {
-		return compareKeys(a.Key, b.Key)
-	})
+	decls := slices.Concat(slots...)
+	slices.SortStableFunc(decls, compareDeclKeys)
 
 	return decls, where, nil
 }
