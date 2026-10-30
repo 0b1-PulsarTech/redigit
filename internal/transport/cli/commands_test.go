@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -571,3 +572,68 @@ func TestWarnUnclaimed(t *testing.T) {
 }
 
 var _ io.Writer = failWriter{}
+
+func TestRunGraphIgnoresInputOrder(t *testing.T) {
+	t.Parallel()
+
+	names := []string{"A", "B", "C", "D"}
+	decls := make([]entities.Decl, 0, len(names))
+	edges := make([]entities.Edge, 0, len(names))
+	at := map[entities.DeclKey]entities.Position{}
+
+	for index, name := range names {
+		decls = append(decls, entities.Decl{Key: declKey(name), Unit: "a"})
+		edges = append(edges, entities.Edge{
+			Dependent: declKey(name),
+			Provider:  declKey(names[(index+1)%len(names)]),
+			Reason:    entities.ReasonReference,
+		})
+		at[declKey(name)] = entities.Position(index)
+	}
+
+	render := func(reverse bool) string {
+		forward, backward := slices.Clone(decls), slices.Clone(edges)
+		if reverse {
+			slices.Reverse(forward)
+			slices.Reverse(backward)
+		}
+
+		ctrl := gomock.NewController(t)
+		pl := NewMockPipeline(ctrl)
+		pl.EXPECT().Unseen().Return(nil).AnyTimes()
+		pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
+		pl.EXPECT().Graph(gomock.Any()).Return(
+			indexing.Result{Graph: entities.NewGraph(forward, backward, nil)}, nil,
+		)
+		pl.EXPECT().Order(gomock.Any()).Return(entities.Ordering{At: at, Rounds: 1}, nil)
+		pl.EXPECT().Close(gomock.Any()).Return(nil)
+
+		start := func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+
+		var out bytes.Buffer
+		if err := runGraph(context.Background(), bootstrap.Config{}, &out, start); err != nil {
+			t.Fatalf("runGraph() = %v", err)
+		}
+
+		return out.String()
+	}
+
+	testCases := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"reversed inputs print the same bytes", render(true), render(false)},
+		{"a second run prints the same bytes", render(false), render(false)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if testCase.got != testCase.want {
+				t.Fatalf("output differs:\n%s\nwant:\n%s", testCase.got, testCase.want)
+			}
+		})
+	}
+}

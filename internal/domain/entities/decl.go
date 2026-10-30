@@ -1,10 +1,12 @@
 package entities
 
-import "strings"
+import (
+	"cmp"
+	"strings"
+)
 
-// DeclKind is what a declaration declares. It is deliberately coarser than any
-// one language's grammar: the ordering rules only ever ask whether something is
-// a type, a callable, a bound value, or none of those.
+// DeclKind is what a declaration declares, coarser than any one language grammar:
+// the ordering rules only ask for a type, a callable, a bound value, or none.
 type DeclKind string
 
 const (
@@ -51,30 +53,61 @@ func (k DeclKey) String() string {
 	return k.File + ":" + string(k.Kind) + ":" + k.Name
 }
 
-// IsZero reports whether the key names nothing, which is how a lookup miss is
-// returned without a second boolean.
+func CompareKeys(left, right DeclKey) int {
+	// Same sign as comparing String() without building it. String is not injective
+	// (x:func + type + T against x + func + type:T), so equal text falls back to File, then Kind.
+	leftParts := [...]string{left.File, ":", string(left.Kind), ":", left.Name}
+	rightParts := [...]string{right.File, ":", string(right.Kind), ":", right.Name}
+	leftIndex, rightIndex, leftUsed, rightUsed := 0, 0, 0, 0
+
+	for {
+		for leftIndex < len(leftParts) && leftUsed == len(leftParts[leftIndex]) {
+			leftIndex, leftUsed = leftIndex+1, 0
+		}
+
+		for rightIndex < len(rightParts) && rightUsed == len(rightParts[rightIndex]) {
+			rightIndex, rightUsed = rightIndex+1, 0
+		}
+
+		if leftIndex == len(leftParts) || rightIndex == len(rightParts) {
+			rest := cmp.Compare(len(leftParts)-leftIndex, len(rightParts)-rightIndex)
+
+			return cmp.Or(
+				rest, cmp.Compare(left.File, right.File), cmp.Compare(left.Kind, right.Kind),
+			)
+		}
+
+		leftRest, rightRest := leftParts[leftIndex][leftUsed:], rightParts[rightIndex][rightUsed:]
+		step := min(len(leftRest), len(rightRest))
+
+		if order := strings.Compare(leftRest[:step], rightRest[:step]); order != 0 {
+			return order
+		}
+
+		leftUsed, rightUsed = leftUsed+step, rightUsed+step
+	}
+}
+
+// IsZero reports whether the key names nothing: a lookup miss without a second boolean.
 func (k DeclKey) IsZero() bool {
 	return k.File == "" && k.Kind == "" && k.Name == ""
 }
 
-// Span is a byte range in a file's final content. Byte offsets, not lines: the
-// renderer cuts text with them, and a line number cannot address a declaration
-// that shares a line with another.
+// Span is a byte range in a file's final content, in bytes not lines: the
+// renderer cuts text with it, and a line cannot address a shared-line declaration.
 type Span struct {
 	Start int
 	End   int
 }
 
-// Location addresses a point in a file the way a language server does: Line is
-// zero-based, and Char counts UTF-16 CODE UNITS from the start of the line, not
-// bytes and not runes.
+// Location addresses a point in a file the way a language server does: Line is zero-based,
+// and Char counts UTF-16 CODE UNITS from the start of the line, not bytes and not runes.
 //
-// The unit is stated here because it is invisible at the call site and wrong
-// silently: a server asked at a byte column answers about a different character
-// on any line holding a non-ASCII one, and reports nothing amiss. gopls never
-// advertises positionEncoding at all, so there is no handshake to read it from.
-// Whoever produces a Location converts; whoever consumes one may not assume
-// bytes.
+// The unit is stated here because it is invisible at the call site and wrong silently: a
+// server asked at a byte column answers about a different character on any line holding a
+// non-ASCII one, and reports nothing amiss. gopls never advertises positionEncoding at all,
+// so there is no handshake to read it from. Whoever produces a Location converts; whoever
+// consumes one may not assume bytes.
 type Location struct {
 	File string
 	Line int
@@ -135,3 +168,13 @@ const DefaultMaxAddedLines = 900
 // DefaultMinCommitLines is the size below which a commit is a scrap: a reader
 // opens it for a handful of lines that belong to the commit beside it.
 const DefaultMinCommitLines = 15
+
+func flagBits(decl Decl) (mask int) {
+	for bit, flag := range [...]bool{decl.IsTest, decl.IsInterface, decl.Generated} {
+		if flag {
+			mask |= 1 << bit
+		}
+	}
+
+	return mask
+}
