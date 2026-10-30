@@ -58,6 +58,11 @@ Flags:
                 from the type-check the rules already ran and starts the
                 language server only for a query it cannot cover; lsp starts
                 the server first and asks it everything.
+  --mode M      what the plan's order follows: history (default) seeds each
+                declaration at the commit that first touched its file;
+                lineage orders by the commit that first held the declaration
+                and still exists, following renames. It scans the history
+                once, so it costs seconds more; a cached plan skips that.
   --far  N      positions a declaration may sit ahead of its first outside
                 reader before audit reports it (default 25)
   --layers FILE which path prefixes come first when the graph is indifferent.

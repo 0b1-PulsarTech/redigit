@@ -36,7 +36,7 @@ func testSet(t *testing.T, args ...string) (*flag.FlagSet, bootstrap.Config) {
 
 	for _, name := range []string{
 		"tags", "layers", "features", "chunk-map", "config", "blob-dir", "cpuprofile",
-		"memprofile", "trace", "mem-limit",
+		"memprofile", "trace", "mem-limit", "mode",
 	} {
 		set.String(name, "", "")
 	}
@@ -62,6 +62,7 @@ func TestClassifyFlag(t *testing.T) {
 		{"tags", ClassKey},
 		{"virtual", ClassKey},
 		{"resolver", ClassKey},
+		{"mode", ClassKey},
 		{"layers", ClassFile},
 		{"features", ClassFile},
 		{"chunk-map", ClassFile},
@@ -109,12 +110,52 @@ func TestCacheFlagsLeaveOutRunOnlyFlags(t *testing.T) {
 
 	want := []plancache.Flag{
 		{Name: "layers", Value: layers, IsFile: true},
+		{Name: "mode", Value: "history"},
 		{Name: "repo", Value: "/src"},
 		{Name: "resolver", Value: "typed"},
 		{Name: "tags", Value: "a,b"},
 	}
 	if got := Flags(set, nil); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Flags() = %+v, want %+v", got, want)
+	}
+}
+
+func TestCacheFlagsKeyTheEffectiveMode(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"the default is history", []string{"--repo", "/src"}, "history"},
+		{"history spelled out", []string{"--repo", "/src", "--mode", "history"}, "history"},
+		{"lineage", []string{"--repo", "/src", "--mode", "lineage"}, "lineage"},
+	}
+
+	keyed := map[string][]plancache.Flag{}
+
+	for _, testCase := range testCases {
+		set, _ := testSet(t, testCase.args...)
+		got := Flags(set, nil)
+		keyed[testCase.name] = got
+
+		index := slices.IndexFunc(
+			got,
+			func(flag plancache.Flag) bool { return flag.Name == "mode" },
+		)
+		if index < 0 || got[index].Value != testCase.want {
+			t.Fatalf("%s: Flags() = %+v, want mode %q", testCase.name, got, testCase.want)
+		}
+	}
+
+	if !reflect.DeepEqual(keyed["the default is history"], keyed["history spelled out"]) {
+		t.Fatalf("default %+v and explicit history %+v key differently",
+			keyed["the default is history"], keyed["history spelled out"])
+	}
+
+	if reflect.DeepEqual(keyed["history spelled out"], keyed["lineage"]) {
+		t.Fatalf("lineage and history key alike: %+v", keyed["lineage"])
 	}
 }
 

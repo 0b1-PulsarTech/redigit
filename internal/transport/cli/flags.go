@@ -77,8 +77,8 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: --repo is required", ErrUsage)
 	}
 
-	if err := bootstrap.CheckResolver(cfg.Resolver); err != nil {
-		return bootstrap.Config{}, 0, fmt.Errorf("%w: --resolver: %w", ErrUsage, err)
+	if err := checkChoices(cfg); err != nil {
+		return bootstrap.Config{}, 0, err
 	}
 
 	if err := applyTags(&cfg, tags); err != nil {
@@ -108,6 +108,19 @@ func addServerFlags(set *flag.FlagSet, cfg *bootstrap.Config) {
 		bootstrap.ResolverTyped,
 		"typed with lsp fallback, or lsp",
 	)
+	set.StringVar(&cfg.Mode, "mode", bootstrap.ModeHistory, "history, or lineage")
+}
+
+func checkChoices(cfg bootstrap.Config) error {
+	if err := bootstrap.CheckResolver(cfg.Resolver); err != nil {
+		return fmt.Errorf("%w: --resolver: %w", ErrUsage, err)
+	}
+
+	if err := bootstrap.CheckMode(cfg.Mode); err != nil {
+		return fmt.Errorf("%w: --mode: %w", ErrUsage, err)
+	}
+
+	return nil
 }
 
 func addVirtual(cfg *bootstrap.Config, refused *error) func(string) error {

@@ -294,3 +294,40 @@ func TestParseResolver(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMode(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		args    []string
+		want    string
+		wantErr bool
+	}{
+		{"the default", []string{"--repo", "."}, bootstrap.ModeHistory, false},
+		{"history", []string{"--repo", ".", "--mode", "history"}, bootstrap.ModeHistory, false},
+		{"lineage", []string{"--repo", ".", "--mode=lineage"}, bootstrap.ModeLineage, false},
+		{"an unknown name is a usage error", []string{"--repo", ".", "--mode", "fold"}, "", true},
+		{"an empty name is a usage error", []string{"--repo", ".", "--mode", ""}, "", true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg, _, err := parse(newFlagSet(), testCase.args)
+
+			if testCase.wantErr {
+				if !errors.Is(err, ErrUsage) || !errors.Is(err, bootstrap.ErrMode) {
+					t.Fatalf("err = %v, want ErrUsage and ErrMode", err)
+				}
+
+				return
+			}
+
+			if err != nil || cfg.Mode != testCase.want {
+				t.Fatalf("Mode = %q, %v, want %q", cfg.Mode, err, testCase.want)
+			}
+		})
+	}
+}

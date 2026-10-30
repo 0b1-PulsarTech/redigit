@@ -18,6 +18,29 @@ func TestRunUsageFitsAnEightyColumnTerminal(t *testing.T) {
 	}
 }
 
+func TestUsageDocumentsTheModeFlag(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		needle string
+	}{
+		{"the flag", "--mode M"},
+		{"the history choice and its default", "history (default)"},
+		{"the lineage choice", "lineage orders"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if !strings.Contains(usage, testCase.needle) {
+				t.Fatalf("usage holds no %q", testCase.needle)
+			}
+		})
+	}
+}
+
 func TestUsageDocumentsTheResolverFlag(t *testing.T) {
 	t.Parallel()
 
