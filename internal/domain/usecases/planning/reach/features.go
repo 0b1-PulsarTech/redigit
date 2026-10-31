@@ -58,6 +58,11 @@ func isOrphanProse(graph entities.Graph, decl entities.Decl) bool {
 func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wiring) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
+		// Hosting a code declaration is co-birth: a helper of package main waits
+		// for main's file without consuming it, or main stops being a tip.
+		if edge.Reason == entities.ReasonHosts && isCode(key) {
+			continue
+		}
 		// A test consumer does not count, or every tested function would be a
 		// feature of its own.
 		if found && !entities.IsTestSide(consumer) && !roots[edge.Dependent] &&
@@ -67,6 +72,16 @@ func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wir
 	}
 
 	return false
+}
+
+func isCode(key entities.DeclKey) bool {
+	switch key.Kind {
+	case entities.KindFunc, entities.KindMethod, entities.KindType,
+		entities.KindValue, entities.KindStmt:
+		return true
+	default:
+		return false
+	}
 }
 
 func FeatureOf(decl entities.Decl) FeatureID {

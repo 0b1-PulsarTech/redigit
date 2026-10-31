@@ -315,3 +315,93 @@ func TestHasProductionConsumerIgnoresAnAfterword(t *testing.T) {
 		t.Fatal("a changelog line counted as a production consumer of the route it describes")
 	}
 }
+
+func TestHasProductionConsumerHostsEdges(t *testing.T) {
+	t.Parallel()
+
+	kindOf := func(file string, kind entities.DeclKind) entities.Decl {
+		return entities.Decl{
+			Key:  entities.DeclKey{File: file, Kind: kind, Name: "main"},
+			Unit: "root",
+		}
+	}
+	runFn := decl("run.go", "run", "root")
+
+	testCases := []struct {
+		name     string
+		provider entities.Decl
+		want     bool
+	}{
+		{"a func provider is co-born, not consumed", kindOf("main.go", entities.KindFunc), false},
+		{"a method provider is co-born", kindOf("main.go", entities.KindMethod), false},
+		{"a type provider is co-born", kindOf("main.go", entities.KindType), false},
+		{"a value provider is co-born", kindOf("main.go", entities.KindValue), false},
+		{"a stmt provider is co-born", kindOf("main.go", entities.KindStmt), false},
+		{"a manifest keeps its hosts consumers", kindOf("go.mod", entities.KindOther), true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(
+				[]entities.Decl{runFn, testCase.provider},
+				[]entities.Edge{edgeOf(runFn, testCase.provider, entities.ReasonHosts)},
+				nil,
+			)
+
+			got := hasProductionConsumer(graph, testCase.provider.Key, Wiring{})
+			if got != testCase.want {
+				t.Fatalf("hasProductionConsumer() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestEntryPointsCountsOnlyWhatHostsDoNotCoBirth(t *testing.T) {
+	t.Parallel()
+
+	mainFn := decl("main.go", "main", "root")
+	runFn := decl("run.go", "run", "root")
+	manifest := entities.Decl{
+		Key:  entities.DeclKey{File: "go.mod", Kind: entities.KindOther, Name: "<file>"},
+		Unit: "root",
+	}
+
+	testCases := []struct {
+		name  string
+		decls []entities.Decl
+		edges []entities.Edge
+		want  []string
+	}{
+		{
+			"a main that reads a helper hosted by it stays an entry point",
+			[]entities.Decl{mainFn, runFn},
+			[]entities.Edge{needs(mainFn, runFn), edgeOf(runFn, mainFn, entities.ReasonHosts)},
+			[]string{"main"},
+		},
+		{
+			"a hosted helper nothing reads is an entry point of its own",
+			[]entities.Decl{mainFn, runFn},
+			[]entities.Edge{edgeOf(runFn, mainFn, entities.ReasonHosts)},
+			[]string{"main", "run"},
+		},
+		{
+			"a manifest is consumed by what it hosts, so it is no entry point",
+			[]entities.Decl{manifest, runFn},
+			[]entities.Edge{edgeOf(runFn, manifest, entities.ReasonHosts)},
+			[]string{"run"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(testCase.decls, testCase.edges, nil)
+			if got := entryPointNames(graph); !slices.Equal(got, testCase.want) {
+				t.Fatalf("entryPoints() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
