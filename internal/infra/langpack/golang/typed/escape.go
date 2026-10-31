@@ -164,25 +164,25 @@ func isConcrete(value types.Type) bool {
 	return !types.IsInterface(value)
 }
 
-func (scan *factScan) convert(at token.Pos, value, target types.Type) {
-	if value == nil || target == nil {
-		return
-	}
-
-	if _, isParam := target.(*types.TypeParam); isParam {
-		return
+func (scan *factScan) demand(at token.Pos, value, target types.Type) (entities.DeclKey, bool) {
+	if _, isParam := target.(*types.TypeParam); target == nil || isParam {
+		return entities.DeclKey{}, false
 	}
 
 	iface, isInterface := target.Underlying().(*types.Interface)
-	if !isInterface {
-		return
-	}
 
 	dependent, inTree := scan.where.DeclAt(scan.pkg.Fset, at)
-	if !inTree {
-		return
+	if !isInterface || !inTree {
+		return entities.DeclKey{}, false
 	}
 
 	scan.require(&scan.facts.Converted, dependent, value, iface)
-	scan.escape(dependent, value)
+
+	return dependent, true
+}
+
+func (scan *factScan) convert(at token.Pos, value, target types.Type) {
+	if dependent, isDemanded := scan.demand(at, value, target); isDemanded {
+		scan.escape(dependent, value)
+	}
 }

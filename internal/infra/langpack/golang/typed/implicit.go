@@ -2,8 +2,74 @@ package typed
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 )
+
+func (visitor *conversionVisitor) convertEach(
+	rhs []ast.Expr,
+	count int,
+	target func(index int) types.Type,
+) {
+	// A lone tuple-valued call (or comma-ok form) spreads over every target.
+	if len(rhs) == 1 {
+		visitor.convertTuple(rhs[0], count, target)
+	}
+
+	if len(rhs) != count {
+		return
+	}
+
+	checked := visitor.scan.pkg.TypesInfo
+
+	for index, expr := range rhs {
+		visitor.scan.convert(expr.Pos(), checked.TypeOf(expr), target(index))
+	}
+}
+
+func (visitor *conversionVisitor) convertTuple(
+	rhs ast.Expr,
+	count int,
+	target func(index int) types.Type,
+) {
+	tuple, isTuple := visitor.scan.pkg.TypesInfo.TypeOf(rhs).(*types.Tuple)
+	if !isTuple {
+		return
+	}
+
+	for index := range min(tuple.Len(), count) {
+		visitor.scan.convert(rhs.Pos(), tuple.At(index).Type(), target(index))
+	}
+}
+
+func (visitor *conversionVisitor) compare(expr *ast.BinaryExpr) {
+	if expr.Op == token.EQL || expr.Op == token.NEQ {
+		visitor.exchange(expr.X, expr.Y)
+	}
+}
+
+func (visitor *conversionVisitor) switchCases(stmt *ast.SwitchStmt) {
+	if stmt.Tag == nil {
+		return
+	}
+
+	for _, clause := range stmt.Body.List {
+		if cc, isClause := clause.(*ast.CaseClause); isClause {
+			for _, expr := range cc.List {
+				visitor.exchange(stmt.Tag, expr)
+			}
+		}
+	}
+}
+
+func (visitor *conversionVisitor) exchange(left, right ast.Expr) {
+	checked := visitor.scan.pkg.TypesInfo
+
+	// Comparing converts the concrete side to the interface one; demand ignores the rest.
+	// The temporary interface never escapes, so only the demand counts.
+	visitor.scan.demand(left.Pos(), checked.TypeOf(left), checked.TypeOf(right))
+	visitor.scan.demand(right.Pos(), checked.TypeOf(right), checked.TypeOf(left))
+}
 
 func (visitor *conversionVisitor) composite(lit *ast.CompositeLit) {
 	checked := visitor.scan.pkg.TypesInfo

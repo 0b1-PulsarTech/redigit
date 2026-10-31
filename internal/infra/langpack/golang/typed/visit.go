@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"math"
 )
 
 type conversionVisitor struct {
@@ -42,6 +43,10 @@ func (visitor *conversionVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 	case *ast.TypeSwitchStmt:
 		visitor.typeSwitch(typed)
+	case *ast.BinaryExpr:
+		visitor.compare(typed)
+	case *ast.SwitchStmt:
+		visitor.switchCases(typed)
 	}
 
 	return visitor
@@ -78,12 +83,23 @@ func (visitor *conversionVisitor) call(call *ast.CallExpr) {
 		return
 	}
 
+	if fun.Type == nil {
+		return
+	}
+
+	// A builtin records its call-site signature too: append's variadic element is a conversion.
 	sig, isSig := fun.Type.Underlying().(*types.Signature)
-	if !isSig || fun.IsBuiltin() {
+	if !isSig {
 		return
 	}
 
 	params := sig.Params()
+
+	if len(call.Args) == 1 {
+		visitor.convertTuple(call.Args[0], math.MaxInt, func(index int) types.Type {
+			return paramAt(sig, params, index, call.Ellipsis)
+		})
+	}
 
 	for index, arg := range call.Args {
 		visitor.scan.convert(
@@ -120,42 +136,31 @@ func paramAt(sig *types.Signature, params *types.Tuple, index int, ellipsis toke
 }
 
 func (visitor *conversionVisitor) assign(stmt *ast.AssignStmt) {
-	if stmt.Tok != token.ASSIGN || len(stmt.Lhs) != len(stmt.Rhs) {
+	if stmt.Tok != token.ASSIGN {
 		return
 	}
 
-	checked := visitor.scan.pkg.TypesInfo
-
-	for index, target := range stmt.Lhs {
-		visitor.scan.convert(
-			stmt.Rhs[index].Pos(),
-			checked.TypeOf(stmt.Rhs[index]),
-			checked.TypeOf(target),
-		)
-	}
+	visitor.convertEach(stmt.Rhs, len(stmt.Lhs), func(index int) types.Type {
+		return visitor.scan.pkg.TypesInfo.TypeOf(stmt.Lhs[index])
+	})
 }
 
 func (visitor *conversionVisitor) valueSpec(spec *ast.ValueSpec) {
-	if spec.Type == nil || len(spec.Values) != len(spec.Names) {
+	if spec.Type == nil {
 		return
 	}
 
-	checked := visitor.scan.pkg.TypesInfo
-	target := checked.TypeOf(spec.Type)
+	target := visitor.scan.pkg.TypesInfo.TypeOf(spec.Type)
 
-	for _, value := range spec.Values {
-		visitor.scan.convert(value.Pos(), checked.TypeOf(value), target)
-	}
+	visitor.convertEach(spec.Values, len(spec.Names), func(int) types.Type { return target })
 }
 
 func (visitor *conversionVisitor) returns(stmt *ast.ReturnStmt) {
-	if visitor.results == nil || len(stmt.Results) != visitor.results.Len() {
+	if visitor.results == nil {
 		return
 	}
 
-	checked := visitor.scan.pkg.TypesInfo
-
-	for index, result := range stmt.Results {
-		visitor.scan.convert(result.Pos(), checked.TypeOf(result), visitor.results.At(index).Type())
-	}
+	visitor.convertEach(stmt.Results, visitor.results.Len(), func(index int) types.Type {
+		return visitor.results.At(index).Type()
+	})
 }
