@@ -37,8 +37,9 @@ const (
 	// ReasonQuery places generated query code after the query text it came
 	// from, which lives in a file the language graph does not cover at all.
 	ReasonQuery EdgeReason = "query"
-	// ReasonHosts keeps a declaration behind the manifest that makes its unit
-	// importable at all: a module file, a workspace entry, a build file.
+	// ReasonHosts keeps a declaration behind the manifest that makes its unit importable at all:
+	// a module file, a workspace entry, a build file. A package main declaration is hosted by
+	// its func main, which is code: there the edge is co-birth, not a consumer.
 	ReasonHosts EdgeReason = "hosts"
 	// ReasonDescribes keeps prose beside what it describes, for the case where
 	// a document belongs to one unit - a package README - rather than to the

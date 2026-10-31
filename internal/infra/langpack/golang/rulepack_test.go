@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
@@ -258,6 +259,84 @@ func TestNewRulePackWithSharesTheSource(t *testing.T) {
 			after, err := source.Packages(context.Background(), snap)
 			if err != nil || after[0] != before[0] {
 				t.Fatalf("the rules loaded the packages again: %v", err)
+			}
+		})
+	}
+}
+
+func orderedFixture(
+	t *testing.T,
+	files map[string]string,
+	touches []entities.SourceTouch,
+	extra func([]entities.Decl, []entities.Edge) ([]entities.Decl, []entities.Edge),
+) (entities.Graph, entities.Ordering) {
+	t.Helper()
+
+	snap, decls := testkit.Fixture(t, files)
+	snap.History = touches
+
+	edges, err := NewRulePack(nil).Edges(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Edges() error = %v", err)
+	}
+
+	if extra != nil {
+		decls, edges = extra(decls, edges)
+	}
+
+	graph := entities.NewGraph(decls, edges, nil)
+
+	result, err := ordering.New(ordering.Config{}).Order(graph, snap)
+	if err != nil {
+		t.Fatalf("Order() error = %v", err)
+	}
+
+	return graph, result
+}
+
+func TestRulePackOrdersWhatSatisfiesWithItsReaders(t *testing.T) {
+	t.Parallel()
+
+	_, result := orderedFixture(t, map[string]string{
+		"ordering/err.go":       "package ordering\n\ntype Unresolved struct{}\n",
+		"ordering/errmethod.go": "package ordering\n\nfunc (*Unresolved) Error() string { return \"\" }\n",
+		"ordering/collect.go": "package ordering\n\nfunc collect() []error {\n\tvar errs []error\n\n" +
+			"\treturn append(errs, &Unresolved{})\n}\n",
+		"main.go": "package main\n\nfunc main() {}\n",
+		"run.go":  "package main\n\nfunc run() {}\n",
+	}, []entities.SourceTouch{
+		{Position: 1, Touched: []string{"ordering/collect.go", "ordering/err.go", "run.go"}},
+		{Position: 5, Touched: []string{"ordering/errmethod.go"}},
+		{Position: 6, Touched: []string{"main.go"}},
+	}, nil)
+
+	testCases := []struct {
+		name     string
+		provider entities.DeclKey
+		reader   entities.DeclKey
+	}{
+		{
+			"the method that satisfies error is born with the append that converts to it",
+			testkit.DeclKey("ordering/errmethod.go", entities.KindMethod, "Unresolved.Error"),
+			testkit.DeclKey("ordering/collect.go", entities.KindFunc, "collect"),
+		},
+		{
+			"a declaration of package main is ordered with its func main",
+			testkit.DeclKey("main.go", entities.KindFunc, "main"),
+			testkit.DeclKey("run.go", entities.KindFunc, "run"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider, reader := result.Of(testCase.provider), result.Of(testCase.reader)
+			if provider == entities.NoPosition || provider != reader {
+				t.Fatalf(
+					"%v at %d is not born with %v at %d",
+					testCase.provider, provider, testCase.reader, reader,
+				)
 			}
 		})
 	}

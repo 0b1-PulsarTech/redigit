@@ -56,6 +56,7 @@ var rules = []rule{
 	wiring.Bound{},
 	buildtags.Rule{},
 	wiring.Embed{},
+	wiring.MainPackage{},
 	tests.RoutePath{},
 }
 
