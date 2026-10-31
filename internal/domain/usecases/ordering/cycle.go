@@ -13,24 +13,19 @@ import (
 // and nothing represented, so a cycle has to be explainable by what made it.
 func findCycles(graph entities.Graph) []entities.Cycle {
 	decls := graph.Decls()
-	slices.SortFunc(decls, func(a, b entities.Decl) int { return compareKeys(a.Key, b.Key) })
-
-	finder := &tarjan{
-		graph:   graph,
-		index:   map[entities.DeclKey]int{},
-		lowlink: map[entities.DeclKey]int{},
-		onStack: map[entities.DeclKey]bool{},
-	}
+	keys := make([]entities.DeclKey, 0, len(decls))
 
 	for _, decl := range decls {
-		if _, seen := finder.index[decl.Key]; !seen {
-			finder.strongConnect(decl.Key)
-		}
+		keys = append(keys, decl.Key)
 	}
 
-	cycles := make([]entities.Cycle, 0, len(finder.cycles))
-	for _, members := range finder.cycles {
-		cycles = append(cycles, buildCycle(graph, members))
+	slices.SortFunc(keys, compareKeys)
+
+	found := components(graph, keys, nil)
+	cycles := make([]entities.Cycle, 0, len(found))
+
+	for _, members := range found {
+		cycles = append(cycles, splitAtHosts(graph, buildCycle(graph, members))...)
 	}
 
 	slices.SortFunc(
@@ -51,6 +46,30 @@ type tarjan struct {
 	stack   []entities.DeclKey
 	counter int
 	cycles  [][]entities.DeclKey
+
+	keep func(entities.Edge) bool
+}
+
+func components(
+	graph entities.Graph,
+	keys []entities.DeclKey,
+	keep func(entities.Edge) bool,
+) [][]entities.DeclKey {
+	finder := &tarjan{
+		graph:   graph,
+		index:   map[entities.DeclKey]int{},
+		lowlink: map[entities.DeclKey]int{},
+		onStack: map[entities.DeclKey]bool{},
+		keep:    keep,
+	}
+
+	for _, key := range keys {
+		if _, seen := finder.index[key]; !seen {
+			finder.strongConnect(key)
+		}
+	}
+
+	return finder.cycles
 }
 
 func (t *tarjan) strongConnect(v entities.DeclKey) {
@@ -62,6 +81,10 @@ func (t *tarjan) strongConnect(v entities.DeclKey) {
 
 	for _, edge := range t.graph.Needs(v) {
 		w := edge.Provider
+
+		if t.keep != nil && !t.keep(edge) {
+			continue
+		}
 
 		if _, seen := t.index[w]; !seen {
 			t.strongConnect(w)
