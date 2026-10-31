@@ -19,6 +19,10 @@ func TestBuildConstraints(t *testing.T) {
 
 	testkit.WriteFile(t, root, "linux_only.go", "//go:build linux\n\npackage sample\n")
 	testkit.WriteFile(t, root, "plain.go", "package sample\n")
+	testkit.WriteFile(
+		t, root, "licensed.go",
+		"/*\nCopyright 2026 X.\n*/\n\n//go:build integration\n\npackage sample\n",
+	)
 	testkit.WriteFile(t, root, "legacy.go", "// +build integration\n\npackage sample\n")
 	testkit.WriteFile(
 		t,
@@ -29,7 +33,7 @@ func TestBuildConstraints(t *testing.T) {
 
 	snap := entities.Snapshot{
 		Root:  root,
-		Files: []string{"linux_only.go", "plain.go", "legacy.go", "combo.go"},
+		Files: []string{"linux_only.go", "plain.go", "legacy.go", "combo.go", "licensed.go"},
 	}
 
 	got, err := BuildConstraints(snap)
@@ -49,6 +53,7 @@ func TestBuildConstraints(t *testing.T) {
 	}{
 		{"go:build tag", "linux_only.go", []string{"linux"}},
 		{"legacy +build tag", "legacy.go", []string{"integration"}},
+		{"a block comment header does not hide it", "licensed.go", []string{"integration"}},
 		{"compound expression collects every tag", "combo.go", []string{"amd64", "arm64", "linux"}},
 	}
 
@@ -215,5 +220,39 @@ func TestHiddenRejectsAMalformedConstraint(t *testing.T) {
 	_, err := Hidden([]BuildTag{{File: "bad.go", Constraint: "//go:build ("}}, nil)
 	if err == nil {
 		t.Fatal("Hidden accepted a constraint that does not parse")
+	}
+}
+
+func TestBuildConstraintsMarksAnIgnoreProgram(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{"go:build ignore", "//go:build ignore\n\npackage main\n", true},
+		{"a negated ignore", "//go:build !ignore\n\npackage main\n", false},
+		{"ignore among other tags", "//go:build ignore && linux\n\npackage main\n", true},
+		{"ignore or another tag", "//go:build ignore || windows\n\npackage main\n", false},
+		{"another tag", "//go:build linux\n\npackage main\n", false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := t.TempDir()
+			testkit.WriteFile(t, root, "gen.go", testCase.source)
+
+			got, err := BuildConstraints(entities.Snapshot{Root: root, Files: []string{"gen.go"}})
+			if err != nil || len(got) != 1 {
+				t.Fatalf("BuildConstraints() = %v, %v, want one tag", got, err)
+			}
+
+			if got[0].IsIgnore != testCase.want {
+				t.Fatalf("IsIgnore = %v, want %v", got[0].IsIgnore, testCase.want)
+			}
+		})
 	}
 }

@@ -1,14 +1,11 @@
 package buildtags
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"go/build/constraint"
 	"runtime"
 	"slices"
-	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
@@ -38,6 +35,7 @@ type BuildTag struct {
 	File       string
 	Constraint string
 	Tags       []string
+	IsIgnore   bool
 }
 
 func BuildConstraints(snap entities.Snapshot) ([]BuildTag, error) {
@@ -60,30 +58,6 @@ func BuildConstraints(snap entities.Snapshot) ([]BuildTag, error) {
 	}
 
 	return out, nil
-}
-
-func buildTagFor(file string, source []byte) (BuildTag, bool, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(source))
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !constraint.IsGoBuild(line) && !constraint.IsPlusBuild(line) {
-			if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "//") {
-				continue
-			}
-
-			break
-		}
-
-		expr, err := constraint.Parse(line)
-		if err != nil {
-			return BuildTag{}, false, fmt.Errorf("parse constraint %q in %s: %w", line, file, err)
-		}
-
-		return BuildTag{File: file, Constraint: line, Tags: ConstraintTags(expr)}, true, nil
-	}
-
-	return BuildTag{}, false, nil
 }
 
 func ConstraintTags(expr constraint.Expr) []string {
