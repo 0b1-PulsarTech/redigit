@@ -252,7 +252,6 @@ func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
 		command string
 		slice   string
 	}{
-		{"format", cmdFormat, "slice 15w"},
 		{"continue", cmdContinue, "slice 24b"},
 	}
 
@@ -326,6 +325,57 @@ func TestDispatchLintRunsItsOwnCommandWithoutAPipeline(t *testing.T) {
 
 			if got := strings.Contains(stderr.String(), "redigit lint"); got != testCase.wantUsage {
 				t.Fatalf("stderr = %q, want lint usage = %v", stderr.String(), testCase.wantUsage)
+			}
+		})
+	}
+}
+
+func TestDispatchFormatRunsItsOwnCommandWithoutAPipeline(t *testing.T) {
+	t.Parallel()
+
+	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
+		t.Fatal("format must never start a pipeline")
+
+		return nil, nil
+	}
+
+	testCases := []struct {
+		name        string
+		args        []string
+		wantUsage   bool
+		wantMessage string
+	}{
+		{
+			name: "no manifest is format's own usage error", args: []string{cmdFormat},
+			wantUsage: true, wantMessage: "--manifest is required",
+		},
+		{
+			name: "a missing config file is a run failure, not usage",
+			args: []string{
+				cmdFormat, "--manifest", "m", "--out", "o", "--blob-dir", "b",
+				"--out-blob-dir", "ob", "--config", "/nonexistent/redigit.json",
+			},
+			wantMessage: "/nonexistent/redigit.json",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+
+			err := dispatch(
+				context.Background(), testCase.args, &stdout, &stderr, runEnv{Start: unreachable},
+			)
+			if err == nil || errors.Is(err, ErrUsage) != testCase.wantUsage ||
+				!strings.Contains(err.Error(), testCase.wantMessage) || stdout.Len() != 0 {
+				t.Fatalf("err = %v, stdout = %q", err, stdout.String())
+			}
+
+			got := strings.Contains(stderr.String(), "redigit format")
+			if got != testCase.wantUsage {
+				t.Fatalf("stderr = %q, want format usage = %v", stderr.String(), testCase.wantUsage)
 			}
 		})
 	}
