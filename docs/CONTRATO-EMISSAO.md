@@ -260,3 +260,42 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
 
 A invariante da arvore continua valendo: o ultimo commit tem a arvore do HEAD.
 `[wip]` e tolerado pelo `verify`; um commit vermelho sem a marca nao.
+
+## 9. O que a regra `go-router` promete e o que nao promete
+
+Promete: uma funcao de montagem e a primeira instrucao que a chama sao um atomo
+somente quando nem essa instrucao, nem o atomo que o fatiador lhe deu, nem o
+grupo de recurso dela hospedam outra montagem da mesma regra (so uma instrucao
+conta como chamador; uma funcao inteira nasce uma vez e juntaria todas as
+montagens a ela;
+tres montagens numa unica instrucao seguem separadas, porque unidas prenderiam
+o corpo de uma ao chamador da outra). As instrucoes de um recurso podem formar
+um atomo, e o grupo junta caminhos iguais, prefixo incluido, de grupos diferentes
+na mesma funcao.
+Duas regras `go-router` nunca unem atomos pelo rotulo: cada regra depois da
+primeira tem o seu. Uma declaracao em duas regras fica no atomo da ultima; o
+atomo da anterior a perde.
+
+Os padroes de `handle` e `mount` casam o nome curto da chamada (`Router.GET`,
+`Get`) ou o qualificado (`github.com/go-fuego/fuego.Get`). Um metodo tem o nome
+do tipo que o declara, sem ponteiro e sem argumentos de tipo, e `*` nao
+atravessa `/`: `*.Get` nao casa aquela funcao. Quando nenhum padrao de `handle`
+casa chamada alguma, `Excluded` diz isso.
+
+Nao promete ler rotas registradas por variavel de funcao, grupos abertos por
+atribuicao ou por chamada encadeada, montagens passadas por variavel, nem rotas
+de um modulo aninhado (um `go.mod` abaixo da raiz): o indice de fatos nao as
+carrega, e a `go-di` divide o mesmo limite. O portao de rotas declara isso em
+`Excluded` e nao conta o que nao ve.
+
+O que o portao conta: so entra no total a rota com caminho constante e handler
+nomeado; rota sem caminho ou sem handler fica fora, com a contagem dita. A
+repeticao vale dentro de uma funcao; a mesma chave em outra funcao e dita e nao
+julgada, e `HANDLEFUNC` e `HANDLE` contam como dois metodos. `Site` pode ser a
+funcao inteira quando ela nao foi cortada em instrucoes, e `Path` ja vem unido
+ao prefixo do grupo. `Blind` conta toda rota sem caminho, a constante que nao e
+caminho inclusive (o portao a dita a parte), e `Inline` o handler que nenhum
+fato nomeia; as duas ficam fora do total. Montagem chamada so por funcao inteira
+aparece em `Excluded` como nao comparada. "Colocado" compara posicoes do
+ordenamento, nao os commits do plano: uma montagem e seu chamador numa mesma
+posicao podem cair em commits diferentes.

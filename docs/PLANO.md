@@ -457,6 +457,35 @@ Um teste nasce no commit do que exercita (ou no seguinte): a feature que
 completa o sujeito leva os testes prontos, e dentro do commit cada teste fica
 logo depois do ultimo que ele precisa, sem partir um atomo.
 
+### 3.8 Rotas: o registro nasce com quem o chama
+
+A regra `go-router` (config `{handle, mount, groupMethods, paths?}`) entra no
+mesmo pacote de idiomas da `go-di`, sem linguagem nova. Cada chamada que casa um
+padrao de `handle` e uma rota: metodo, caminho (que pode ser cego, sem constante
+que o de), handler (que pode ser anonimo) e a instrucao que a registra. Um
+padrao casa o nome curto da chamada (`Router.GET`) ou o qualificado
+(`github.com/go-fuego/fuego.Get`) e `*` nao atravessa `/`. Uma funcao de
+montagem (alvo de uma chamada que casa `mount` cujo corpo registra rotas) nasce
+junto com a primeira instrucao que a chama, desde que nem essa instrucao, nem o
+atomo que o fatiador lhe deu, nem o grupo de recurso dela hospedem outra
+montagem da mesma regra; as instrucoes de um mesmo recurso (mesmo caminho,
+prefixo incluido, mesma funcao) podem nascer juntas com `groupMethods`. Um
+rotulo de atomo vem da menor chave do
+grupo, entao as duas passagens do indexador concordam; cada regra depois da
+primeira tem o seu rotulo, e uma declaracao em duas regras fica no atomo da
+ultima.
+
+A visao `Routes(decls, facts)` entrega os fatos de rota aos cortes seguintes (e2e
+e changelog). `Site` pode ser a funcao inteira quando ela nao foi cortada, e
+`Path` vem unido ao prefixo do grupo. O portao conta montagens longe de quem as
+chama (por posicao do ordenamento, nao por commit do plano: os dois podem cair
+em commits diferentes), rotas repetidas dentro de uma funcao e handlers que
+nascem depois da rota; so entra no total a rota com caminho constante e handler
+nomeado. O texto de `Excluded` diz o que ele nao ve: rota por variavel de funcao, grupo aberto
+por atribuicao, prefixo de grupo aninhado, caminho nao constante, constante que
+nao e caminho, handler anonimo, montagem passada por variavel, rota de modulo
+aninhado e padrao de `handle` que nao casa chamada alguma.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.
