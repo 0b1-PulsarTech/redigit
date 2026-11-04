@@ -1,5 +1,7 @@
 package entities
 
+import "slices"
+
 // EdgeReason names why one declaration has to wait for another. Naming it is
 // not decoration: every ordering defect in the rewrite that preceded this tool
 // was an edge that existed in the code and nothing in the graph represented, so
@@ -76,7 +78,9 @@ const (
 	// supplies: the signature it sits under, and the statement that declares or
 	// last writes a local it reads. The compiler needs both, and no reference
 	// query sees a local.
-	ReasonBody EdgeReason = "body"
+	ReasonBody       EdgeReason = "body"
+	ReasonProvides   EdgeReason = "provides"   // a register needs its constructor's argument types
+	ReasonRegistered EdgeReason = "registered" // a resolve site needs the registration of its type
 )
 
 // Edge records that Dependent cannot be born before Provider. The field names
@@ -112,15 +116,28 @@ func FillsInterface(graph Graph, edge Edge) bool {
 	return found && provider.IsInterface
 }
 
+func IsLinkOnly(reason EdgeReason) bool {
+	switch reason {
+	case ReasonImport, ReasonProvides, ReasonRegistered:
+		return true
+	default:
+		return IsStructural(reason)
+	}
+}
+
 func IsHard(reason EdgeReason) bool {
 	switch reason {
 	case ReasonReference, ReasonImport, ReasonModule,
 		ReasonQuery, ReasonSchema, ReasonEncloses,
 		ReasonMethodSet, ReasonHosts, ReasonBody,
 		ReasonMirrors, ReasonChecksum, ReasonWorkspace,
-		ReasonEmbed:
+		ReasonEmbed, ReasonProvides, ReasonRegistered:
 		return true
 	default:
 		return false
 	}
+}
+
+func (kind DeclKind) IsCode() bool {
+	return slices.Contains([]DeclKind{KindFunc, KindMethod, KindType, KindValue, KindStmt}, kind)
 }

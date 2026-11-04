@@ -154,7 +154,7 @@ func ClosureSize(graph Graph, start DeclKey) int {
 		queue = queue[1:]
 
 		for _, edge := range graph.Needs(current) {
-			if seen[edge.Provider] || IsStructural(edge.Reason) || edge.Reason == ReasonImport {
+			if seen[edge.Provider] || IsLinkOnly(edge.Reason) {
 				continue
 			}
 

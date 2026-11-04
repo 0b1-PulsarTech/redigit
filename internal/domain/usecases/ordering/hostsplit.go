@@ -20,7 +20,7 @@ func splitAtHosts(graph entities.Graph, cycle entities.Cycle) []entities.Cycle {
 	// only the recursion left is still a cycle. A manifest is not code: the
 	// edge onto it stays, so a manifest that reads its script is still reported.
 	keep := func(edge entities.Edge) bool {
-		isCoBirth := edge.Reason == entities.ReasonHosts && isCodeKind(edge.Provider)
+		isCoBirth := edge.Reason == entities.ReasonHosts && edge.Provider.Kind.IsCode()
 
 		return !isCoBirth && members[edge.Provider]
 	}
@@ -37,14 +37,4 @@ func splitAtHosts(graph entities.Graph, cycle entities.Cycle) []entities.Cycle {
 	}
 
 	return parts
-}
-
-func isCodeKind(key entities.DeclKey) bool {
-	switch key.Kind {
-	case entities.KindFunc, entities.KindMethod, entities.KindType,
-		entities.KindValue, entities.KindStmt:
-		return true
-	default:
-		return false
-	}
 }

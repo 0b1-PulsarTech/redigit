@@ -60,7 +60,7 @@ func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wir
 		consumer, found := graph.Decl(edge.Dependent)
 		// Hosting a code declaration is co-birth: a helper of package main waits
 		// for main's file without consuming it, or main stops being a tip.
-		if edge.Reason == entities.ReasonHosts && isCode(key) {
+		if edge.Reason == entities.ReasonHosts && key.Kind.IsCode() {
 			continue
 		}
 		// A test consumer does not count, or every tested function would be a
@@ -72,16 +72,6 @@ func hasProductionConsumer(graph entities.Graph, key entities.DeclKey, roots Wir
 	}
 
 	return false
-}
-
-func isCode(key entities.DeclKey) bool {
-	switch key.Kind {
-	case entities.KindFunc, entities.KindMethod, entities.KindType,
-		entities.KindValue, entities.KindStmt:
-		return true
-	default:
-		return false
-	}
 }
 
 func FeatureOf(decl entities.Decl) FeatureID {

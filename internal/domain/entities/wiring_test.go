@@ -216,6 +216,43 @@ func TestFindWiring(t *testing.T) {
 	}
 }
 
+func TestFindWiringCountsOnlyWhatARootCalls(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		reason EdgeReason
+		want   bool
+	}{
+		{"a root that references its callees assembles the program", ReasonReference, true},
+		{"register sites needing each other's types are not calls", ReasonProvides, false},
+		{"a resolve site waiting for registrations is not a call", ReasonRegistered, false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := decl("boot/boot.go", "Setup", "boot")
+			decls := append(make([]Decl, 0, 25), root)
+			edges := make([]Edge, 0, 24)
+
+			for index := range 24 {
+				leaf := decl("app/app.go", fmt.Sprintf("New%d", index), "app")
+				decls = append(decls, leaf)
+				edges = append(edges, Edge{
+					Dependent: root.Key, Provider: leaf.Key, Reason: testCase.reason,
+				})
+			}
+
+			roots := FindWiring(NewGraph(decls, edges, nil))
+			if got := roots[root.Key]; got != testCase.want {
+				t.Fatalf("wiring[Setup] = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestFindWiringIgnoresASmallProgram(t *testing.T) {
 	t.Parallel()
 
