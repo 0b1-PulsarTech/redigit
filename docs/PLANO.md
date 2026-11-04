@@ -216,6 +216,19 @@ e 24 KB (`-trimpath -p=2`). Amigonimo (clone de `2502d84`): com tags base
 iguais as da base nos dois jeitos de `GOFLAGS`; a comparacao foi feita sobre o
 grafo normalizado, nao sobre os bytes da saida.
 
+Um valor que escapa para uma interface como ponteiro de ponteiro (`var alvo
+*MeuErro; errors.As(err, &alvo)`, `json.Unmarshal(dados, &ponteiro)`) tem
+conjunto de metodos vazio. `escape` le os metodos do que ele aponta, e o dono
+do tipo tira todos os ponteiros: o leitor ganha aresta `implements` para
+`Error`, e `go vet` deixa de ver o metodo nascer depois do leitor. Em T
+(`157d218`, com tags) sao 14 arestas a mais, todas de `errors.As`, nenhuma a
+menos, nenhuma declaracao alterada.
+
+Limite: um metodo do proprio tipo com alvo por valor (`func (E) Wrap(err error)
+bool { var alvo E; return errors.As(err, &alvo) }`) segue sem aresta para `Error`,
+pois `escape` so ve o tipo `*E` e nao separa esse alvo do receptor que passa por
+interface (`fmt.Errorf("%v", receptor)` dentro de `Error`), que nao pode ter aresta.
+
 ## 3. A decisao vertical contra horizontal
 
 Ordenar por dependencia produz camadas horizontais. Quem escreve a mao produz

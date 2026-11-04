@@ -14,15 +14,16 @@ func (scan *factScan) escape(dependent entities.DeclKey, value types.Type) {
 		return
 	}
 
+	value = types.Unalias(value)
 	owner := scan.ownerOf(value)
 
-	if owner != (entities.DeclKey{}) && belongsTo(dependent, owner) {
+	if owner != (entities.DeclKey{}) && pointee(value) == value && belongsTo(dependent, owner) {
 		return
 	}
 
 	var methods []entities.DeclKey
 
-	set := types.NewMethodSet(value)
+	set := types.NewMethodSet(pointee(value))
 
 	for selection := range set.Methods() {
 		fn, isFunc := selection.Obj().(*types.Func)
@@ -30,7 +31,8 @@ func (scan *factScan) escape(dependent entities.DeclKey, value types.Type) {
 			continue
 		}
 
-		if key, inTree := scan.where.ObjectAt(scan.pkg.Fset, fn.Origin()); inTree {
+		key, inTree := scan.where.ObjectAt(scan.pkg.Fset, fn.Origin())
+		if inTree && key != dependent {
 			methods = append(methods, key)
 		}
 	}
@@ -97,11 +99,16 @@ func (scan *factScan) require(
 }
 
 func (scan *factScan) ownerOf(value types.Type) entities.DeclKey {
-	if pointer, isPointer := value.(*types.Pointer); isPointer {
-		value = pointer.Elem()
+	for {
+		pointer, isPointer := types.Unalias(value).(*types.Pointer)
+		if !isPointer {
+			break
+		}
+
+		value = types.Unalias(pointer.Elem())
 	}
 
-	named, isNamed := value.(*types.Named)
+	named, isNamed := types.Unalias(value).(*types.Named)
 	if !isNamed {
 		return entities.DeclKey{}
 	}
@@ -143,5 +150,21 @@ func (scan *factScan) demand(at token.Pos, value, target types.Type) (entities.D
 func (scan *factScan) convert(at token.Pos, value, target types.Type) {
 	if dependent, isDemanded := scan.demand(at, value, target); isDemanded {
 		scan.escape(dependent, value)
+	}
+}
+
+func pointee(value types.Type) types.Type {
+	// A pointer to a pointer has no methods of its own; what it can reach are its pointee's.
+	for {
+		outer, isPointer := types.Unalias(value).(*types.Pointer)
+		if !isPointer {
+			return value
+		}
+
+		if _, isNested := types.Unalias(outer.Elem()).(*types.Pointer); !isNested {
+			return value
+		}
+
+		value = types.Unalias(outer.Elem())
 	}
 }
