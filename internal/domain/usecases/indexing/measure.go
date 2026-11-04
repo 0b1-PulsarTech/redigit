@@ -32,14 +32,27 @@ func measure(file string, source []byte, decls []entities.Decl) {
 		measured = append(measured, index)
 	}
 
-	slices.SortFunc(measured, func(a, b int) int {
+	// Stable, so the member of a shared span that carries its lines is the first in declaration order.
+	slices.SortStableFunc(measured, func(a, b int) int {
 		return cmp.Compare(decls[a].Span.Start, decls[b].Span.Start)
 	})
 
 	for position, index := range measured {
+		decls[index].Lines = 0
+
+		// Members of one atom share a span; the planner sums lines, so only one may hold them.
+		if position > 0 && decls[measured[position-1]].Span == decls[index].Span {
+			continue
+		}
+
 		end := len(source)
-		if position+1 < len(measured) {
-			end = decls[measured[position+1]].Span.Start
+
+		for _, next := range measured[position+1:] {
+			if decls[next].Span != decls[index].Span {
+				end = decls[next].Span.Start
+
+				break
+			}
 		}
 
 		decls[index].Lines = lineCount(

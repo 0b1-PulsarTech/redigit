@@ -122,3 +122,48 @@ func TestMeasure(t *testing.T) {
 		)
 	}
 }
+
+func TestMeasureCountsASharedSpanOnce(t *testing.T) {
+	t.Parallel()
+
+	whole := "package a\n\nconst (\n\tA = iota\n\tB\n)\n\nfunc F() {\n}\n"
+	block := entities.Span{Start: 11, End: 33}
+	fn := entities.Span{Start: 35, End: 48}
+
+	testCases := []struct {
+		name   string
+		source string
+		spans  []entities.Span
+		want   []int
+	}{
+		{"members before a function", whole, []entities.Span{block, block, fn}, []int{5, 0, 2}},
+		{"function listed first", whole, []entities.Span{fn, block, block}, []int{2, 5, 0}},
+		{"function between members", whole, []entities.Span{block, fn, block}, []int{5, 2, 0}},
+		{"three members", whole, []entities.Span{block, block, block, fn}, []int{5, 0, 0, 2}},
+		{
+			"block at the end of the file",
+			whole[:34],
+			[]entities.Span{block, block},
+			[]int{4, 0},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decls := make([]entities.Decl, 0, len(testCase.spans))
+			for _, span := range testCase.spans {
+				decls = append(decls, entities.Decl{Span: span})
+			}
+
+			measure("a/a.go", []byte(testCase.source), decls)
+
+			for index, want := range testCase.want {
+				if decls[index].Lines != want {
+					t.Fatalf("decl %d = %d lines, want %d", index, decls[index].Lines, want)
+				}
+			}
+		})
+	}
+}
