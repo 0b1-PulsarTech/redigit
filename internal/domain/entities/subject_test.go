@@ -269,3 +269,28 @@ func TestUnmarkWIP(t *testing.T) {
 		})
 	}
 }
+
+func TestIsDraft(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		subject string
+		want    bool
+	}{
+		{"generated", DraftMarker + "feat(lead): Create", true},
+		{"authored", ":seedling: feat(lead): Register a lead", false},
+		{"empty", "", false},
+		{"the marker only counts at the start", "feat: " + DraftMarker, false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := IsDraft(testCase.subject); got != testCase.want {
+				t.Fatalf("IsDraft(%q) = %v, want %v", testCase.subject, got, testCase.want)
+			}
+		})
+	}
+}
