@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 	"github.com/wrapped-owls/redigit/internal/infra/plancache"
 	"github.com/wrapped-owls/redigit/internal/infra/profiling"
@@ -113,4 +114,9 @@ func realStart(ctx context.Context, cfg bootstrap.Config) (pipeline, error) {
 	}
 
 	return pl, nil
+}
+
+func warnBlind(result indexing.Result) {
+	// A graph missing edges or type facts looks complete; both are replayed from a cache.
+	session.WarnShortfalls(result)
 }

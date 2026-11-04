@@ -12,7 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
-	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
@@ -217,9 +216,4 @@ func warnUnclaimed(unclaimed []auditing.Unclaimed) {
 		slog.Int("files", len(unclaimed)),
 		slog.String("first", unclaimed[0].File),
 	)
-}
-
-func warnBlind(result indexing.Result) {
-	// A graph missing edges or type facts looks complete; both are replayed from a cache.
-	session.WarnShortfalls(result)
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/chunking"
 )
 
@@ -54,4 +55,13 @@ func toPieceDTO(piece chunking.Piece) pieceDTO {
 		BornAt:  int(piece.BornAt),
 		BornRev: piece.BornRev,
 	}
+}
+
+func toKeys(in []entities.DeclKey) []string {
+	out := make([]string, 0, len(in))
+	for _, key := range in {
+		out = append(out, key.String())
+	}
+
+	return out
 }

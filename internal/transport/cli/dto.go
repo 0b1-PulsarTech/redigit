@@ -173,12 +173,3 @@ func toCycles(in []entities.Cycle) []cycleDTO {
 
 	return out
 }
-
-func toKeys(in []entities.DeclKey) []string {
-	out := make([]string, 0, len(in))
-	for _, key := range in {
-		out = append(out, key.String())
-	}
-
-	return out
-}
