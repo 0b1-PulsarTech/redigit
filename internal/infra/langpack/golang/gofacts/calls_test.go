@@ -38,26 +38,18 @@ func useBoxMethod(box Box[int]) { box.Get() }
 func Make[T any](item T) Box[T] { return Box[T]{item: item} }
 
 func Pair[K comparable, V any](key K, value V) {}
-
 func handler(string) {}
-
 func take(string) {}
-
 func apply(func(string) string) {}
-
 func Plain() {}
-
 func usePlain() { Plain() }
-
 func useValue(repo Repo) { repo.Get("x") }
-
 func usePointer() {
 	repo := &Repo{}
 	repo.Put("k", handler)
 }
 
 func useExplicit() { Pair[string, int]("k", 1) }
-
 func useInferred() { Make(Repo{}) }
 
 func useFuncValue() { apply(strings.ToUpper); take(prefix) }
@@ -84,6 +76,14 @@ func useBuiltins(values []int) int { return len(values) + int(int64(1)) }
 
 func useNested() { take(fmt.Sprint(prefix)) }
 
+type Action func(string)
+func hold(func(string)) {}
+func wrap(fn func(string)) func(string) { return fn }
+func note(any) {}
+func useConversion() { hold(Action(handler)) }
+func useWrapped() { hold(wrap(handler)) }
+func useAny() { note(any(handler)) }
+
 func useLocalType() {
 	type Local struct{}
 
@@ -102,9 +102,13 @@ type callsCase struct {
 func TestIndexCalls(t *testing.T) {
 	t.Parallel()
 
-	fix := indexOf(t, callsFiles())
+	requireCalls(t, indexOf(t, callsFiles()), slices.Concat(callsCases(), argumentCases()))
+}
 
-	for _, testCase := range slices.Concat(callsCases(), argumentCases()) {
+func requireCalls(t *testing.T, fix built, testCases []callsCase) {
+	t.Helper()
+
+	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -124,8 +128,7 @@ func callsCases() []callsCase {
 
 	return []callsCase{
 		{
-			"a plain call",
-			"usePlain",
+			"a plain call", "usePlain",
 			[]facts.Call{
 				{Site: funcKey("a.go", "usePlain"), Callee: module + ".Plain", CalleeKey: plain},
 			},
@@ -148,8 +151,7 @@ func callsCases() []callsCase {
 			}},
 		},
 		{
-			"explicit type arguments",
-			"useExplicit",
+			"explicit type arguments", "useExplicit",
 			[]facts.Call{{
 				Site: funcKey("a.go", "useExplicit"), Callee: module + ".Pair",
 				CalleeKey: funcKey("a.go", "Pair"), Literals: []string{"k"},
@@ -157,8 +159,7 @@ func callsCases() []callsCase {
 			}},
 		},
 		{
-			"inferred type arguments",
-			"useInferred",
+			"inferred type arguments", "useInferred",
 			[]facts.Call{{
 				Site: funcKey("a.go", "useInferred"), Callee: module + ".Make",
 				CalleeKey: funcKey("a.go", "Make"), TypeArgs: []facts.TypeRef{repoRef},
@@ -196,6 +197,7 @@ func callsCases() []callsCase {
 
 func argumentCases() []callsCase {
 	plain := funcKey("a.go", "Plain")
+	external, nested := funcKey("a.go", "useExternal"), funcKey("a.go", "useNested")
 	get := methodKey("Repo.Get")
 
 	return []callsCase{
@@ -214,8 +216,7 @@ func argumentCases() []callsCase {
 			},
 		},
 		{
-			"a method value argument",
-			"useMethodValue",
+			"a method value argument", "useMethodValue",
 			[]facts.Call{{
 				Site: funcKey("a.go", "useMethodValue"), Callee: module + ".apply",
 				CalleeKey: funcKey("a.go", "apply"), FuncArgs: []entities.DeclKey{get},
@@ -229,19 +230,10 @@ func argumentCases() []callsCase {
 			},
 		},
 		{
-			"an external callee has no key and a qualified name",
-			"useExternal",
+			"an external callee has no key and a qualified name", "useExternal",
 			[]facts.Call{
-				{
-					Site:     funcKey("a.go", "useExternal"),
-					Callee:   "fmt.Sprint",
-					Literals: []string{"q"},
-				},
-				{
-					Site:     funcKey("a.go", "useExternal"),
-					Callee:   "strings.ToUpper",
-					Literals: []string{"a"},
-				},
+				{Site: external, Callee: "fmt.Sprint", Literals: []string{"q"}},
+				{Site: external, Callee: "strings.ToUpper", Literals: []string{"a"}},
 			},
 		},
 		{
@@ -260,13 +252,10 @@ func argumentCases() []callsCase {
 			"useNested",
 			[]facts.Call{
 				{
-					Site: funcKey("a.go", "useNested"), Callee: module + ".take",
+					Site: nested, Callee: module + ".take",
 					CalleeKey: funcKey("a.go", "take"),
 				},
-				{
-					Site: funcKey("a.go", "useNested"), Callee: "fmt.Sprint",
-					Literals: []string{"pre"},
-				},
+				{Site: nested, Callee: "fmt.Sprint", Literals: []string{"pre"}},
 			},
 		},
 		{"a declaration that calls nothing", "Plain", nil},
@@ -299,16 +288,14 @@ func viaOuter(outer Outer) { outer.Hi() }
 
 	testCases := []callsCase{
 		{
-			"a method of an embedded interface names the interface declaring it",
-			"viaExt",
+			"a method of an embedded interface names the interface declaring it", "viaExt",
 			[]facts.Call{{
 				Site: funcKey("a.go", "viaExt"), Callee: module + ".Namer.Name",
 				Receiver: facts.TypeRef{Key: typeKey("Namer"), Name: module + ".Namer"},
 			}},
 		},
 		{
-			"a method promoted through an embedded pointer names the embedded type",
-			"viaOuter",
+			"a method promoted through an embedded pointer names the embedded type", "viaOuter",
 			[]facts.Call{{
 				Site: funcKey("a.go", "viaOuter"), Callee: module + ".Inner.Hi",
 				CalleeKey: methodKey("Inner.Hi"),
@@ -317,16 +304,7 @@ func viaOuter(outer Outer) { outer.Hi() }
 		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := fix.index.Calls(funcKey("a.go", testCase.site))
-			if !reflect.DeepEqual(got, testCase.want) {
-				t.Fatalf("Calls(%s) = %+v, want %+v", testCase.site, got, testCase.want)
-			}
-		})
-	}
+	requireCalls(t, fix, testCases)
 }
 
 func TestIndexCallsOnInterfaces(t *testing.T) {
@@ -391,16 +369,7 @@ func useNamedConstraint[T Namer](value T) { value.Name() }
 		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := fix.index.Calls(funcKey("a.go", testCase.site))
-			if !reflect.DeepEqual(got, testCase.want) {
-				t.Fatalf("Calls(%s) = %+v, want %+v", testCase.site, got, testCase.want)
-			}
-		})
-	}
+	requireCalls(t, fix, testCases)
 }
 
 func TestIndexCallsAttributesToTheStatement(t *testing.T) {
@@ -451,4 +420,49 @@ func TestIndexCallsAttributesToTheStatement(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIndexCallsReadAConversion(t *testing.T) {
+	t.Parallel()
+
+	handler := funcKey("a.go", "handler")
+	hold, wrap := funcKey("a.go", "hold"), funcKey("a.go", "wrap")
+	testCases := []callsCase{
+		{
+			name: "a conversion hands on the func value it wraps", site: "useConversion",
+			want: []facts.Call{{
+				Site: funcKey("a.go", "useConversion"), Callee: module + ".hold",
+				CalleeKey: hold, FuncArgs: []entities.DeclKey{handler},
+			}},
+		},
+		{
+			name: "a call with one argument is no conversion", site: "useWrapped",
+			want: []facts.Call{
+				{Site: funcKey("a.go", "useWrapped"), Callee: module + ".hold", CalleeKey: hold},
+				{
+					Site: funcKey("a.go", "useWrapped"), Callee: module + ".wrap", CalleeKey: wrap,
+					FuncArgs: []entities.DeclKey{handler},
+				},
+			},
+		},
+		{
+			name: "a conversion to no func type hands nothing on", site: "useAny",
+			want: []facts.Call{{
+				Site: funcKey("a.go", "useAny"), Callee: module + ".note",
+				CalleeKey: funcKey("a.go", "note"),
+			}},
+		},
+		{
+			name: "a conversion to a type parameter hands on the func value", site: "useParam",
+			want: []facts.Call{{
+				Site: funcKey("a.go", "useParam"), Callee: module + ".hold",
+				CalleeKey: hold, FuncArgs: []entities.DeclKey{handler},
+			}},
+		},
+	}
+
+	files := callsFiles()
+	files["a.go"] += "func useParam[F ~func(string)]() { hold(F(handler)) }\n"
+
+	requireCalls(t, indexOf(t, files), testCases)
 }

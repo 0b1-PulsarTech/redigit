@@ -16,6 +16,7 @@ type walker struct {
 	refs  refs
 	info  *types.Info
 	index *Index
+	lits  *[]litScope
 }
 
 func (index *Index) walk(pkgs []*packages.Package, where typed.Positions) {
@@ -26,7 +27,10 @@ func (index *Index) walk(pkgs []*packages.Package, where typed.Positions) {
 			continue
 		}
 
-		scan := walker{refs: refs{where: where, fset: pkg.Fset}, info: pkg.TypesInfo, index: index}
+		scan := walker{
+			refs: refs{where: where, fset: pkg.Fset}, info: pkg.TypesInfo, index: index,
+			lits: &[]litScope{},
+		}
 
 		for _, file := range pkg.Syntax {
 			// A test variant repeats the files of its package, and each is read once.
@@ -96,6 +100,8 @@ func (scan walker) record(expr *ast.CallExpr) {
 	}
 
 	scan.arguments(&call, expr.Args)
+	call.Within = scan.within(expr.Pos())
+	scan.hold(call, expr.Args)
 	scan.index.calls[site] = append(scan.index.calls[site], call)
 }
 
@@ -152,6 +158,18 @@ func (scan walker) funcKey(fn *types.Func) entities.DeclKey {
 }
 
 func (scan walker) funcValue(arg ast.Expr) *types.Func {
+	// Only a conversion to a func type or type parameter, as Hook(helper), hands the func value on.
+	if conv, isCall := arg.(*ast.CallExpr); isCall && len(conv.Args) == 1 {
+		if fun := scan.info.Types[conv.Fun]; fun.IsType() {
+			_, isFunc := fun.Type.Underlying().(*types.Signature)
+			_, isParam := types.Unalias(fun.Type).(*types.TypeParam)
+
+			if isFunc || isParam {
+				return scan.funcValue(conv.Args[0])
+			}
+		}
+	}
+
 	fn, _ := scan.callee(arg)
 
 	return fn

@@ -25,6 +25,7 @@ type Call struct {
 	TypeArgs  []TypeRef
 	FuncArgs  []entities.DeclKey
 	Literals  []string
+	Within    *Call // the call a func literal holding this call was passed to
 }
 
 func (call Call) Short() string {
