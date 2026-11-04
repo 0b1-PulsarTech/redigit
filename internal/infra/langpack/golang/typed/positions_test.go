@@ -251,12 +251,13 @@ func TestPositionsObjectAtRefusesWhatItCannotKeyExactly(t *testing.T) {
 
 	where, decls, root := objectFixture(t)
 	imported := root.Types.Imports()[0]
+	treeRoot := filepath.Dir(filepath.Dir(root.GoFiles[0]))
 	elsewhere := NewPositions(t.TempDir(), NewDeclLocator(decls)).Parsing(nil)
-	without := NewPositions(where.root, NewDeclLocator(slices.DeleteFunc(
+	without := NewPositions(treeRoot, NewDeclLocator(slices.DeleteFunc(
 		slices.Clone(decls),
 		func(decl entities.Decl) bool { return decl.Key.Name == "F" },
 	))).Parsing(nil)
-	twice := NewPositions(where.root, NewDeclLocator(append(slices.Clone(decls), decls...))).
+	twice := NewPositions(treeRoot, NewDeclLocator(append(slices.Clone(decls), decls...))).
 		Parsing(nil)
 
 	testCases := []struct {

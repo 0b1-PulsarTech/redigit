@@ -3,15 +3,13 @@ package typed
 import (
 	"go/token"
 	"go/types"
-	"path/filepath"
 	"slices"
-	"strings"
-	"sync"
 
 	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed/modmap"
 )
 
 type DeclLocator struct {
@@ -57,18 +55,13 @@ func (locator DeclLocator) has(key entities.DeclKey) bool {
 }
 
 type Positions struct {
-	root    string
+	files   modmap.Files
 	locator DeclLocator
-	rel     *sync.Map
 	parsed  map[*token.File]bool
 }
 
 func NewPositions(root string, locator DeclLocator) Positions {
-	if resolved, err := filepath.EvalSymlinks(root); err == nil {
-		root = resolved
-	}
-
-	return Positions{root: root, locator: locator, rel: &sync.Map{}}
+	return Positions{files: modmap.New(root), locator: locator}
 }
 
 func (where Positions) DeclAt(fset *token.FileSet, pos token.Pos) (entities.DeclKey, bool) {
@@ -114,27 +107,7 @@ func (where Positions) ObjectAt(fset *token.FileSet, obj types.Object) (entities
 	return entities.DeclKey{}, false
 }
 
-func (where Positions) relative(name string) string {
-	if cached, known := where.rel.Load(name); known {
-		return cached.(string)
-	}
-
-	resolved := name
-	if target, err := filepath.EvalSymlinks(name); err == nil {
-		resolved = target
-	}
-
-	rel, err := filepath.Rel(where.root, resolved)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		rel = ""
-	}
-
-	// a miss race recomputes the same value, so a plain Store is enough
-	slashed := filepath.ToSlash(rel)
-	where.rel.Store(name, slashed)
-
-	return slashed
-}
+func (where Positions) relative(name string) string { return where.files.Rel(name) }
 
 func declKeyOf(obj types.Object) (entities.DeclKey, bool) {
 	if fn, isFunc := obj.(*types.Func); isFunc {
