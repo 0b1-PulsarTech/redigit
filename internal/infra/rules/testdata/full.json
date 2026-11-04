@@ -11,5 +11,6 @@
   "format": {"gofumpt": true, "imports": true, "localPrefix": "github.com/org/"},
   "write": {"identity": {"name": "n", "email": "e"}, "dateRef": "rebuild/date-ref", "subjects": "subjects.json"},
   "verify": {"tags": ["integration"], "parallel": 4, "exclude": ["apps/khux/lifted"], "stride": 1},
-  "lineage": {"follow": true, "anchors": [{"rev": "abc123", "kind": "fix"}]}
+  "lineage": {"follow": true, "anchors": [{"rev": "abc123", "kind": "fix"}]},
+  "lint": {"sourceAdded": 900}
 }

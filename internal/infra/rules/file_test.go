@@ -65,7 +65,7 @@ func TestDecodeKeepsEachSection(t *testing.T) {
 
 	for name, raw := range map[string][]byte{
 		"slice": file.Slice, "passes": file.Passes, "format": file.Format,
-		"write": file.Write, "verify": file.Verify, "lineage": file.Lineage,
+		"write": file.Write, "verify": file.Verify, "lineage": file.Lineage, "lint": file.Lint,
 		"rule": file.Rules[0].Raw,
 	} {
 		if len(raw) == 0 {

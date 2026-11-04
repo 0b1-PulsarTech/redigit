@@ -254,7 +254,6 @@ func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
 	}{
 		{"subjects", cmdSubjects, "slice 19"},
 		{"format", cmdFormat, "slice 15w"},
-		{"lint", cmdLint, "slice 17"},
 		{"continue", cmdContinue, "slice 24b"},
 	}
 
@@ -281,6 +280,53 @@ func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
 					stderr.String(),
 					stdout.String(),
 				)
+			}
+		})
+	}
+}
+
+func TestDispatchLintRunsItsOwnCommandWithoutAPipeline(t *testing.T) {
+	t.Parallel()
+
+	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
+		t.Fatal("lint must never start a pipeline")
+
+		return nil, nil
+	}
+
+	testCases := []struct {
+		name        string
+		args        []string
+		wantUsage   bool
+		wantMessage string
+	}{
+		{
+			name: "no manifest is lint's own usage error", args: []string{cmdLint},
+			wantUsage: true, wantMessage: "--manifest is required",
+		},
+		{
+			name:        "a missing manifest file is a run failure, not usage",
+			args:        []string{cmdLint, "--manifest", "/nonexistent/m.jsonl"},
+			wantMessage: "open manifest",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+
+			err := dispatch(
+				context.Background(), testCase.args, &stdout, &stderr, runEnv{Start: unreachable},
+			)
+			if err == nil || errors.Is(err, ErrUsage) != testCase.wantUsage ||
+				!strings.Contains(err.Error(), testCase.wantMessage) || stdout.Len() != 0 {
+				t.Fatalf("err = %v, stdout = %q", err, stdout.String())
+			}
+
+			if got := strings.Contains(stderr.String(), "redigit lint"); got != testCase.wantUsage {
+				t.Fatalf("stderr = %q, want lint usage = %v", stderr.String(), testCase.wantUsage)
 			}
 		})
 	}

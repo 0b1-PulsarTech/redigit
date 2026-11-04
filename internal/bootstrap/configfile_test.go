@@ -453,10 +453,10 @@ func TestApplyConfigFileKeepsTheRawSections(t *testing.T) {
 		{
 			name: "every raw section is kept",
 			content: `{"slice":{"a":1},"passes":{"b":2},"format":{"c":3},` +
-				`"write":{"d":4},"verify":{"e":5},"lineage":{"f":6}}`,
+				`"write":{"d":4},"verify":{"e":5},"lineage":{"f":6},"lint":{"g":7}}`,
 			want: map[string]string{
 				"slice": `{"a":1}`, "passes": `{"b":2}`, "format": `{"c":3}`,
-				"write": `{"d":4}`, "verify": `{"e":5}`, "lineage": `{"f":6}`,
+				"write": `{"d":4}`, "verify": `{"e":5}`, "lineage": `{"f":6}`, "lint": `{"g":7}`,
 			},
 		},
 		{
@@ -464,7 +464,7 @@ func TestApplyConfigFileKeepsTheRawSections(t *testing.T) {
 			content: `{"verify":{"e":5}}`,
 			want: map[string]string{
 				"slice": "", "passes": "", "format": "",
-				"write": "", "verify": `{"e":5}`, "lineage": "",
+				"write": "", "verify": `{"e":5}`, "lineage": "", "lint": "",
 			},
 		},
 		{
@@ -472,7 +472,7 @@ func TestApplyConfigFileKeepsTheRawSections(t *testing.T) {
 			content: `{}`,
 			want: map[string]string{
 				"slice": "", "passes": "", "format": "",
-				"write": "", "verify": "", "lineage": "",
+				"write": "", "verify": "", "lineage": "", "lint": "",
 			},
 		},
 	}
@@ -482,11 +482,11 @@ func TestApplyConfigFileKeepsTheRawSections(t *testing.T) {
 			t.Parallel()
 
 			cfg := loadAndApply(t, testCase.content, Config{}, nil)
-
 			got := map[string]string{
 				"slice": string(cfg.Sections.Slice), "passes": string(cfg.Sections.Passes),
 				"format": string(cfg.Sections.Format), "write": string(cfg.Sections.Write),
 				"verify": string(cfg.Sections.Verify), "lineage": string(cfg.Sections.Lineage),
+				"lint": string(cfg.Sections.Lint),
 			}
 
 			if !maps.Equal(got, testCase.want) {

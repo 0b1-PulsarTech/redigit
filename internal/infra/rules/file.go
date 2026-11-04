@@ -29,6 +29,7 @@ type (
 		Write   json.RawMessage
 		Verify  json.RawMessage
 		Lineage json.RawMessage
+		Lint    json.RawMessage
 	}
 
 	Spec struct {
@@ -51,6 +52,7 @@ func (file *File) keepRaw(key string, raw json.RawMessage) bool {
 	slots := map[string]*json.RawMessage{
 		"slice": &file.Slice, "passes": &file.Passes, "format": &file.Format,
 		"write": &file.Write, "verify": &file.Verify, "lineage": &file.Lineage,
+		"lint": &file.Lint,
 	}
 
 	slot, found := slots[key]
