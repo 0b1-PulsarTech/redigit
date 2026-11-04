@@ -78,7 +78,7 @@ func TestParseConfigFileKeepsTheCause(t *testing.T) {
 
 	dir := t.TempDir()
 	missing := filepath.Join(dir, "no.json")
-	unknown := writeIn(t, dir, "unknown.json", `{"rules":[{"type":"go-di"}]}`)
+	unknown := writeIn(t, dir, "unknown.json", `{"rules":[{"type":"no-such-rule"}]}`)
 	malformed := writeIn(t, dir, "malformed.json", `{"languages":`)
 	language := writeIn(t, dir, "language.json", `{"languages":{"golang":{}}}`)
 
@@ -91,7 +91,7 @@ func TestParseConfigFileKeepsTheCause(t *testing.T) {
 		{"a missing file", missing, os.ErrNotExist, ": no such file or directory"},
 		{
 			"an unknown rule type", unknown, rules.ErrUnknownType,
-			`: rules[0]: unknown type "go-di" (no rule types are registered in this build)`,
+			`: rules[0]: unknown type "no-such-rule" (known: go-di)`,
 		},
 		{"a malformed file", malformed, rules.ErrMalformed, ": invalid JSON at offset 13"},
 		{

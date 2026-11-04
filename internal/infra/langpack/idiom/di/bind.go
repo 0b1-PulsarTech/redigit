@@ -122,6 +122,32 @@ func (built model) catalog() catalog {
 	return view
 }
 
+func (built model) ambiguous() int {
+	var (
+		seen = map[resolve]bool{}
+		view = built.catalog()
+	)
+
+	for _, use := range built.uses() {
+		if _, isAmbiguous := view.serving(use); isAmbiguous {
+			seen[use] = true
+		}
+	}
+
+	return len(seen)
+}
+
+func (built model) summary() string {
+	switch {
+	case built.untyped > 0:
+		return "calls with no static bound type"
+	case len(built.registrations) == 0:
+		return "0 register sites"
+	default:
+		return "bindings left out"
+	}
+}
+
 func (view catalog) serving(use resolve) ([]registration, bool) {
 	exact := view.byType[use.typ]
 

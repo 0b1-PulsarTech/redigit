@@ -41,7 +41,7 @@ func TestLoadConfigFile(t *testing.T) {
 		{"a missing file", ``, true, os.ErrNotExist},
 		{"malformed json", `{`, false, rules.ErrMalformed},
 		{"an unknown key", `{"nope":1}`, false, rules.ErrMalformed},
-		{"an unknown rule type", `{"rules":[{"type":"go-di"}]}`, false, rules.ErrUnknownType},
+		{"an unknown rule type", `{"rules":[{"type":"nope"}]}`, false, rules.ErrUnknownType},
 	}
 
 	for _, testCase := range testCases {
@@ -137,15 +137,14 @@ func TestLoadConfigFileRendersOneMessage(t *testing.T) {
 	}
 }
 
-func TestLoadConfigFileRendersWithoutRuleTypes(t *testing.T) {
+func TestLoadConfigFileRendersTheKnownRuleTypes(t *testing.T) {
 	t.Parallel()
 
-	path := writeConfigFile(t, `{"rules":[{"type":"go-di"}]}`)
+	path := writeConfigFile(t, `{"rules":[{"type":"no-such-rule"}]}`)
 
 	_, err := LoadConfigFile(path)
 
-	want := "config file " + path +
-		`: rules[0]: unknown type "go-di" (no rule types are registered in this build)`
+	want := "config file " + path + `: rules[0]: unknown type "no-such-rule" (known: go-di)`
 	if !errors.Is(err, ErrConfig) || !errors.Is(err, rules.ErrUnknownType) || err.Error() != want {
 		t.Fatalf("LoadConfigFile() err = %v, want %q", err, want)
 	}
