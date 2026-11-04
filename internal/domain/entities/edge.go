@@ -29,6 +29,7 @@ const (
 	ReasonMirrors EdgeReason = "mirrors"
 	// ReasonTestOf is a test waiting for the declaration it exercises.
 	ReasonTestOf EdgeReason = "test-of"
+	ReasonE2E    EdgeReason = "e2e" // a route is no tested code: one only tests read stays production
 	// ReasonEncloses keeps a value or constructor with the type it belongs to,
 	// so a type and the constants that enumerate it are never split apart.
 	ReasonEncloses EdgeReason = "encloses"

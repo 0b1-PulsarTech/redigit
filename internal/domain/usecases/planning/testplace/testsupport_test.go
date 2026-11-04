@@ -49,3 +49,37 @@ func TestTestSupportLeavesAFunctionOnlyItsOwnTestsReadAsCode(t *testing.T) {
 		t.Fatal("a function only its own package's tests read was taken for test support")
 	}
 }
+
+func TestTestSupportDoesNotTakeARouteOnlyAnE2ETestReadsForSupport(t *testing.T) {
+	t.Parallel()
+
+	route := decl("app/routes.go", "Routes", "app")
+	probe := testDecl("test/api_test.go", "TestHealth", "test")
+
+	testCases := []struct {
+		name   string
+		reason entities.EdgeReason
+		want   bool
+	}{
+		{name: "an e2e edge", reason: entities.ReasonE2E, want: false},
+		{name: "a test-of edge", reason: entities.ReasonTestOf, want: true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(
+				[]entities.Decl{route, probe},
+				[]entities.Edge{
+					{Dependent: probe.Key, Provider: route.Key, Reason: testCase.reason},
+				},
+				nil,
+			)
+
+			if got := TestSupport(graph)[route.Key]; got != testCase.want {
+				t.Fatalf("TestSupport()[route] = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

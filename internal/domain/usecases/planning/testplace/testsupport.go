@@ -33,7 +33,8 @@ func onlyOtherTestsRead(graph entities.Graph, decl entities.Decl, support reach.
 
 	for _, edge := range graph.Consumers(decl.Key) {
 		consumer, found := graph.Decl(edge.Dependent)
-		if !found || entities.IsStructural(edge.Reason) ||
+		// An HTTP test only orders itself after the route; the route is not support.
+		if !found || entities.IsStructural(edge.Reason) || edge.Reason == entities.ReasonE2E ||
 			reach.IsAfterword(graph, edge.Dependent) {
 			continue
 		}

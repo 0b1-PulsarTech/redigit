@@ -32,7 +32,8 @@ func (index sharedIndex) safeToPull(
 			// A shared test is pulled along with its reader, so it is checked as the
 			// reader is.
 			switch {
-			case birth.IsSoft(edge.Reason) || seen[provider] || born[provider]:
+			case (birth.IsSoft(edge.Reason) && edge.Reason != entities.ReasonE2E) ||
+				seen[provider] || born[provider]:
 				continue
 			// A provider owned by a feature that is not built yet makes the pull unsafe.
 			case index.own.Owner[provider] != reach.SharedFeature:

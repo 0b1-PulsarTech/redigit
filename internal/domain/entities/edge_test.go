@@ -43,6 +43,7 @@ func TestIsHard(t *testing.T) {
 		{ReasonGeneratedBy, false},
 		{ReasonMirrors, true},
 		{ReasonTestOf, false},
+		{ReasonE2E, false},
 		{ReasonEncloses, true},
 		{ReasonSchema, true},
 		{ReasonQuery, true},

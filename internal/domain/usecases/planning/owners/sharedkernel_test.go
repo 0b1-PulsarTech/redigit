@@ -368,3 +368,64 @@ func TestUnbornProvidersDoesNotFollowAnInterfaceATypeOnlyFills(t *testing.T) {
 		t.Fatalf("unbornProviders() = %v, want %v", got, want)
 	}
 }
+
+func TestUnbornProvidersPullsASharedTestOnlyPastItsSoftEdges(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		reason entities.EdgeReason
+		want   bool
+	}{
+		{
+			name:   "an e2e edge keeps the test behind its route",
+			reason: entities.ReasonE2E, want: false,
+		},
+		{
+			name:   "a generated-by edge is still skipped",
+			reason: entities.ReasonGeneratedBy, want: true,
+		},
+		{
+			name:   "a mirrors edge is still skipped",
+			reason: entities.ReasonMirrors, want: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			member := decl("a/handler.go", "Handle", "a")
+			norm := decl("shared/norm.go", "Norm", "shared")
+			normTest := testDecl("shared/norm_test.go", "TestNorm", "shared")
+			route := decl("users/routes.go", "Routes", "users")
+
+			graph := entities.NewGraph(
+				[]entities.Decl{member, norm, normTest, route},
+				[]entities.Edge{
+					needs(member, norm),
+					edgeOf(normTest, route, testCase.reason),
+				},
+				[]entities.Anchor{
+					{Decl: normTest.Key, To: norm.Key, Reason: entities.ReasonTestOf},
+				},
+			)
+
+			own := Ownership{Owner: map[entities.DeclKey]reach.FeatureID{
+				member.Key:   "a",
+				norm.Key:     reach.SharedFeature,
+				normTest.Key: reach.SharedFeature,
+				route.Key:    "users",
+			}}
+
+			got := UnbornProviders(
+				graph, own, []entities.DeclKey{member.Key}, map[entities.DeclKey]bool{},
+			)
+
+			if carried := slices.Contains(got, normTest.Key); carried != testCase.want {
+				t.Fatalf("unbornProviders() = %v, carries %s = %v, want %v",
+					got, normTest.Key, carried, testCase.want)
+			}
+		})
+	}
+}

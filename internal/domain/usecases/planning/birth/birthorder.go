@@ -102,5 +102,6 @@ func byDependency(
 }
 
 func IsSoft(reason entities.EdgeReason) bool {
-	return reason == entities.ReasonGeneratedBy || reason == entities.ReasonMirrors
+	return reason == entities.ReasonGeneratedBy || reason == entities.ReasonMirrors ||
+		reason == entities.ReasonE2E
 }

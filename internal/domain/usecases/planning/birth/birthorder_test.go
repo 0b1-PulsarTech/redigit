@@ -175,3 +175,71 @@ func TestSortForBirthPutsWhatWaitsOnAHardCycleAfterIt(t *testing.T) {
 		t.Fatalf("order = %v, want the dependent after the cycle it needs", got)
 	}
 }
+
+func TestIsSoft(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		reason entities.EdgeReason
+		want   bool
+	}{
+		{reason: entities.ReasonGeneratedBy, want: true},
+		{reason: entities.ReasonMirrors, want: true},
+		{reason: entities.ReasonE2E, want: true},
+		{reason: entities.ReasonTestOf, want: false},
+		{reason: entities.ReasonReference, want: false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(string(testCase.reason), func(t *testing.T) {
+			t.Parallel()
+
+			if got := IsSoft(testCase.reason); got != testCase.want {
+				t.Fatalf("IsSoft(%q) = %v, want %v", testCase.reason, got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestSortForBirthOrdersAnE2EEdgeByItsWaitAndBreaksItsCycle(t *testing.T) {
+	t.Parallel()
+
+	route := decl("app/routes.go", "Routes", "app")
+	probe := testDecl("test/api_test.go", "TestHealth", "test")
+	e2e := entities.Edge{Dependent: probe.Key, Provider: route.Key, Reason: entities.ReasonE2E}
+
+	testCases := []struct {
+		name    string
+		edges   []entities.Edge
+		arrival []entities.DeclKey
+		want    []entities.DeclKey
+	}{
+		{
+			name:    "the test waits for its route",
+			edges:   []entities.Edge{e2e},
+			arrival: []entities.DeclKey{probe.Key, route.Key},
+			want:    []entities.DeclKey{route.Key, probe.Key},
+		},
+		{
+			name:    "a cycle through the edge is broken",
+			edges:   []entities.Edge{e2e, needs(route, probe)},
+			arrival: []entities.DeclKey{route.Key, probe.Key},
+			want:    []entities.DeclKey{probe.Key, route.Key},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := entities.NewGraph(
+				[]entities.Decl{route, probe}, testCase.edges, nil,
+			)
+
+			got := SortForBirth(graph, entities.Ordering{}, testCase.arrival, nil)
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("order = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
