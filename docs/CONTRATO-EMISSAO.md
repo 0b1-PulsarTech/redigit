@@ -171,17 +171,46 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
   que compilou (`kept`; uma `wip` ja esta marcada e uma sem veredito continua sem
   veredito) e lida: se cita uma funcao, tipo ou valor da mesma unidade (um que e
   de teste, ou que esta num `_test.go`, so conta para quem tambem e de teste), ou
-  por `pacote.Nome` (o ultimo trecho do diretorio) o de outra, colocado depois da
+  por `pacote.Nome` (o nome local de um import da pre-imagem, ver abaixo) o de outra, colocado depois da
   ativacao (o lugar da ancora anterior da chave, ou o commit onde ela nasce), o
   veredito e de reprovada: `fold`, ou `wip` sob essa politica, com a declaracao
-  no motivo. Uma entrada que nao e declaracao Go (um `README.md`) nao le nada.
+  no motivo. Um metodo conta quando a pre-imagem seleciona `Nome` e o texto final
+  da MESMA declaracao nao o tem, e o metodo nasce depois da ativacao, na mesma
+  unidade ou numa que o arquivo importa. A pre-imagem seleciona `Nome` quando tem
+  `.Nome` (um seletor cujo receptor nao e um nome solto: um local, outro seletor
+  como `s.bbb.Nome`, uma chamada, um indice, um literal) ou `q.Nome` com `q` um
+  nome solto que nao e o nome local de um import da pre-imagem; assim um
+  qualificador de pacote (`entities.Plan`) nao e um seletor de metodo, e uma
+  variavel de pacote solta e. Um local que tem o nome de um pacote importado
+  vira `.Nome` e conta. O texto final tem `Nome` so quando tem `.Nome`: um
+  `q.Nome` com `q` solto no texto final nao o tem, seja `q` um pacote
+  (`hlp.Nome(t)`) ou uma variavel de pacote, o que dobra a ancora sem ler os
+  imports do arquivo final. Uma variavel de pacote chamada nos dois textos vira
+  assim um falso descarte, que e aceito. Quando os dois textos tem `.Nome` do
+  mesmo referente, a declaracao final ja tem uma aresta ate o metodo e a ordem a
+  coloca depois dele; so quando os dois nomeiam o mesmo referente: um `.Nome` de
+  outro referente em cada texto nao e visto (limite abaixo), e um seletor que a
+  correcao tirou pode nomear algo nascido depois. Sem tipos nao da para dizer
+  de que tipo e o seletor: o metodo de outro tipo com o mesmo nome tambem conta,
+  um campo com esse nome tambem conta, e um metodo mais antigo com esse nome nao
+  salva um mais novo. Por isso o motivo pode nomear um metodo que a pre-imagem
+  nao le de verdade (medido no alvo: a ancora 157d218 descarta com o motivo
+  `reads ...assertionRule.Name` quando `d.Key.Name` e um campo); o falso descarte
+  e aceito, e o motivo diz `may read`. Uma entrada que nao e declaracao (um
+  `README.md`) nao le nada.
   Os nomes lidos vem de uma analise sintatica quando a porta `Reader` esta ligada
   e o arquivo e Go: sao os identificadores que o texto da pre-imagem nao resolve
   sozinho, a chave solta de um literal composto que nao e um local nem um
-  parametro (sem tipos pode ser um campo ou uma leitura) e `qualificador.Nome`
-  quando o qualificador nao se resolve; um local, um parametro, um campo lido
-  por seletor, um comentario ou um literal de texto nao contam. Sem a porta, ou
-  quando o texto nao analisa sozinho (uma instrucao de funcao cortada, `Nome#i`),
+  parametro (sem tipos pode ser um campo ou uma leitura), `qualificador.Nome`
+  quando o qualificador nao se resolve e `.Nome` para todo seletor cujo
+  receptor nao e um nome solto; um local, um parametro, um comentario ou um
+  literal de texto nao contam, e o `.Nome` de um seletor dividido em linhas
+  conta. A analise de cada texto se faz uma vez por entrada. Quando a
+  pre-imagem nao analisa sozinha (uma instrucao de funcao cortada, `Nome#i`, ou
+  um arquivo que nao e Go) o seletor vale pela busca de texto `.Nome`, nos dois
+  textos, com o qualificador de pacote fora. Se so o texto final nao analisa, ele
+  nao tem nada e a ancora dobra. Para os outros nomes, sem a porta, ou quando o texto nao analisa
+  sozinho (uma instrucao de funcao cortada, `Nome#i`),
   vale a busca da palavra inteira `Nome`, em que letra ou digito de qualquer
   alfabeto continua a palavra, no texto, comentarios e literais incluidos, e ela
   pode descartar uma ancora sa.
@@ -193,18 +222,54 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
   como lido: um falso positivo descarta a ancora sob `fold` ou a marca sob `wip`,
   e um falso negativo quebraria um commit; por isso a chave de um literal com o
   nome de uma declaracao posterior conta como lida, e um campo de struct pode
-  descartar uma ancora que compilaria. Limites: um metodo chamado antes de
-  nascer nao e visto, nem a leitura por um import com apelido, por um import com
-  ponto (`import . "x"`) ou por um pacote cujo nome difere do diretorio (o da raiz
-  do modulo incluido); o `verify` do plano ainda pega esses casos.
+  descartar uma ancora que compilaria. Os nomes locais de um pacote lido vem dos
+  imports da pre-imagem cuja ultima parte do caminho e a base do diretorio da
+  unidade (o apelido de cada um, ou a base quando nao tem), mais a propria base.
+  So uma raiz de modulo (a raiz do repositorio, ou a de um modulo aninhado, que
+  o grafo mostra pela aresta `module` ate o `go.mod` do diretorio) pode importar
+  sob uma base diferente da do diretorio, e so ela conta todos os imports da
+  pre-imagem, por excesso. Em qualquer outro diretorio a base do caminho do
+  import tem de ser a do diretorio; se nenhum import a tem, nada daquele pacote
+  e lido por qualificador. Limites: um metodo de um pacote que nenhum import
+  nomeia pela base do diretorio nao e visto, nem a leitura por um import com
+  ponto (`import . "x"`) ou por um pacote cujo nome difere do diretorio sem
+  apelido (e esse nome tambem nao e tomado por pacote no seletor); um mesmo
+  `.Nome` nos dois textos com outro referente em cada um nao e visto aqui
+  (medido: `t.M()` virando `bbb.U{}.M()`, ou `t.X.M`, no texto final); e uma
+  pre-imagem que entrega um tipo
+  a uma interface cujo metodo nasce depois compila na sonda e quebra no commit
+  (medido: a ancora fica `kept` e o `verify` falha na posicao 1 com `bbb.T does
+  not implement bbb.I (missing method M)`). Tambem ficam `kept` e vermelhos, sem
+  marcador, o metodo de um import com ponto (`import . "x"`) e o promovido por
+  um tipo embutido de uma unidade que o arquivo nao importa. O `verify` do
+  plano pega esses casos.
 - Uma pre-imagem que nao pode ser costurada nem renderizada (um `go.mod` que a
   correcao transformou em bloco, uma casca com o mesmo trecho em duas entradas)
   nao pode ser emitida: o veredito e "inadequada" e a ancora cai em `fold` mesmo
   sob `wip`. Uma edicao fora da arvore e uma falha de leitura continuam sendo
   erro. Entradas e edicoes que dividem o mesmo trecho com o mesmo texto (um grupo
   `const (...)`) valem uma so; o mesmo trecho com textos diferentes
-  (`var a = 1; var b = 2` virando `var a, b = 3, 4`) e inadequado e a ancora cai
-  em `fold`, para a sonda e o emissor concordarem.
+  (`var a = 1; var b = 2` virando `var a, b = 3, 4`) e inadequado para a sonda e
+  para o emissor, que costuram com o mesmo codigo (`emitting.Compose`). O
+  planejador nao deixa esse caso chegar la dentro de uma ancora: os nomes de
+  pre-imagens diferentes saem dela com o aviso `anchors: not spliced` (ver
+  abaixo), e a ancora fica com o que sobra. Entre ancoras o emissor costura toda
+  pre-imagem escolhida, tambem as de uma ancora `wip` ou sem veredito, que a
+  sonda de uma mais antiga nao leva: uma pre-imagem cujo trecho se sobrepoe ao
+  de outro nome de uma ancora mais nova assim escolhida e inadequada e a ancora
+  cai em `fold`, mesmo sob `wip`, com o motivo `its pre-image overlaps <chave>,
+  which a newer anchor keeps`.
+- A sonda constroi o que o emissor escreve: o arquivo final com as
+  pre-imagens ativas e os imports delas, pela mesma `Compose`. Como o emissor
+  escreve um commit so com as declaracoes ja nascidas, depois de decidir cada
+  ancora o planejador sonda de novo as pre-imagens restritas as declaracoes
+  nascidas antes do `slot` dela, da ancora mais nova para a mais antiga: a
+  primeira que quebra nesse estado cai em `fold` (ou em `wip`) e as mais antigas
+  sao julgadas de novo, ja sem ela. Um estado que o renderizador recusa nao e
+  o veredito "inadequada" de cima: segue a politica, e sob `wip` marca a ancora.
+  Limite: a sonda olha o estado logo antes do `slot`, nao cada commit
+  intermediario da janela, e esse estado so tem o que nasceu antes: um metodo que
+  nasce depois da pre-imagem que o chama e pego pela leitura acima, nao por ele.
 - A sonda de uma ancora mais antiga leva so as pre-imagens das ancoras mais novas
   que ja compilaram. Antes de editar, cada unidade afetada e compilada uma vez na
   arvore intacta. Uma unidade vermelha antes de qualquer edicao e compilada de
@@ -226,6 +291,32 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
   pulado, com o aviso `anchors: not spliced`. Mover o arquivo depois, com o mesmo
   tipo e nome, mantem a entrada na chave final; renomear a declaracao a perde.
   Uma ancora que fica sem nenhuma declaracao e descartada.
+- Uma pre-imagem leva os imports que o seu texto usa, lidos do arquivo PAI da
+  ancora (`Version.Imports`, `Edit.Imports`), pela porta opcional `Importer` da
+  linguagem (`Needed`); o emissor e a sonda os acrescentam ao arquivo final com a
+  mesma `Admit` opcional, antes de renderizar, e o renderizador depois poda o que
+  nada mais usa. Nunca vai `import "C"`, `_` ou `.`. Varias ancoras no mesmo arquivo
+  valem a uniao. Uma declaracao movida toma os imports do arquivo de origem para o
+  arquivo final. Um apelido que o arquivo final ja usa para outro pacote, ou um
+  pacote que o `go.mod` nao tem, nao compila: a sonda diz isso e, com a politica
+  `fold`, a ancora cai em `fold`, com o motivo; com `wip` o resultado e `wip` e os
+  commits ficam marcados (r38). Sem `Importer` ou sem `Admit` na linguagem, nada se
+  acrescenta.
+- Nomes que dividem um trecho final (um grupo `const` com `iota`, `var a, b = ...`)
+  e tem pre-imagens diferentes entre si, e um nome declarado duas vezes no mesmo
+  arquivo (`init`), nao se costuram: saem da ancora com o aviso
+  `anchors: not spliced` e o motivo, e a ancora sem mais nada e descartada. Um
+  nome que divide o trecho e nao tem pre-imagem (nasceu na ancora) nao discorda
+  de ninguem: o grupo que ganha um nome mantem a correcao dos outros (r16) so
+  quando nada usa o nome novo; com um usuario dele a pre-imagem nao compila no
+  commit da ancora e a ancora cai em `fold` com o motivo `undefined: C`. Um
+  nome que divide o trecho com outro deixado de lado tambem fica de lado. Uma
+  correcao que reescreve um grupo com pre-imagens diferentes por nome deixa
+  esses nomes como estao e avisa; o resumo da ancora descartada diz "every
+  placed declaration it changes is left alone" quando alguma declaracao
+  colocada ficou de lado, e "it changes no placed declaration" quando nenhuma
+  das que ela muda esta colocada (uma apagada depois, pulada com "absent from
+  the final tree", so conta aqui).
 - Uma pre-imagem igual a seguinte da mesma declaracao, ate no espaco em branco, nao muda nada naquele
   commit e sai do plano; a ancora que fica sem mudanca nenhuma nunca vira commit
   vazio. Espaco em branco dentro de um literal de texto conta como sem mudanca
@@ -244,10 +335,18 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
 - O plano mostra `changes` em cada commit de ancora (omitido quando vazio).
 - Um plano lido do cache (`--from-cache`) perde o relatorio das ancoras; o plano,
   o manifesto e os blobs sao os mesmos.
-- Limites conhecidos: a pre-imagem de uma declaracao que usava um import que a
-  correcao removeu por completo nao leva o import do pai, e a ancora pode cair em
-  `fold` por isso (M2); a sonda compila com o padrao Go e as `tags`, nao com a
-  configuracao de `verify`, e uma correcao fora de Go e de qualquer modulo fica
+- Limites conhecidos: o import de uma pre-imagem e achado pelo nome local que o
+  renderizador adivinha pelo caminho; um pacote cujo nome difere da base do
+  caminho e sem apelido pode nao ser achado, e o erro e um `fold` (ou `wip`);
+  a sonda compila com o `Verify` da configuracao (`verify.exclude` e `tags`):
+  uma unidade excluida nao e construida, nem quando uma unidade compilada a
+  exige (compila so o que importa dela), e a ancora cujas edicoes so tocam
+  unidades excluidas fica `unchecked` ("every module the edits touch is excluded
+  by verify.exclude"); se a edicao toca tambem uma unidade compilada, a nota
+  (`built <unidades>; excluded by verify.exclude and not built: <unidades>`)
+  nomeia depois do `not built` so as unidades excluidas donas de um arquivo
+  editado, e uma excluida que apenas depende da editada nao entra; num modulo aninhado, os arquivos dele pertencem a ele, nao ao modulo
+  da raiz. Uma correcao fora de Go e de qualquer modulo fica
   sem unidade, logo sem veredito, e dentro de um modulo na raiz fica `kept` sem
   build que a leia (M6); o estouro de tempo e o campo `Outcome.IsTimeout`, que o
   cache de `verify` nao guarda; uma ancora que perdeu quase toda a mudanca por
