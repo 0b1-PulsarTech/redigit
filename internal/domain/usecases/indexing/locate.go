@@ -2,6 +2,7 @@ package indexing
 
 import (
 	"cmp"
+	"context"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -81,4 +82,62 @@ func (l locator) add(path string, source []byte, decls []entities.Decl) {
 	})
 
 	l.byFile[path] = entry
+}
+
+// reattach asks again who reads what the cut functions read, and keeps the
+// answers that land on a head or a statement. The locator now tells the
+// statements apart, so each reader is attributed to the one that wrote it.
+func (i Indexer) reattach(
+	ctx context.Context,
+	graph entities.Graph,
+	cut wiringCut,
+	where locator,
+) []entities.Edge {
+	providers := map[entities.DeclKey]bool{}
+
+	for key := range cut.replaced {
+		for _, edge := range graph.Needs(key) {
+			if edge.Reason == entities.ReasonReference || edge.Reason == entities.ReasonImplements {
+				providers[edge.Provider] = true
+			}
+		}
+	}
+
+	interfaces := map[entities.DeclKey]bool{}
+
+	for _, decl := range graph.Decls() {
+		if decl.IsInterface {
+			interfaces[decl.Key] = true
+		}
+	}
+
+	var out []entities.Edge
+
+	for _, key := range sortedKeySet(providers) {
+		provider, found := graph.Decl(key)
+		if !found {
+			continue
+		}
+
+		edges, _ := i.edgesOf(ctx, provider, where, interfaces)
+
+		for _, edge := range edges {
+			if cut.added[edge.Dependent] {
+				out = append(out, edge)
+			}
+		}
+	}
+
+	return out
+}
+
+func sortedKeySet(set map[entities.DeclKey]bool) []entities.DeclKey {
+	out := make([]entities.DeclKey, 0, len(set))
+	for key := range set {
+		out = append(out, key)
+	}
+
+	slices.SortFunc(out, entities.CompareKeys)
+
+	return out
 }
