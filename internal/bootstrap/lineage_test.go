@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/lineage"
 )
@@ -38,8 +39,8 @@ func TestDecodeLineageSection(t *testing.T) {
 		name        string
 		raw         string
 		wantFollow  bool
-		wantAnchors string
-		wantErr     error
+		wantPolicy  anchoring.Policy
+		wantAnchors []anchoring.Spec
 	}{
 		{name: "a missing section follows renames", wantFollow: true},
 		{name: "an empty object follows renames", raw: `{}`, wantFollow: true},
@@ -47,14 +48,19 @@ func TestDecodeLineageSection(t *testing.T) {
 		{name: "follow true", raw: `{"follow": true}`, wantFollow: true},
 		{name: "follow false", raw: `{"follow": false}`},
 		{
-			name: "anchors stay raw for the stage that reads them",
-			raw:  `{"anchors": {"policy": "fold"}}`, wantFollow: true,
-			wantAnchors: `{"policy": "fold"}`,
+			name: "anchors decode with their own policy and the global one",
+			raw: `{"policy": "wip", "anchors": [
+				{"rev": "3d2d883", "kind": "fix"}, {"rev": "0aab4c6", "kind": "perf", "policy": "fold"}]}`,
+			wantFollow: true, wantPolicy: anchoring.PolicyWIP,
+			wantAnchors: []anchoring.Spec{
+				{Rev: "3d2d883", Kind: "fix"},
+				{Rev: "0aab4c6", Kind: "perf", Policy: anchoring.PolicyFold},
+			},
 		},
-		{name: "an unknown key is refused", raw: `{"rename": true}`, wantErr: ErrConfig},
-		{name: "a wrong type is refused", raw: `{"follow": "yes"}`, wantErr: ErrConfig},
-		{name: "a non-object is refused", raw: `[true]`, wantErr: ErrConfig},
-		{name: "trailing data is refused", raw: `{} {}`, wantErr: ErrConfig},
+		{
+			name: "a global policy alone is kept", raw: `{"policy": "fold"}`,
+			wantFollow: true, wantPolicy: anchoring.PolicyFold,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -62,20 +68,58 @@ func TestDecodeLineageSection(t *testing.T) {
 			t.Parallel()
 
 			got, err := decodeLineageSection(json.RawMessage(testCase.raw))
-
-			if !errors.Is(err, testCase.wantErr) {
-				t.Fatalf("err = %v, want %v", err, testCase.wantErr)
-			}
-
 			if err != nil {
-				return
+				t.Fatalf("decodeLineageSection() = %v", err)
 			}
 
-			if got.follow != testCase.wantFollow || string(got.anchors) != testCase.wantAnchors {
+			if got.Follow != testCase.wantFollow || got.Policy != testCase.wantPolicy ||
+				!slices.Equal(got.Anchors, testCase.wantAnchors) {
 				t.Fatalf(
-					"section = {%v %q}, want {%v %q}",
-					got.follow, got.anchors, testCase.wantFollow, testCase.wantAnchors,
+					"section = %+v, want follow %v policy %q anchors %v",
+					got, testCase.wantFollow, testCase.wantPolicy, testCase.wantAnchors,
 				)
+			}
+		})
+	}
+}
+
+func TestDecodeLineageSectionRefusals(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		raw  string
+	}{
+		{name: "stop arrives later", raw: `{"policy": "stop"}`},
+		{
+			name: "stop on one anchor arrives later",
+			raw:  `{"anchors": [{"rev": "3d2d883", "kind": "fix", "policy": "stop"}]}`,
+		},
+		{name: "an unknown policy", raw: `{"policy": "later"}`},
+		{name: "an unknown kind", raw: `{"anchors": [{"rev": "3d2d883", "kind": "feat"}]}`},
+		{name: "a missing rev", raw: `{"anchors": [{"kind": "fix"}]}`},
+		{
+			name: "a repeated rev",
+			raw:  `{"anchors": [{"rev": "3d2d883", "kind": "fix"}, {"rev": "3d2d883", "kind": "perf"}]}`,
+		},
+		{name: "anchors that are not a list", raw: `{"anchors": {"policy": "fold"}}`},
+		{
+			name: "an unknown anchor key",
+			raw:  `{"anchors": [{"rev": "3d2d883", "kind": "fix", "slot": 3}]}`,
+		},
+		{name: "an unknown key", raw: `{"rename": true}`},
+		{name: "a wrong type", raw: `{"follow": "yes"}`},
+		{name: "a non-object", raw: `[true]`},
+		{name: "trailing data", raw: `{} {}`},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := decodeLineageSection(json.RawMessage(testCase.raw))
+			if !errors.Is(err, ErrConfig) {
+				t.Fatalf("err = %v, want %v", err, ErrConfig)
 			}
 		})
 	}
@@ -171,7 +215,8 @@ func TestLineageStage(t *testing.T) {
 			kept := errors.New("kept")
 			built := identityStages(kept)
 
-			err := lineageStage(t.Context(), &cfg, goAndBareEnv(), built, fake.scan)
+			deps := lineageDeps{scan: fake.scan}
+			err := lineageStage(t.Context(), &cfg, goAndBareEnv(), built, deps)
 
 			if !errors.Is(err, testCase.wantErr) {
 				t.Fatalf("err = %v, want %v", err, testCase.wantErr)
@@ -236,7 +281,7 @@ func TestLineageStageRunsLastAndOwnsTheOrderer(t *testing.T) {
 				name, inner := hooks[idx].name, hooks[idx].run
 				if name == "lineage" {
 					inner = func(ctx context.Context, conf *Config, env stageEnv, held *stages) error {
-						return lineageStage(ctx, conf, env, held, fake.scan)
+						return lineageStage(ctx, conf, env, held, lineageDeps{scan: fake.scan})
 					}
 				}
 
@@ -267,6 +312,120 @@ func TestLineageStageRunsLastAndOwnsTheOrderer(t *testing.T) {
 				t.Fatalf("orderer after every hook is %T, lineage = %v, want %v",
 					seen, isLineage, testCase.wantLineage)
 			}
+		})
+	}
+}
+
+type anchorStageCase struct {
+	name        string
+	mode        string
+	section     string
+	openErr     error
+	wantErr     error
+	wantOpens   int
+	wantScans   int
+	wantClosers int
+	wantWrapped bool
+}
+
+func runAnchorStage(t *testing.T, testCase anchorStageCase) {
+	t.Helper()
+
+	history := []entities.SourceTouch{
+		{Position: 4, Rev: "3d2d883000"},
+		{Position: 7, Rev: "0aab4c6000"},
+		{Position: 9, Rev: "3d2d8aa000"},
+	}
+
+	var (
+		opens int
+		order []string
+	)
+
+	scan := &fakeLineageScan{}
+	deps := lineageDeps{
+		scan: scan.scan,
+		open: func(context.Context, *Config, stageEnv) (anchoring.Config, closers, error) {
+			opens++
+
+			held := closers{orderedCloser{"probe", &order}}
+
+			return anchoring.Config{}, held, testCase.openErr
+		},
+	}
+
+	cfg := Defaults()
+	cfg.Mode = testCase.mode
+	cfg.Sections.Lineage = json.RawMessage(testCase.section)
+
+	env := goAndBareEnv()
+	env.opened.snapshot.History = history
+	kept := errors.New("kept")
+	built := identityStages(kept)
+
+	err := lineageStage(t.Context(), &cfg, env, built, deps)
+	if !errors.Is(err, testCase.wantErr) {
+		t.Fatalf("err = %v, want %v", err, testCase.wantErr)
+	}
+
+	if opens != testCase.wantOpens || scan.calls != testCase.wantScans {
+		t.Fatalf("opens = %d, scans = %d, want %d and %d",
+			opens, scan.calls, testCase.wantOpens, testCase.wantScans)
+	}
+
+	if len(built.closers) != testCase.wantClosers {
+		t.Fatalf("closers = %d, want %d", len(built.closers), testCase.wantClosers)
+	}
+
+	_, isWrapped := built.planner.(anchoring.Planner)
+	if isWrapped != testCase.wantWrapped {
+		t.Fatalf("planner is %T, want anchoring = %v", built.planner, testCase.wantWrapped)
+	}
+
+	if isWrapped {
+		_, planErr := built.planner.Plan(entities.Graph{}, entities.Ordering{})
+		if !errors.Is(planErr, kept) {
+			t.Fatalf("Plan() = %v, want the previous planner under the anchors", planErr)
+		}
+	}
+}
+
+func TestLineageStageAnchors(t *testing.T) {
+	t.Parallel()
+
+	openFailure := errors.New("open failed")
+	fix := `{"anchors": [{"rev": "3d2d883", "kind": "fix"}]}`
+
+	testCases := []anchorStageCase{
+		{name: "no anchors never open the probe", mode: ModeLineage, wantScans: 1},
+		{name: "history mode ignores the anchors", mode: ModeHistory, section: fix},
+		{
+			name: "history mode refuses an unknown rev", mode: ModeHistory,
+			section: `{"anchors": [{"rev": "beef000", "kind": "fix"}]}`, wantErr: ErrConfig,
+		},
+		{
+			name: "an anchor wraps the planner and holds what it opened", mode: ModeLineage,
+			section: fix, wantOpens: 1, wantScans: 1, wantClosers: 1, wantWrapped: true,
+		},
+		{
+			name: "an unknown rev fails before the scan", mode: ModeLineage,
+			section: `{"anchors": [{"rev": "beef000", "kind": "fix"}]}`, wantErr: ErrConfig,
+		},
+		{
+			name: "an ambiguous rev fails before the scan", mode: ModeLineage,
+			section: `{"anchors": [{"rev": "3d2d8", "kind": "fix"}]}`, wantErr: ErrConfig,
+		},
+		{
+			name: "a probe that cannot open fails the stage", mode: ModeLineage,
+			section: `{"anchors": [{"rev": "0aab4c6", "kind": "perf"}]}`,
+			openErr: openFailure, wantErr: openFailure, wantOpens: 1, wantScans: 1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			runAnchorStage(t, testCase)
 		})
 	}
 }

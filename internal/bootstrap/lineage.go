@@ -9,19 +9,30 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/lineage"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
+	"github.com/wrapped-owls/redigit/internal/infra/anchorprobe"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore/batch"
+	"github.com/wrapped-owls/redigit/internal/infra/gitstore/preimage"
 )
 
 type (
 	lineageSection struct {
-		follow  bool
-		anchors json.RawMessage
+		Follow  bool             `json:"follow"`
+		Policy  anchoring.Policy `json:"policy"`
+		Anchors []anchoring.Spec `json:"anchors"`
 	}
 
 	lineageScan func(context.Context, *Config, stageEnv, lineage.Config) (lineage.Result, error)
+
+	anchorOpen func(context.Context, *Config, stageEnv) (anchoring.Config, closers, error)
+
+	lineageDeps struct {
+		scan lineageScan
+		open anchorOpen
+	}
 
 	lineageOrderer struct {
 		ordering.Orderer
@@ -31,7 +42,7 @@ type (
 )
 
 func lineageHook(ctx context.Context, cfg *Config, env stageEnv, built *stages) error {
-	return lineageStage(ctx, cfg, env, built, scanHistory)
+	return lineageStage(ctx, cfg, env, built, lineageDeps{scan: scanHistory, open: openProbe})
 }
 
 func lineageStage(
@@ -39,7 +50,7 @@ func lineageStage(
 	cfg *Config,
 	env stageEnv,
 	built *stages,
-	scan lineageScan,
+	deps lineageDeps,
 ) error {
 	// Decoded in every mode, so a bad section fails before any indexing starts.
 	section, err := decodeLineageSection(cfg.Sections.Lineage)
@@ -47,12 +58,21 @@ func lineageStage(
 		return err
 	}
 
+	anchors, err := anchoring.Locate(section.Anchors, env.opened.snapshot.History)
+	if err != nil {
+		return fmt.Errorf("%w: lineage anchors: %w", ErrConfig, err)
+	}
+
 	if cfg.Mode != ModeLineage {
+		if len(anchors) > 0 {
+			slog.Warn("anchors: ignored outside lineage mode", slog.Int("count", len(anchors)))
+		}
+
 		return nil
 	}
 
-	result, err := scan(ctx, cfg, env, lineage.Config{
-		Languages: lineageLanguages(env.specific), Follow: section.follow,
+	result, err := deps.scan(ctx, cfg, env, lineage.Config{
+		Languages: lineageLanguages(env.specific), Follow: section.Follow,
 	})
 	if err != nil {
 		return fmt.Errorf("scan lineage: %w", err)
@@ -70,7 +90,41 @@ func lineageStage(
 	// The full Result rides on the orderer for the anchors stage to read.
 	built.orderer = lineageOrderer{Orderer: ordering.New(floored), result: result}
 
+	if len(anchors) == 0 {
+		return nil
+	}
+
+	anchored, held, err := deps.open(ctx, cfg, env)
+	if err != nil {
+		return fmt.Errorf("open anchors: %w", err)
+	}
+
+	anchored.Inner, anchored.Policy, anchored.Anchors = built.planner, section.Policy, anchors
+	anchored.Floor, anchored.Renames, anchored.Bound = floored.Floor, result.Renames(), ctx
+	anchored.Languages, anchored.Finals = lineageLanguages(env.specific), env.tree.reader
+
+	built.closers = append(built.closers, held...)
+	built.planner = anchoring.New(anchored)
+
 	return nil
+}
+
+func openProbe(ctx context.Context, cfg *Config, env stageEnv) (anchoring.Config, closers, error) {
+	renderers := renderersByExtension(env.specific)
+	settings := anchorprobe.Settings{
+		Repo: env.root, Rev: cfg.Rev, Tags: cfg.BuildTags,
+		Renderer: newRenderer(renderers[".go"], renderers),
+	}
+
+	probe, err := anchorprobe.Open(ctx, settings)
+	if err != nil {
+		return anchoring.Config{}, nil, fmt.Errorf("open probe: %w", err)
+	}
+
+	reader := preimage.NewReader(env.root)
+	opened := anchoring.Config{Revisions: reader, Probe: probe, Reader: probe}
+
+	return opened, closers{probe, reader}, nil
 }
 
 func scanHistory(
@@ -83,11 +137,7 @@ func scanHistory(
 	result, err := lineage.NewScanner(revisions, scanCfg).Scan(ctx, env.opened.snapshot)
 
 	// Closed on every path: the stream is not needed once the scan is over.
-	if closeErr := revisions.Close(); closeErr != nil {
-		err = errors.Join(err, closeErr)
-	}
-
-	return result, err
+	return result, errors.Join(err, revisions.Close())
 }
 
 func lineageLanguages(specific []indexing.Language) []lineage.Language {
@@ -105,20 +155,15 @@ func lineageLanguages(specific []indexing.Language) []lineage.Language {
 }
 
 func decodeLineageSection(raw json.RawMessage) (lineageSection, error) {
-	section := lineageSection{follow: true}
+	section := lineageSection{Follow: true}
 	if len(raw) == 0 {
 		return section, nil
-	}
-
-	var shape struct {
-		Follow  *bool           `json:"follow"`
-		Anchors json.RawMessage `json:"anchors"`
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 
-	if err := decoder.Decode(&shape); err != nil {
+	if err := decoder.Decode(&section); err != nil {
 		return lineageSection{}, fmt.Errorf("%w: lineage section: %w", ErrConfig, err)
 	}
 
@@ -126,11 +171,9 @@ func decodeLineageSection(raw json.RawMessage) (lineageSection, error) {
 		return lineageSection{}, fmt.Errorf("%w: lineage section: trailing data", ErrConfig)
 	}
 
-	if shape.Follow != nil {
-		section.follow = *shape.Follow
+	if err := anchoring.Validate(section.Anchors, section.Policy); err != nil {
+		return lineageSection{}, fmt.Errorf("%w: lineage section: %w", ErrConfig, err)
 	}
-
-	section.anchors = shape.Anchors
 
 	return section, nil
 }

@@ -1,11 +1,18 @@
 package bootstrap
 
 import (
+	"bytes"
 	"cmp"
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
 )
 
 type lineagePlan struct {
@@ -367,6 +374,93 @@ func TestLineagePlanInsertedMatchesSeed(t *testing.T) {
 
 			if got := limitOf(testCase.snap, 8); got != testCase.wantLimit {
 				t.Errorf("limitOf() = %d, want %d", got, testCase.wantLimit)
+			}
+		})
+	}
+}
+
+func TestLineageStageWarnsWhenAnchorsAreIgnored(t *testing.T) {
+	fix := `{"anchors": [{"rev": "3d2d883", "kind": "fix"}]}`
+	testCases := []struct {
+		name, section string
+		wantWarn      bool
+	}{
+		{name: "history mode ignores the anchors and says so", section: fix, wantWarn: true},
+		{name: "history mode without anchors says nothing"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buf bytes.Buffer
+
+			restore := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+
+			runAnchorStage(t, anchorStageCase{mode: ModeHistory, section: testCase.section})
+			slog.SetDefault(restore)
+
+			warned := strings.Contains(buf.String(), "ignored outside")
+			if warned != testCase.wantWarn {
+				t.Errorf("warned = %v, want %v", warned, testCase.wantWarn)
+			}
+		})
+	}
+}
+
+type runKey struct{}
+
+type ctxRevisions struct{ seen *any }
+
+func (stub ctxRevisions) Revision(ctx context.Context, _ string) (anchoring.Revision, error) {
+	*stub.seen = ctx.Value(runKey{})
+
+	return anchoring.Revision{}, errRevisionStop
+}
+
+func (ctxRevisions) Blob(context.Context, string) ([]byte, error) { return nil, errRevisionStop }
+
+var errRevisionStop = errors.New("revision stop")
+
+func TestLineageStageBindsTheRunContextToTheAnchors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct{ name, section string }{
+		{name: "the run context", section: `{"anchors": [{"rev": "3d2d883", "kind": "fix"}]}`},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var seen any
+
+			deps := lineageDeps{
+				scan: (&fakeLineageScan{}).scan,
+				open: func(context.Context, *Config, stageEnv) (anchoring.Config, closers, error) {
+					return anchoring.Config{Revisions: ctxRevisions{seen: &seen}}, nil, nil
+				},
+			}
+
+			cfg := Defaults()
+			cfg.Mode = ModeLineage
+			cfg.Sections.Lineage = json.RawMessage(testCase.section)
+
+			env := goAndBareEnv()
+			env.opened.snapshot.History = []entities.SourceTouch{{Position: 4, Rev: "3d2d883000"}}
+			built := identityStages(nil)
+			ctx := context.WithValue(t.Context(), runKey{}, "run")
+
+			if err := lineageStage(ctx, &cfg, env, built, deps); err != nil {
+				t.Fatalf("lineageStage() = %v", err)
+			}
+
+			_, err := built.planner.Plan(entities.Graph{}, entities.Ordering{})
+			if !errors.Is(err, errRevisionStop) {
+				t.Fatalf("Plan() = %v, want the revision stop", err)
+			}
+
+			if seen != "run" {
+				t.Fatalf("the anchors read revisions under %v, want the run context", seen)
 			}
 		})
 	}
