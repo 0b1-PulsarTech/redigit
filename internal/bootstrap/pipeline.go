@@ -203,14 +203,6 @@ type (
 	}
 )
 
-func stageHooks() []namedHook {
-	return []namedHook{
-		{name: "rules", run: ruleHook},
-		{name: "shaping", run: shapeHook},
-		{name: "lineage", run: lineageHook},
-	}
-}
-
 func shapeStages(
 	ctx context.Context,
 	cfg *Config,

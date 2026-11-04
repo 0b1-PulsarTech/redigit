@@ -110,3 +110,11 @@ func (observer slogObserver) Refused(pass string, added []entities.Edge) {
 		slog.Any("edges", edges),
 	)
 }
+
+func stageHooks() []namedHook {
+	return []namedHook{
+		{name: "rules", run: ruleHook},
+		{name: "shaping", run: shapeHook},
+		{name: "lineage", run: lineageHook},
+	}
+}

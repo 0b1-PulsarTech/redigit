@@ -268,3 +268,19 @@ func TestSlogObserver(t *testing.T) {
 		})
 	}
 }
+
+func TestStageHooksRunInTheFixedOrder(t *testing.T) {
+	t.Parallel()
+
+	hooks := stageHooks()
+	names := make([]string, 0, len(hooks))
+
+	for _, hook := range hooks {
+		names = append(names, hook.name)
+	}
+
+	want := []string{"rules", "shaping", "lineage"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("stageHooks() = %v, want %v", names, want)
+	}
+}

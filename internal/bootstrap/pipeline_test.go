@@ -690,22 +690,6 @@ func summarise(built *stages, replaced error) ([]string, bool) {
 	return names, errors.Is(orderErr, replaced) && errors.Is(planErr, replaced)
 }
 
-func TestStageHooksRunInTheFixedOrder(t *testing.T) {
-	t.Parallel()
-
-	hooks := stageHooks()
-	names := make([]string, 0, len(hooks))
-
-	for _, hook := range hooks {
-		names = append(names, hook.name)
-	}
-
-	want := []string{"rules", "shaping", "lineage"}
-	if !slices.Equal(names, want) {
-		t.Fatalf("stageHooks() = %v, want %v", names, want)
-	}
-}
-
 func identityStages(failure error) *stages {
 	return &stages{
 		languages: []indexing.Language{{Name: "kept"}},
