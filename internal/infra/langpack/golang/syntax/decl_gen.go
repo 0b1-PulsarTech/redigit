@@ -21,8 +21,8 @@ func buildGenDecl(
 	case token.TYPE:
 		return buildTypeSpecs(fset, path, source, unit, decl)
 	case token.CONST:
-		if HasImplicitSpec(decl) {
-			return buildAtomicGroup(fset, path, source, unit, entities.KindValue, decl)
+		if NeedsItsBlock(decl) {
+			return buildAtomicGroup(fset, path, source, unit, decl)
 		}
 
 		return buildValueSpecs(fset, source, path, unit, decl)
@@ -31,79 +31,6 @@ func buildGenDecl(
 	default:
 		return nil
 	}
-}
-
-func HasImplicitSpec(decl *ast.GenDecl) bool {
-	for index, spec := range decl.Specs {
-		if index == 0 {
-			continue
-		}
-
-		vs, ok := spec.(*ast.ValueSpec)
-		if ok && vs.Type == nil && len(vs.Values) == 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
-func buildAtomicGroup(
-	fset *token.FileSet,
-	path string,
-	source []byte,
-	unit entities.UnitID,
-	kind entities.DeclKind,
-	decl *ast.GenDecl,
-) []entities.Decl {
-	start := decl.Pos()
-	if decl.Doc != nil {
-		start = decl.Doc.Pos()
-	}
-
-	// Every name shares the group's span, so whichever one a plan names, the
-	// renderer emits the whole group and the constants keep their values.
-	span := spanOf(fset, start, decl.End())
-
-	var decls []entities.Decl
-
-	size := len(GroupNames(decl))
-
-	for _, spec := range decl.Specs {
-		vs, ok := spec.(*ast.ValueSpec)
-		if !ok {
-			continue
-		}
-
-		for _, name := range vs.Names {
-			decls = append(decls, entities.Decl{
-				Key:       entities.DeclKey{File: path, Kind: kind, Name: name.Name},
-				Unit:      unit,
-				Span:      span,
-				Selector:  LocationOf(fset, path, source, name.Pos()),
-				GroupSize: size,
-			})
-		}
-	}
-
-	return decls
-}
-
-func GroupNames(decl *ast.GenDecl) []string {
-	var names []string
-
-	for _, spec := range decl.Specs {
-		vs, ok := spec.(*ast.ValueSpec)
-		if !ok {
-			continue
-		}
-
-		for _, name := range vs.Names {
-			names = append(names, name.Name)
-		}
-	}
-
-	return names
 }
 
 func buildTypeSpecs(
@@ -160,8 +87,15 @@ func buildValueSpecs(
 
 		start := specStart(decl, vs.Doc, vs.Pos())
 
+		// The renderer keeps a whole spec when any of its names is planned, so its names must be born together.
+		atom := ""
+		if len(vs.Names) > 1 {
+			atom = atomLabel("spec-group", fset, vs.Pos())
+		}
+
 		for _, name := range vs.Names {
 			decls = append(decls, entities.Decl{
+				Atom: atom,
 				Key: entities.DeclKey{
 					File: path,
 					Kind: entities.KindValue,

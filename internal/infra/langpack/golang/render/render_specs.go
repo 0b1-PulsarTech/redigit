@@ -25,7 +25,7 @@ func filterGenDecl(
 		})
 	}
 
-	if gen.Tok == token.CONST && syntax.HasImplicitSpec(gen) {
+	if gen.Tok == token.CONST && syntax.NeedsItsBlock(gen) {
 		// Any surviving name keeps the whole group: an iota constant that is
 		// not written down still takes its value from its position in the
 		// block, so the block cannot be cut.
