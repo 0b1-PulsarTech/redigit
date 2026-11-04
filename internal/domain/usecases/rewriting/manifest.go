@@ -20,6 +20,8 @@ type (
 		Position int
 		Subject  string
 		Blobs    []BlobRef
+		IsWIP    bool
+		ID       string
 	}
 )
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/rewriting"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/subjecting"
 )
 
 func TestReadRows(t *testing.T) {
@@ -26,7 +27,10 @@ func TestReadRows(t *testing.T) {
 			"lines with extra fields and blank lines",
 			`{"position":1,"subject":"s","shape":"x","blobs":[{"path":"a.go","mode":"100644","handle":"h"}]}` +
 				"\n\n" + `{"position":0,"subject":"t","blobs":[]}` + "\n",
-			[]rewriting.Row{{Position: 1, Subject: "s", Blobs: blobs}, {Position: 0, Subject: "t"}},
+			[]rewriting.Row{
+				{Position: 1, Subject: "s", Blobs: blobs, ID: subjecting.ID(nil, []string{"a.go"})},
+				{Position: 0, Subject: "t", ID: subjecting.ID(nil, nil)},
+			},
 			nil,
 		},
 		{"empty manifest", "", nil, nil},
@@ -116,4 +120,54 @@ func TestReadSubjects(t *testing.T) {
 
 func noModeRow(modeField string) string {
 	return `{"position":0,"blobs":[{"path":"a",` + modeField + `"handle":"h"}]}`
+}
+
+func TestReadRowsKeepsWIPAndID(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		content string
+		wantWIP bool
+		wantID  string
+	}{
+		{
+			name: "a wip row hashes its chunk keys and blob paths",
+			content: `{"position":0,"subject":"s","is_wip":true,` +
+				`"chunks":[{"key":"k2","span":[0,1],"unit":"u"},{"key":"k1","span":[9,12],"unit":"u"}],` +
+				`"blobs":[{"path":"a.go","mode":"100644","handle":"h"}]}`,
+			wantWIP: true,
+			wantID:  subjecting.ID([]string{"k1", "k2"}, []string{"a.go"}),
+		},
+		{
+			name:    "a row without chunks hashes its blobs alone",
+			content: `{"position":0,"blobs":[{"path":"go.mod","mode":"100644","handle":"h"}]}`,
+			wantID:  subjecting.ID(nil, []string{"go.mod"}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.TempDir(), "m.jsonl")
+			if err := os.WriteFile(path, []byte(testCase.content), 0o600); err != nil {
+				t.Fatalf("write manifest: %v", err)
+			}
+
+			got, err := readRows(path)
+			if err != nil || len(got) != 1 {
+				t.Fatalf("readRows() = %+v, %v", got, err)
+			}
+
+			if got[0].IsWIP != testCase.wantWIP || got[0].ID != testCase.wantID {
+				t.Fatalf(
+					"readRows() row = %+v, want wip %v id %q",
+					got[0],
+					testCase.wantWIP,
+					testCase.wantID,
+				)
+			}
+		})
+	}
 }
