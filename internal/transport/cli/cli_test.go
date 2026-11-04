@@ -237,3 +237,51 @@ func TestDispatchVerifyRoutesWithoutAPipeline(t *testing.T) {
 		})
 	}
 }
+
+func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
+	t.Parallel()
+
+	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
+		t.Fatal("a reserved verb must never start a pipeline")
+
+		return nil, nil
+	}
+
+	testCases := []struct {
+		name    string
+		command string
+		slice   string
+	}{
+		{"subjects", cmdSubjects, "slice 19"},
+		{"format", cmdFormat, "slice 15w"},
+		{"lint", cmdLint, "slice 17"},
+		{"continue", cmdContinue, "slice 24b"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+
+			err := dispatch(
+				context.Background(),
+				[]string{testCase.command, "--repo", "."},
+				&stdout,
+				&stderr,
+				runEnv{Start: unreachable},
+			)
+			if !errors.Is(err, ErrUsage) || !strings.Contains(err.Error(), testCase.slice) {
+				t.Fatalf("err = %v, want a usage error naming %q", err, testCase.slice)
+			}
+
+			if stderr.String() != fullUsage || stdout.Len() != 0 {
+				t.Fatalf(
+					"stderr = %q, stdout = %q, want the full usage alone",
+					stderr.String(),
+					stdout.String(),
+				)
+			}
+		})
+	}
+}
