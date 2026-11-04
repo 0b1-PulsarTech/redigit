@@ -8,7 +8,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
-var ErrBlobMissing = errors.New("blob missing")
+var (
+	ErrBlobMissing = errors.New("blob missing")
+	ErrDeadGlob    = errors.New("slice.functions glob matches no function that can be cut")
+)
 
 type RevisionLog interface {
 	Changes(ctx context.Context) iter.Seq2[RevisionChange, error]
@@ -75,6 +78,10 @@ type Slicer interface {
 	// statements. It reports false for a function whose body cannot be cut and
 	// still compile: one with labels, or an early return between statements.
 	Slice(ctx context.Context, fn entities.Decl, source []byte) (Sliced, bool, error)
+}
+
+type Selector interface {
+	Functions() []string
 }
 
 // Sliced is a function cut into pieces. Head keeps the key of the function and

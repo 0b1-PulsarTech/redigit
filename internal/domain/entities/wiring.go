@@ -22,8 +22,8 @@ const wiringFloor = 20
 // entry points.
 //
 // A statement of such a function is wiring by kind: it was cut out of a root,
-// and nothing but the root's own assembly reads it. So is the signature the
-// statements sit under.
+// or out of any function a slice.functions glob names, and nothing but that
+// function's own assembly reads it. So is the signature the statements sit under.
 func FindWiring(graph Graph) map[DeclKey]bool {
 	total := 0
 

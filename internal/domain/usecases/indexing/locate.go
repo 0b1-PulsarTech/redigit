@@ -3,7 +3,10 @@ package indexing
 import (
 	"cmp"
 	"context"
+	"fmt"
+	"maps"
 	"slices"
+	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
@@ -129,6 +132,36 @@ func (i Indexer) reattach(
 	}
 
 	return out
+}
+
+func (indexer Indexer) refuseDeadGlobs(replaced map[entities.DeclKey]bool) error {
+	var dead []string
+
+	cutKeys := slices.Collect(maps.Keys(replaced))
+
+	// The slicer leaves whole a body it cannot cut safely, so a glob is counted by
+	// what was cut: one left with nothing is as dead as one that matched no name.
+	for _, lang := range indexer.langs {
+		selector, isSelector := lang.Syntax.(Selector)
+		if !isSelector {
+			continue
+		}
+
+		for _, glob := range selector.Functions() {
+			isCut := slices.ContainsFunc(cutKeys, func(key entities.DeclKey) bool {
+				return lang.Owns(key.File) && globMatches(glob, key.Name)
+			})
+			if !isCut {
+				dead = append(dead, glob)
+			}
+		}
+	}
+
+	if len(dead) > 0 {
+		return fmt.Errorf("%w: %s", ErrDeadGlob, strings.Join(dead, ", "))
+	}
+
+	return nil
 }
 
 func sortedKeySet(set map[entities.DeclKey]bool) []entities.DeclKey {

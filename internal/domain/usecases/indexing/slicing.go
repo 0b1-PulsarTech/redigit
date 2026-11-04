@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -21,11 +22,12 @@ type wiringCut struct {
 	body []entities.Edge
 }
 
-// cutWiring slices every function the graph reads as wiring, for the languages
-// that can. A route table, an injector or a bootstrap list is written one
-// registration at a time, each with the feature it registers; read as a single
-// declaration it waits for the last feature and the program's entry lands at
-// the end of the history, so it is cut into the statements it is made of.
+// cutWiring slices every function the graph reads as wiring, and every one a
+// slice.functions glob names, for the languages that can. A route table, an
+// injector or a bootstrap list is written one registration at a time, each with
+// the feature it registers; read as a single declaration it waits for the last
+// feature and the program's entry lands at the end of the history, so it is cut
+// into the statements it is made of.
 func (i Indexer) cutWiring(
 	ctx context.Context,
 	graph entities.Graph,
@@ -33,6 +35,8 @@ func (i Indexer) cutWiring(
 	where locator,
 ) (wiringCut, error) {
 	roots := entities.FindWiring(graph)
+	i.selectFunctions(decls, roots)
+
 	byFile := map[string][]entities.Decl{}
 
 	for _, decl := range decls {
@@ -47,6 +51,11 @@ func (i Indexer) cutWiring(
 		if err := i.cutFile(ctx, file, byFile, roots, &cut, where); err != nil {
 			return wiringCut{}, err
 		}
+	}
+
+	// A silently ignored setting is one the author believes is working.
+	if err := i.refuseDeadGlobs(cut.replaced); err != nil {
+		return wiringCut{}, err
 	}
 
 	for _, file := range files {
@@ -145,3 +154,27 @@ func isCuttable(decl entities.Decl) bool {
 }
 
 func compareDeclKeys(a, b entities.Decl) int { return entities.CompareKeys(a.Key, b.Key) }
+
+func globMatches(glob, name string) bool {
+	hit, _ := path.Match(glob, name)
+
+	return hit
+}
+
+func (i Indexer) selectFunctions(decls []entities.Decl, roots map[entities.DeclKey]bool) {
+	for _, lang := range i.langs {
+		selector, isSelector := lang.Syntax.(Selector)
+		if !isSelector {
+			continue
+		}
+
+		for _, decl := range decls {
+			if lang.Owns(decl.Key.File) && isCuttable(decl) &&
+				slices.ContainsFunc(selector.Functions(), func(glob string) bool {
+					return globMatches(glob, decl.Key.Name)
+				}) {
+				roots[decl.Key] = true
+			}
+		}
+	}
+}
