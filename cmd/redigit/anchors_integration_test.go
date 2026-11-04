@@ -38,6 +38,10 @@ func commitFiles(t testing.TB, dir, subject string, files map[string]string) {
 	t.Helper()
 
 	for name, text := range files {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o750); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o600); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
