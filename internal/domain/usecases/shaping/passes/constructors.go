@@ -17,5 +17,15 @@ func Entries() []shaping.Entry {
 
 			return tidy, nil
 		},
+	}, {
+		Type: CapName,
+		New: func(raw json.RawMessage) (shaping.Pass, error) {
+			pass, err := NewCap(raw)
+			if err != nil {
+				return nil, err
+			}
+
+			return pass, nil
+		},
 	}}
 }

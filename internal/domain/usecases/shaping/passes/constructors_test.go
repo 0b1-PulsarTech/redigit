@@ -17,9 +17,23 @@ func TestEntries(t *testing.T) {
 		wantName string
 		wantErr  error
 	}{
-		{"tidy by its type", `[{"type":"tidy-test-after"}]`, "tidy-test-after", nil},
-		{"unknown field", `[{"type":"tidy-test-after","nope":1}]`, "", shaping.ErrMalformed},
-		{"unknown type", `[{"type":"nope"}]`, "", shaping.ErrUnknownType},
+		{
+			name:     "tidy by its type",
+			raw:      `[{"type":"tidy-test-after"}]`,
+			wantName: "tidy-test-after",
+		},
+		{name: "cap by its type", raw: `[{"type":"finish-cap"}]`, wantName: "finish-cap"},
+		{
+			name:    "cap unknown field",
+			raw:     `[{"type":"finish-cap","nope":1}]`,
+			wantErr: shaping.ErrMalformed,
+		},
+		{
+			name:    "unknown field",
+			raw:     `[{"type":"tidy-test-after","nope":1}]`,
+			wantErr: shaping.ErrMalformed,
+		},
+		{name: "unknown type", raw: `[{"type":"nope"}]`, wantErr: shaping.ErrUnknownType},
 	}
 
 	for _, testCase := range testCases {
