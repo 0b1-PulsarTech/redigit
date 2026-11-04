@@ -39,7 +39,7 @@ func Needed(source []byte, text string) []string {
 		if path, _ := strconv.Unquote(
 			spec.Path.Value,
 		); path == "C" ||
-			!used[importLocalName(spec)] {
+			!importIsUsed(spec, used) {
 			continue
 		}
 

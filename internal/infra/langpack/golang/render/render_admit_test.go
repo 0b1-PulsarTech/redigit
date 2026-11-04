@@ -31,6 +31,11 @@ func TestNeeded(t *testing.T) {
 			text: "func F() int { return rand.Int() }", want: []string{`"math/rand/v2"`},
 		},
 		{
+			name:   "a major version path is reached by the version element",
+			source: "package p\n\nimport \"example.com/fx/v1\"\n",
+			text:   "func F() { v1.Run() }", want: []string{`"example.com/fx/v1"`},
+		},
+		{
 			name: "two imports in the order of the file", source: header,
 			text: "func F() { _ = rand.Int(); _ = bytes.Equal(nil, nil) }",
 			want: []string{`"bytes"`, `"math/rand/v2"`},

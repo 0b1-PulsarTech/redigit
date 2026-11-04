@@ -3,6 +3,7 @@ package render
 import (
 	"go/ast"
 	"go/token"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -129,12 +130,12 @@ func importIsUsed(spec *ast.ImportSpec, used map[string]bool) bool {
 		return true
 	}
 
-	return used[importLocalName(spec)]
+	return slices.ContainsFunc(importLocalNames(spec), func(name string) bool { return used[name] })
 }
 
-func importLocalName(spec *ast.ImportSpec) string {
+func importLocalNames(spec *ast.ImportSpec) []string {
 	if spec.Name != nil {
-		return spec.Name.Name
+		return []string{spec.Name.Name}
 	}
 
 	path, err := strconv.Unquote(spec.Path.Value)
@@ -142,27 +143,26 @@ func importLocalName(spec *ast.ImportSpec) string {
 		path = spec.Path.Value
 	}
 
-	// The name is a guess from the path; skip /vN (math/rand/v2 is rand) or the import is
-	// pruned and the output does not compile.
-	if slash := strings.LastIndexByte(path, '/'); slash >= 0 {
-		last := path[slash+1:]
-		if isMajorVersion(last) {
-			path = path[:slash]
-			if inner := strings.LastIndexByte(path, '/'); inner >= 0 {
-				path = path[inner+1:]
-			}
-		} else {
-			path = last
-		}
+	// The name is a guess from the path. A trailing /vN has two honest readings: the
+	// parent element (math/rand/v2 is rand) and the element itself (example.com/fx/v1 is
+	// v1); either one in use keeps the import, or it is pruned and the output does not compile.
+	elements := strings.Split(path, "/")
+	last := elements[len(elements)-1]
+	names := []string{last}
+
+	if isMajorVersion(last) && len(elements) > 1 {
+		names = []string{elements[len(elements)-2], last}
 	}
 
 	// "gopkg.in/yaml.v3" is reached as yaml: the version rides on the element
 	// itself rather than on one of its own.
-	if dot := strings.LastIndexByte(path, '.'); dot > 0 && isMajorVersion(path[dot+1:]) {
-		path = path[:dot]
+	for index, name := range names {
+		if dot := strings.LastIndexByte(name, '.'); dot > 0 && isMajorVersion(name[dot+1:]) {
+			names[index] = name[:dot]
+		}
 	}
 
-	return path
+	return names
 }
 
 func isMajorVersion(part string) bool {
