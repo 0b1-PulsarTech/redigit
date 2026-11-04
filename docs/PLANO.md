@@ -160,6 +160,62 @@ anterior encontrou esse bug em producao e o corrigiu ancorando o span no
 `Doc.Pos()` e nao no `decl.Pos()`. O `dst` resolve na raiz. Nenhum formato
 agnostico de indice substitui isto.
 
+### 2.3 O carregador tipado roda com -trimpath
+
+Cada execucao materializa a arvore num diretorio novo em `/tmp`. Sem
+`-trimpath` o cache de build do Go e chaveado por esse diretorio: toda execucao
+recompila tudo e deixa dezenas de MB no `GOCACHE`. O carregador de
+`langpack/golang/typed` passa `-trimpath` e le o modulo (`NeedModule`) e os
+arquivos que o go listou (`NeedFiles`) de cada pacote. Com isso o export data
+nomeia arquivos pelo caminho do modulo (`mod/pkg/f.go`, ou `mod@versao/pkg/f.go`
+para todo modulo com versao) e nao pelo disco. `typed/modmap` volta desse nome
+ao arquivo da arvore: o dono e o modulo de caminho mais longo, achado em todo o
+grafo de imports (`packages.Visit`), nao so no primeiro nivel. O diretorio de um
+modulo sem `Dir`, o vendor, nao e adivinhado: vem do arquivo que o go listou
+para o pacote. Assim vale o vendor ao lado do `go.work`, com ou sem modulo na
+raiz, e o vendor velho de um membro nunca e lido. Um modulo que dois pacotes
+colocam em diretorios diferentes, e um pacote do qual o go nao listou arquivo,
+leem como fora da arvore, igual a um nome que nao se resolve (biblioteca padrao,
+cache de modulos, replace fora da arvore): igual ao `outside` de
+`resolve/uses.go`, nunca como outro arquivo.
+
+Um pacote com cgo guarda no cache, na `//line` do arquivo gerado, o checkout que
+encheu o cache, e o grafo passava a depender de qual checkout foi esse.
+`modmap` troca esse nome pelo arquivo de mesmo nome base que o go listou nesta
+arvore, antes de olhar se o nome e absoluto, e so para um arquivo que o go nao
+listou: um arquivo listado foi lido onde esta, e a sua `//line` nomeia o que o
+autor escreveu. O `Offset` de uma declaracao num arquivo cgo conta no arquivo
+listado e nao no gerado, cujo texto da `//line` leva o tamanho do checkout que
+encheu o cache. Os fixtures com cgo ganham arestas verdadeiras e perdem so as
+falsas em relacao a base, cuja contagem muda com o tamanho do checkout. Nove tamanhos de
+`TMPDIR`, um cache novo por tamanho, dao o mesmo grafo normalizado do tip, e um
+cache enchido de um `TMPDIR` longo e lido de `/tmp` tambem. T e amigonimo nao
+tem esse formato, entao so os fixtures provam.
+
+Uma diretiva `//line` que sai do diretorio do pacote (`//line ../other/o.go:3`)
+deixa no export data o caminho absoluto do checkout que encheu o cache.
+`ObjectAt` recusa um nome absoluto que o proprio pacote do objeto nao lista.
+Mudanca visivel ao dono: as duas arestas que a base dava para o arquivo nomeado
+pela diretiva eram falsas e somem; num fixture com esse formato a base deu 86
+arestas e o tip 84, nas tres execucoes de cada jeito de `GOFLAGS` sobre um
+cache novo. A contagem de recuos do resolvedor (`typed resolver fallbacks`) num
+`//line` que escapa pode variar entre execucoes; as arestas saem iguais.
+
+Medido em `157d218` (T), comando `graph`, `GOCACHE` novo e aquecido por uma
+execucao, tres execucoes cada, com `GOFLAGS=-p=2` e com `GOFLAGS="-trimpath
+-p=2"`; a faixa de cada linha junta tres leituras independentes. Com tags: base
+2,78 a 3,20 s nos dois jeitos, tip `-p=2` 1,03 a 1,19 s, tip `-trimpath -p=2`
+0,96 a 1,18 s. Sem tags: base 4,67 a 5,24 s nos dois jeitos, tip `-p=2` 2,25 a
+2,57 s, tip `-trimpath -p=2` 2,11 a 2,91 s. Crescimento do
+`GOCACHE` na segunda execucao de outro diretorio, T com tags: base 29772 KB, tip
+24 KB nos dois jeitos; T sem tags: base 38192 KB (`-p=2`), tip 224 KB (`-p=2`)
+e 24 KB (`-trimpath -p=2`). Amigonimo (clone de `2502d84`): com tags base
+72440 KB, tip
+1180 KB e 540 KB; sem tags base 72408 KB, tip 1132 KB e 540 KB. As arestas de T
+(20919 com tags, 21585 sem) e as de amigonimo (19757 com tags, 19534 sem) saem
+iguais as da base nos dois jeitos de `GOFLAGS`; a comparacao foi feita sobre o
+grafo normalizado, nao sobre os bytes da saida.
+
 ## 3. A decisao vertical contra horizontal
 
 Ordenar por dependencia produz camadas horizontais. Quem escreve a mao produz
