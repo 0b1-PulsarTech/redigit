@@ -64,11 +64,13 @@ func hiddenPasses(snap entities.Snapshot, tags []string, modules []module) ([]lo
 }
 
 func ownerOf(modules []module, file string) (module, bool) {
+	// "." is the module at the root: it spans no directory, so any nested one outranks it
+	depth := func(dir string) int { return len(strings.TrimPrefix(dir, ".")) }
 	best := -1
 
 	for index, found := range modules {
 		inside := found.dir == "." || strings.HasPrefix(file, found.dir+"/")
-		if inside && (best < 0 || len(found.dir) > len(modules[best].dir)) {
+		if inside && (best < 0 || depth(found.dir) > depth(modules[best].dir)) {
 			best = index
 		}
 	}
@@ -86,9 +88,12 @@ func packageOfFile(modules []module, file string) (string, bool) {
 		return "", false
 	}
 
-	rel := strings.TrimPrefix(path.Dir(file), owner.dir)
+	dir := path.Dir(file)
+	if owner.dir != "." {
+		dir = strings.TrimPrefix(dir, owner.dir)
+	}
 
-	return owner.path + strings.TrimSuffix(rel, "/"), true
+	return path.Join(owner.path, dir), true
 }
 
 func showingTags(line string, tags []string) ([]string, bool) {

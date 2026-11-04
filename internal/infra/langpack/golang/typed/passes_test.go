@@ -59,6 +59,108 @@ func TestShowingTags(t *testing.T) {
 	}
 }
 
+func TestPackageOfFile(t *testing.T) {
+	t.Parallel()
+
+	root := []module{{dir: ".", path: "example.test/root"}}
+	nested := []module{
+		{dir: ".", path: "example.test/root"},
+		{dir: "libs/kit", path: "example.test/kit"},
+	}
+
+	testCases := []struct {
+		name    string
+		modules []module
+		file    string
+		want    string
+		wantOK  bool
+	}{
+		{"a root module's root file", root, "main.go", "example.test/root", true},
+		{
+			"a root module's nested package",
+			root,
+			"internal/store/db.go",
+			"example.test/root/internal/store",
+			true,
+		},
+		{
+			"a root module's deeper package",
+			root,
+			"internal/a/b/c.go",
+			"example.test/root/internal/a/b",
+			true,
+		},
+		{"a nested module's root file", nested, "libs/kit/kit.go", "example.test/kit", true},
+		{
+			"a nested module's package",
+			nested,
+			"libs/kit/ids/id.go",
+			"example.test/kit/ids",
+			true,
+		},
+		{
+			"a file the root module owns beside a nested module",
+			nested,
+			"libs/other/o.go",
+			"example.test/root/libs/other",
+			true,
+		},
+		{"a file outside every module", []module{nested[1]}, "docs/a.go", "", false},
+		{"no modules at all", nil, "main.go", "", false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := packageOfFile(testCase.modules, testCase.file)
+			if got != testCase.want || ok != testCase.wantOK {
+				t.Fatalf(
+					"packageOfFile(%q) = %q, %v; want %q, %v",
+					testCase.file,
+					got,
+					ok,
+					testCase.want,
+					testCase.wantOK,
+				)
+			}
+		})
+	}
+}
+
+func TestHiddenPassesNameThePackagesOfARootModule(t *testing.T) {
+	t.Parallel()
+
+	snap, _ := testkit.Fixture(t, map[string]string{
+		"top.go":                  "package fixture\n",
+		"top_it.go":               "//go:build integration\n\npackage fixture\n",
+		"internal/store/db.go":    "package store\n",
+		"internal/store/db_it.go": "//go:build integration\n\npackage store\n",
+	})
+
+	modules, err := modulesOf(snap)
+	if err != nil {
+		t.Fatalf("modulesOf() error = %v", err)
+	}
+
+	got, err := hiddenPasses(snap, nil, modules)
+	if err != nil {
+		t.Fatalf("hiddenPasses() error = %v", err)
+	}
+
+	want := []loadPass{{
+		tags: []string{"integration"},
+		patterns: []string{
+			"example.test/fixture",
+			"example.test/fixture/internal/store",
+		},
+	}}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("hiddenPasses() = %+v, want %+v", got, want)
+	}
+}
+
 func TestTypedSourceChecksTheFilesTheTagsHide(t *testing.T) {
 	t.Parallel()
 
@@ -196,5 +298,31 @@ func TestSourceLoadSurvivesACancelledFirstCaller(t *testing.T) {
 			len(pkgs),
 			err,
 		)
+	}
+}
+
+func TestOwnerOfCountsTheRootModuleAsDepthZero(t *testing.T) {
+	t.Parallel()
+
+	root := module{dir: ".", path: "example.test/root"}
+	nested := module{dir: "x", path: "example.test/nested"}
+
+	testCases := []struct {
+		name    string
+		modules []module
+	}{
+		{name: "the root module listed first", modules: []module{root, nested}},
+		{name: "the nested module listed first", modules: []module{nested, root}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := ownerOf(testCase.modules, "x/h.go")
+			if !ok || got != nested {
+				t.Fatalf("ownerOf() = %+v, %v; want %+v", got, ok, nested)
+			}
+		})
 	}
 }
