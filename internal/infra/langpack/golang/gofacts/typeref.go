@@ -15,7 +15,60 @@ type refs struct {
 }
 
 func (scope refs) ref(typ types.Type) facts.TypeRef {
-	return facts.TypeRef{Key: scope.keyOf(typ), Name: types.TypeString(typ, qualify)}
+	return facts.TypeRef{Key: scope.keyOf(typ), Name: types.TypeString(unaliased(typ), qualify)}
+}
+
+func unaliased(typ types.Type) types.Type {
+	switch cur := types.Unalias(typ).(type) {
+	case *types.Pointer:
+		return types.NewPointer(unaliased(cur.Elem()))
+	case *types.Slice:
+		return types.NewSlice(unaliased(cur.Elem()))
+	case *types.Array:
+		return types.NewArray(unaliased(cur.Elem()), cur.Len())
+	case *types.Chan:
+		return types.NewChan(cur.Dir(), unaliased(cur.Elem()))
+	case *types.Map:
+		return types.NewMap(unaliased(cur.Key()), unaliased(cur.Elem()))
+	case *types.Signature:
+		return types.NewSignatureType(
+			cur.Recv(), nil, nil,
+			unaliasedTuple(cur.Params()), unaliasedTuple(cur.Results()), cur.Variadic(),
+		)
+	case *types.Named:
+		return unaliasedNamed(cur)
+	default:
+		return cur
+	}
+}
+
+func unaliasedTuple(tuple *types.Tuple) *types.Tuple {
+	vars := make([]*types.Var, tuple.Len())
+	for idx := range vars {
+		field := tuple.At(idx)
+		vars[idx] = types.NewVar(field.Pos(), field.Pkg(), field.Name(), unaliased(field.Type()))
+	}
+
+	return types.NewTuple(vars...)
+}
+
+func unaliasedNamed(named *types.Named) types.Type {
+	args := named.TypeArgs()
+	if args.Len() == 0 {
+		return named
+	}
+
+	list := make([]types.Type, args.Len())
+	for idx := range list {
+		list[idx] = unaliased(args.At(idx))
+	}
+
+	instance, err := types.Instantiate(nil, named.Origin(), list, false)
+	if err != nil {
+		return named
+	}
+
+	return instance
 }
 
 func (scope refs) receiver(name *types.TypeName) facts.TypeRef {
