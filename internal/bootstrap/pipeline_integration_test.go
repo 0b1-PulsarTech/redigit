@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
@@ -331,4 +332,113 @@ func TestStartClosesWhatAHookOpened(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStartWiresTheGoDIRule(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		specs          []rules.Spec
+		wantProvides   int
+		wantRegistered int
+		wantGate       bool
+	}{
+		{name: "without a rule the graph has no DI edge"},
+		{
+			name:           "go-di links registers to their argument types and resolves to registrations",
+			specs:          []rules.Spec{{Type: "go-di", Raw: []byte(goDIRule)}},
+			wantProvides:   12,
+			wantRegistered: 1,
+			wantGate:       true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, pipeline, err := startDimod(t, testCase.specs)
+			if err != nil {
+				t.Fatalf("Start() = %v", err)
+			}
+
+			defer func() { _ = pipeline.Close(context.WithoutCancel(t.Context())) }()
+
+			byReason, gated := diFindings(t, pipeline)
+
+			if byReason[entities.ReasonProvides] != testCase.wantProvides ||
+				byReason[entities.ReasonRegistered] != testCase.wantRegistered {
+				t.Fatalf("edges = %v, want provides %d registered %d",
+					byReason, testCase.wantProvides, testCase.wantRegistered)
+			}
+
+			if gated != testCase.wantGate {
+				t.Fatalf("DI gate measured = %v, want %v", gated, testCase.wantGate)
+			}
+		})
+	}
+}
+
+func startDimod(t *testing.T, specs []rules.Spec) (string, *Pipeline, error) {
+	t.Helper()
+
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("../infra/langpack/idiom/testdata/dimod")); err != nil {
+		t.Fatalf("copy dimod: %v", err)
+	}
+
+	initFixtureRepo(t, dir)
+
+	built, err := compiledRegistry().Build(specs)
+	if err != nil {
+		t.Fatalf("Build() = %v", err)
+	}
+
+	pipeline, err := Start(t.Context(), Config{Repo: dir, Rev: "HEAD", Rules: built})
+
+	return dir, pipeline, err
+}
+
+func diFindings(t *testing.T, pipeline *Pipeline) (map[entities.EdgeReason]int, bool) {
+	t.Helper()
+
+	result, err := pipeline.Graph(t.Context())
+	if err != nil {
+		t.Fatalf("Graph() = %v", err)
+	}
+
+	order, err := pipeline.Order(result.Graph)
+	if err != nil {
+		t.Fatalf("Order() = %v", err)
+	}
+
+	byReason := map[entities.EdgeReason]int{}
+
+	for _, edge := range result.Graph.Edges() {
+		byReason[edge.Reason]++
+
+		late := order.Of(edge.Provider) > order.Of(edge.Dependent)
+		if edge.Reason == entities.ReasonRegistered && late {
+			t.Fatalf("registration %v is after its resolve site %v", edge.Provider, edge.Dependent)
+		}
+	}
+
+	audit, err := pipeline.Audit(result.Graph, order)
+	if err != nil {
+		t.Fatalf("Audit() = %v", err)
+	}
+
+	at := slices.IndexFunc(audit.Report.Integrity, func(measure entities.Measure) bool {
+		return strings.HasPrefix(measure.Name, "DI resolve sites")
+	})
+	if at < 0 {
+		return byReason, false
+	}
+
+	if measure := audit.Report.Integrity[at]; measure.Value != 1 || measure.Total != 1 {
+		t.Fatalf("DI gate = %d of %d, want 1 of 1", measure.Value, measure.Total)
+	}
+
+	return byReason, true
 }
