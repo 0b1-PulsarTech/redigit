@@ -134,3 +134,40 @@ func TestWarnShortfallsNamesTheFirstBlindSpot(t *testing.T) {
 		t.Fatalf("logged %q, want %q", got, want)
 	}
 }
+
+func TestWarnShortfallsNamesTheCauseOfAPartialPass(t *testing.T) {
+	const head = `msg="some packages did not type-check; their type facts are partial" `
+
+	testCases := []struct {
+		name    string
+		partial indexing.Partial
+		want    string
+	}{
+		{
+			name: "the first broken package, its error and how many broken packages carry that message",
+			partial: indexing.Partial{
+				Broken: 2, Of: 9, FirstPackage: "example.com/p/a",
+				FirstError: "reading lifted/go.mod: no such file", SameMessage: 2,
+			},
+			want: head + `count=2 of=9 tags=[] first=example.com/p/a ` +
+				`cause="reading lifted/go.mod: no such file" same_message=2`,
+		},
+		{
+			name:    "a partial with no first package names no cause",
+			partial: indexing.Partial{Broken: 2, Of: 9},
+			want:    head + `count=2 of=9 tags=[]`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		logged := captureWarnings(t)
+
+		partial := []indexing.Partial{testCase.partial}
+
+		WarnShortfalls(indexing.Result{Graph: declGraph(), Partial: partial})
+
+		if got := strings.TrimSpace(logged.String()); got != testCase.want {
+			t.Fatalf("%s: logged %q, want %q", testCase.name, got, testCase.want)
+		}
+	}
+}

@@ -32,9 +32,12 @@ func sampleResult() indexing.Result {
 	}
 
 	return indexing.Result{
-		Graph:   entities.NewGraph(decls, edges, anchors),
-		Blind:   []indexing.Blind{{Decl: declKey("B"), Query: "references", Reason: "no answer"}},
-		Partial: []indexing.Partial{{Broken: 2, Of: 9, Tags: []string{"integration"}}},
+		Graph: entities.NewGraph(decls, edges, anchors),
+		Blind: []indexing.Blind{{Decl: declKey("B"), Query: "references", Reason: "no answer"}},
+		Partial: []indexing.Partial{{
+			Broken: 2, Of: 9, Tags: []string{"integration"},
+			FirstPackage: "example.com/p/a", FirstError: "reading lifted/go.mod", SameMessage: 2,
+		}},
 	}
 }
 

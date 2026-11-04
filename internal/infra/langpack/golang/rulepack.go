@@ -160,6 +160,8 @@ func (pack RulePack) Partial() []indexing.Partial {
 	for _, shortfall := range pack.source.Shortfalls() {
 		partial = append(partial, indexing.Partial{
 			Broken: shortfall.Broken, Of: shortfall.Of, Tags: shortfall.Tags,
+			FirstPackage: shortfall.FirstPackage, FirstError: shortfall.FirstError,
+			SameMessage: shortfall.SameMessage,
 		})
 	}
 

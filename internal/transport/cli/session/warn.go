@@ -26,12 +26,21 @@ func WarnClosed(err error) {
 
 func warnPartial(result indexing.Result) {
 	for _, partial := range result.Partial {
-		slog.Warn(
-			"some packages did not type-check; their type facts are partial",
+		attrs := []any{
 			slog.Int("count", partial.Broken),
 			slog.Int("of", partial.Of),
 			slog.Any("tags", partial.Tags),
-		)
+		}
+
+		if partial.FirstPackage != "" {
+			attrs = append(attrs,
+				slog.String("first", partial.FirstPackage),
+				slog.String("cause", partial.FirstError),
+				slog.Int("same_message", partial.SameMessage),
+			)
+		}
+
+		slog.Warn("some packages did not type-check; their type facts are partial", attrs...)
 	}
 }
 

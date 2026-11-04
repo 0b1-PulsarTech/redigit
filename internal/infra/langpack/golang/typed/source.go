@@ -160,15 +160,3 @@ func typeCheck(
 
 	return pkgs, nil
 }
-
-func brokenPackages(pkgs []*packages.Package) int {
-	broken := 0
-
-	for _, pkg := range pkgs {
-		if len(pkg.Errors) > 0 {
-			broken++
-		}
-	}
-
-	return broken
-}

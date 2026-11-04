@@ -30,9 +30,12 @@ func (r Result) BlindRatio() float64 {
 
 type (
 	Partial struct {
-		Broken int
-		Of     int
-		Tags   []string
+		Broken       int
+		Of           int
+		Tags         []string
+		FirstPackage string
+		FirstError   string
+		SameMessage  int
 	}
 
 	Shortfall interface {

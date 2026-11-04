@@ -341,3 +341,44 @@ func TestRulePackOrdersWhatSatisfiesWithItsReaders(t *testing.T) {
 		})
 	}
 }
+
+func TestRulePackCarriesTheCauseOfAPartialPass(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		files     map[string]string
+		wantFirst string
+		wantCause string
+	}{
+		{
+			name: "a missing import",
+			files: map[string]string{
+				"a.go": "package fixture\n\nimport _ \"example.test/missing/pkg\"\n",
+			},
+			wantFirst: "example.test/fixture",
+			wantCause: "example.test/missing/pkg",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap, decls := testkit.Fixture(t, testCase.files)
+			pack := NewRulePack(nil)
+
+			if _, err := pack.Edges(context.Background(), snap, decls); err != nil {
+				t.Fatalf("Edges() error = %v", err)
+			}
+
+			got := pack.Partial()
+			if len(got) != 1 || got[0].FirstPackage != testCase.wantFirst ||
+				!strings.Contains(got[0].FirstError, testCase.wantCause) ||
+				got[0].SameMessage != 1 {
+				t.Fatalf("Partial() = %+v, want first %q cause %q",
+					got, testCase.wantFirst, testCase.wantCause)
+			}
+		})
+	}
+}
