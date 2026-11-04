@@ -252,7 +252,6 @@ func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
 		command string
 		slice   string
 	}{
-		{"subjects", cmdSubjects, "slice 19"},
 		{"format", cmdFormat, "slice 15w"},
 		{"continue", cmdContinue, "slice 24b"},
 	}
