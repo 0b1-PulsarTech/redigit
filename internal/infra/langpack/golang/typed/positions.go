@@ -3,6 +3,7 @@ package typed
 import (
 	"go/token"
 	"go/types"
+	"path/filepath"
 	"slices"
 
 	"golang.org/x/tools/go/packages"
@@ -58,6 +59,7 @@ type Positions struct {
 	files   modmap.Files
 	locator DeclLocator
 	parsed  map[*token.File]bool
+	listed  map[string]bool
 }
 
 func NewPositions(root string, locator DeclLocator) Positions {
@@ -76,18 +78,25 @@ func (where Positions) DeclAt(fset *token.FileSet, pos token.Pos) (entities.Decl
 		return entities.DeclKey{}, false
 	}
 
-	return where.locator.enclosing(rel, at.Offset)
+	return where.locator.enclosing(rel, where.files.Offset(at))
 }
 
 func (where Positions) Parsing(pkgs []*packages.Package) Positions {
 	where.files = where.files.Reading(pkgs)
 	where.parsed = map[*token.File]bool{}
+	where.listed = map[string]bool{}
 
 	for _, pkg := range pkgs {
 		for _, file := range pkg.Syntax {
 			where.parsed[pkg.Fset.File(file.FileStart)] = true
 		}
 	}
+
+	packages.Visit(pkgs, nil, func(pkg *packages.Package) {
+		for _, name := range pkg.GoFiles {
+			where.listed[pkg.PkgPath+"\n"+name] = true
+		}
+	})
 
 	return where
 }
@@ -98,8 +107,16 @@ func (where Positions) ObjectAt(fset *token.FileSet, obj types.Object) (entities
 		return where.DeclAt(fset, obj.Pos())
 	}
 
+	name := fset.Position(obj.Pos()).Filename
+
+	// A //line directive can name a tree file the package never compiled, and which checkout the
+	// build cache remembers then decides whether the name falls in this tree.
+	if filepath.IsAbs(name) && !where.listed[obj.Pkg().Path()+"\n"+name] {
+		return entities.DeclKey{}, false
+	}
+
 	key, named := declKeyOf(obj)
-	key.File = where.relative(fset.Position(obj.Pos()).Filename)
+	key.File = where.relative(name)
 
 	if named && where.locator.has(key) {
 		return key, true

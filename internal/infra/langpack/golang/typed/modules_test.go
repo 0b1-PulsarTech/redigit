@@ -1,10 +1,16 @@
 package typed
 
 import (
+	"context"
 	"errors"
+	"go/types"
 	"io/fs"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
@@ -106,4 +112,128 @@ func TestAllPatterns(t *testing.T) {
 			}
 		})
 	}
+}
+
+type reading struct {
+	key   entities.DeclKey
+	found bool
+}
+
+func readEveryObject(
+	t *testing.T,
+	snap entities.Snapshot,
+	decls []entities.Decl,
+	flag string,
+	patterns []string,
+) map[string]reading {
+	t.Helper()
+
+	cfg := &packages.Config{
+		Context: context.Background(), Dir: snap.Root, Tests: true, BuildFlags: []string{flag},
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
+			packages.NeedImports | packages.NeedTypes | packages.NeedSyntax |
+			packages.NeedTypesInfo | packages.NeedTypesSizes | packages.NeedModule,
+	}
+
+	pkgs, err := packages.Load(cfg, patterns...)
+	if err != nil || len(pkgs) == 0 || packages.PrintErrors(pkgs) > 0 {
+		t.Fatalf("Load(%v) = %d packages, error %v", patterns, len(pkgs), err)
+	}
+
+	where := NewPositions(snap.Root, NewDeclLocator(decls)).Parsing(pkgs)
+	read := map[string]reading{}
+	seen := map[*types.Package]bool{}
+
+	var visit func(pkg *packages.Package, tpkg *types.Package)
+
+	visit = func(pkg *packages.Package, tpkg *types.Package) {
+		if seen[tpkg] {
+			return
+		}
+
+		seen[tpkg] = true
+
+		members := map[string]types.Object{}
+
+		for _, name := range tpkg.Scope().Names() {
+			obj := tpkg.Scope().Lookup(name)
+			members[tpkg.Path()+"."+name] = obj
+
+			if named, isNamed := obj.Type().(*types.Named); isNamed {
+				for method := range named.Methods() {
+					members[tpkg.Path()+"."+name+"."+method.Name()] = method
+				}
+			}
+		}
+
+		for label, obj := range members {
+			key, found := where.ObjectAt(pkg.Fset, obj)
+			read[label] = reading{key: key, found: found}
+		}
+
+		for _, imported := range tpkg.Imports() {
+			visit(pkg, imported)
+		}
+	}
+
+	for _, pkg := range pkgs {
+		visit(pkg, pkg.Types)
+	}
+
+	return read
+}
+
+const (
+	header = "module example.test/fixture\n\ngo 1.26\n"
+	nested = "module example.test/fixture/nested\n\ngo 1.26\n"
+	source = "package nested\n\ntype N struct{}\n\nfunc (N) M() {}\n\nfunc F() {}\n"
+	single = "package x\n\ntype N struct{}\n\nfunc (N) M() {}\n\nfunc F() {}\n"
+)
+
+type trimpathCase struct {
+	name          string
+	files         map[string]string
+	outside       map[string]string
+	imports       []string
+	wantFiles     []string
+	outsideObject string
+}
+
+func writeTree(
+	t *testing.T,
+	base string,
+	files, outside map[string]string,
+) (entities.Snapshot, []entities.Decl) {
+	t.Helper()
+
+	root := filepath.Join(base, "tree")
+	snap := entities.Snapshot{Root: root}
+	goFiles := []string{}
+
+	for name, content := range files {
+		testkit.WriteFile(t, root, name, content)
+		snap.Files = append(snap.Files, name)
+
+		if strings.HasSuffix(name, ".go") {
+			goFiles = append(goFiles, name)
+		}
+	}
+
+	for name, content := range outside {
+		testkit.WriteFile(t, base, name, content)
+	}
+
+	slices.Sort(goFiles)
+
+	return snap, testkit.DeclareAll(t, root, goFiles)
+}
+
+func mappedFiles(read map[string]reading) map[string]bool {
+	mapped := map[string]bool{}
+
+	for _, got := range read {
+		mapped[got.key.File] = mapped[got.key.File] || got.found
+	}
+
+	return mapped
 }

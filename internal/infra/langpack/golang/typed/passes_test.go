@@ -326,3 +326,118 @@ func TestOwnerOfCountsTheRootModuleAsDepthZero(t *testing.T) {
 		})
 	}
 }
+
+func TestTypedSourceChecksAHiddenFileAgainstANestedModule(t *testing.T) {
+	t.Parallel()
+
+	const header = "module example.test/fixture\n\ngo 1.26\n"
+
+	testCases := []struct {
+		name  string
+		gomod string
+		work  string
+	}{
+		{
+			name: "through a replace",
+			gomod: header + "\nrequire example.test/fixture/nested v0.0.0\n\n" +
+				"replace example.test/fixture/nested => ./nested\n",
+		},
+		{
+			name:  "through a go.work",
+			gomod: header,
+			work:  "go 1.26\n\nuse (\n\t.\n\t./nested\n)\n",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			files := map[string]string{
+				"go.mod":        testCase.gomod,
+				"nested/go.mod": "module example.test/fixture/nested\n\ngo 1.26\n",
+				"nested/n.go":   "package nested\n\nfunc F() {}\n",
+				"top/top.go":    "package top\n",
+				"top/hid.go": "//go:build hid\n\npackage top\n\n" +
+					"import \"example.test/fixture/nested\"\n\nfunc Hidden() { nested.F() }\n",
+			}
+			if testCase.work != "" {
+				files["go.work"] = testCase.work
+			}
+
+			snap, decls := writeTree(t, t.TempDir(), files, nil)
+
+			facts, err := NewSource(nil).Facts(context.Background(), snap, decls)
+			if err != nil {
+				t.Fatalf("Facts() error = %v", err)
+			}
+
+			want := Use{
+				Dependent: testkit.DeclKey("top/hid.go", entities.KindFunc, "Hidden"),
+				Provider:  testkit.DeclKey("nested/n.go", entities.KindFunc, "F"),
+			}
+			if !slices.Contains(facts.Uses, want) {
+				t.Fatalf("Uses = %+v, missing %+v", facts.Uses, want)
+			}
+		})
+	}
+}
+
+func TestTypedSourceChecksAHiddenFileAgainstAModuleReachedOnlyTransitively(t *testing.T) {
+	t.Parallel()
+
+	const header = "module example.test/root\n\ngo 1.26\n"
+
+	testCases := []struct {
+		name  string
+		gomod string
+		work  string
+	}{
+		{
+			name: "through a replace",
+			gomod: header + "\nrequire example.test/base v0.0.0\n\n" +
+				"replace example.test/base => ./libs/base\n",
+		},
+		{
+			name:  "through a go.work",
+			gomod: header + "\nrequire example.test/base v0.0.0\n",
+			work:  "go 1.26\n\nuse (\n\t.\n\t./libs/base\n)\n",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			files := map[string]string{
+				"go.mod":            testCase.gomod,
+				"libs/base/go.mod":  "module example.test/base\n\ngo 1.26\n",
+				"libs/base/base.go": "package base\n\ntype Repo struct{}\n\nfunc (Repo) Save() {}\n",
+				"repo/repo.go": "package repo\n\nimport \"example.test/base\"\n\n" +
+					"type User struct{ base.Repo }\n",
+				"top/top.go": "package top\n",
+				"top/hid.go": "//go:build hid\n\npackage top\n\n" +
+					"import \"example.test/root/repo\"\n\n" +
+					"func Hidden(user repo.User) { user.Save() }\n",
+			}
+			if testCase.work != "" {
+				files["go.work"] = testCase.work
+			}
+
+			snap, decls := writeTree(t, t.TempDir(), files, nil)
+
+			facts, err := NewSource(nil).Facts(context.Background(), snap, decls)
+			if err != nil {
+				t.Fatalf("Facts() error = %v", err)
+			}
+
+			want := Use{
+				Dependent: testkit.DeclKey("top/hid.go", entities.KindFunc, "Hidden"),
+				Provider:  testkit.DeclKey("libs/base/base.go", entities.KindMethod, "Repo.Save"),
+			}
+			if !slices.Contains(facts.Uses, want) {
+				t.Fatalf("Uses = %+v, missing %+v", facts.Uses, want)
+			}
+		})
+	}
+}

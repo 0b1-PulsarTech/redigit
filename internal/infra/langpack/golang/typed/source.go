@@ -143,11 +143,11 @@ func typeCheck(
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports |
 			packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo |
-			packages.NeedTypesSizes,
+			packages.NeedTypesSizes | packages.NeedModule,
 	}
 
-	// Under -trimpath export data names files by module-relative paths no position maps back.
-	cfg.BuildFlags = []string{"-trimpath=false"}
+	// Under -trimpath export data names files by module paths; modmap maps them back to the tree.
+	cfg.BuildFlags = []string{"-trimpath"}
 
 	if len(pass.tags) > 0 {
 		cfg.BuildFlags = append(cfg.BuildFlags, "-tags="+strings.Join(pass.tags, ","))

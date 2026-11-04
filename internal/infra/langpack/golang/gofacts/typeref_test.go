@@ -127,7 +127,7 @@ func holder() {
 	}
 
 	scope := refs{
-		where: typed.NewPositions(fix.snap.Root, typed.NewDeclLocator(fix.decls)),
+		where: typed.NewPositions(fix.snap.Root, typed.NewDeclLocator(fix.decls)).Parsing(roots),
 		fset:  roots[0].Fset,
 	}
 

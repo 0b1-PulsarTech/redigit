@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
@@ -54,5 +55,53 @@ func TestTypedSourceKeepsAPartialPassAsData(t *testing.T) {
 				t.Fatalf("Shortfalls() = %+v, want the broken count, total and tags", got)
 			}
 		})
+	}
+}
+
+func TestTypedSourceKeepsTheUsesOfASoundPackageBesideABrokenDependency(t *testing.T) {
+	t.Parallel()
+
+	snap, decls := testkit.Fixture(t, map[string]string{
+		"lib/lib.go": "package lib\n\nfunc One() {}\n",
+		"bad/bad.go": "package bad\n\nfunc Broken() int { return \"s\" }\n",
+		"a.go": "package fixture\n\nimport (\n\t\"example.test/fixture/bad\"\n\t" +
+			"\"example.test/fixture/lib\"\n)\n\nfunc Run() {\n\tlib.One()\n\t_ = bad.Broken()\n}\n",
+	})
+
+	source := NewSource(nil)
+
+	got, err := source.Facts(context.Background(), snap, decls)
+	if err != nil {
+		t.Fatalf("Facts() error = %v", err)
+	}
+
+	run := testkit.DeclKey("a.go", entities.KindFunc, "Run")
+
+	testCases := []struct {
+		name     string
+		provider entities.DeclKey
+	}{
+		{
+			name:     "a use of the sound package",
+			provider: testkit.DeclKey("lib/lib.go", entities.KindFunc, "One"),
+		},
+		{
+			name:     "a use of the broken package",
+			provider: testkit.DeclKey("bad/bad.go", entities.KindFunc, "Broken"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if !slices.Contains(got.Uses, Use{Dependent: run, Provider: testCase.provider}) {
+				t.Fatalf("Uses = %v, want Run to use %v", got.Uses, testCase.provider)
+			}
+		})
+	}
+
+	if short := source.Shortfalls(); len(short) != 1 || short[0].Broken != 1 {
+		t.Fatalf("Shortfalls() = %+v, want the one broken package", short)
 	}
 }
