@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"maps"
 	"path"
 	"slices"
 	"sync/atomic"
@@ -60,12 +59,7 @@ func (pack Pack) Atoms(
 		return nil, err
 	}
 
-	atoms := map[entities.DeclKey]string{}
-	for _, group := range groups {
-		maps.Copy(atoms, group)
-	}
-
-	return atoms, nil
+	return mergedAtoms(groups), nil
 }
 
 func atomGroup(
