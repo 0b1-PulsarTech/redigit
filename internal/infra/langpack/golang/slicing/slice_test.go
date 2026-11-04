@@ -9,6 +9,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/render"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 const sliceSource = `package app
@@ -84,7 +85,7 @@ func sliceOf(t *testing.T, name string) (entities.Decl, bool, []entities.Decl, [
 			continue
 		}
 
-		sliced, ok, err := Slice(context.Background(), decl, source)
+		sliced, ok, err := Slice(context.Background(), decl, source, sliceconf.Config{})
 		if err != nil {
 			t.Fatalf("Slice(%s) error = %v", name, err)
 		}
@@ -255,31 +256,58 @@ func TestRenderWritesAFunctionNoStatementNamesWhole(t *testing.T) {
 	}
 }
 
-func TestSliceCutsAReturnedListByElement(t *testing.T) {
+func TestSliceLeavesAKeyThatOccursTwiceWhole(t *testing.T) {
 	t.Parallel()
 
-	source := []byte(sliceSource)
+	testCases := []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{
+			name:   "a lone init is cut",
+			source: "package app\n\nfunc init() {\n\ta()\n\tb()\n}\n",
+			want:   true,
+		},
+		{
+			name: "two inits are both left whole",
+			source: "package app\n\nfunc init() {\n\ta()\n\tb()\n}\n\n" +
+				"func init() {\n\tc()\n\td()\n\te()\n}\n",
+		},
+		{
+			name: "two inits with the shorter second are both left whole",
+			source: "package app\n\nfunc init() {\n\ta()\n\tb()\n}\n\n" +
+				"func init() {\n\tc()\n\td()\n}\n",
+		},
+		{
+			name: "two blank functions are both left whole",
+			source: "package app\n\nfunc _() {\n\ta()\n\tb()\n}\n\n" +
+				"func _() {\n\tc()\n\td()\n}\n",
+		},
+	}
 
-	for _, name := range []string{"Table", "Chain"} {
-		head, ok, members, _ := sliceOf(t, name)
-		if !ok || len(members) != 2 {
-			t.Fatalf("Slice(%s) = %v with %d members, want 2 elements", name, ok, len(members))
-		}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-		if head.Atom == "" || head.Atom != members[0].Atom || members[1].Atom != "" {
-			t.Fatalf("atoms head %q first %q second %q, want head born with the first element",
-				head.Atom, members[0].Atom, members[1].Atom)
-		}
+			source := []byte(testCase.source)
 
-		got, err := render.Render(
-			context.Background(), source, []entities.DeclKey{head.Key, members[1].Key},
-		)
-		if err != nil {
-			t.Fatalf("Render() error = %v", err)
-		}
+			decls, err := syntax.Declarations(context.Background(), "app/app.go", source)
+			if err != nil {
+				t.Fatalf("Declarations() error = %v", err)
+			}
 
-		if strings.Contains(string(got), "runA") || strings.Contains(string(got), "tableA") {
-			t.Fatalf("Render(%s) = %s, want only the kept element", name, got)
-		}
+			for _, decl := range decls {
+				if decl.Key.Kind != entities.KindFunc {
+					continue
+				}
+
+				_, ok, err := Slice(context.Background(), decl, source, sliceconf.Config{})
+				if err != nil || ok != testCase.want {
+					t.Fatalf("Slice(%s) ok = %v, error = %v, want ok %v",
+						decl.Key.Name, ok, err, testCase.want)
+				}
+			}
+		})
 	}
 }

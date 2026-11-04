@@ -14,20 +14,20 @@ type bodyFlow struct {
 	writes   []map[types.Object]bool
 	reads    []map[types.Object]bool
 	declared map[types.Object]int
-	info     *types.Info
+	info     localTypes
 }
 
-func readFlow(stmts []ast.Stmt, info *types.Info) bodyFlow {
+func readFlow(stmts []ast.Stmt, locals localTypes) bodyFlow {
 	flow := bodyFlow{
 		declares: make([]map[types.Object]bool, len(stmts)),
 		writes:   make([]map[types.Object]bool, len(stmts)),
 		reads:    make([]map[types.Object]bool, len(stmts)),
 		declared: map[types.Object]int{},
-		info:     info,
+		info:     locals,
 	}
 
 	for index, stmt := range stmts {
-		flow.declares[index] = declaredBy(stmt, info)
+		flow.declares[index] = declaredBy(stmt, locals.Info)
 		flow.writes[index] = map[types.Object]bool{}
 		flow.reads[index] = map[types.Object]bool{}
 
@@ -109,7 +109,7 @@ func (flow bodyFlow) visit(index int, stmt ast.Stmt) {
 			return true
 		}
 
-		obj := flow.objectOf(ident)
+		obj := flow.info.objectOf(ident)
 		if _, known := flow.declared[obj]; obj == nil || !known {
 			return true
 		}
@@ -122,14 +122,6 @@ func (flow bodyFlow) visit(index int, stmt ast.Stmt) {
 
 		return true
 	})
-}
-
-func (flow bodyFlow) objectOf(ident *ast.Ident) types.Object {
-	if obj := flow.info.Defs[ident]; obj != nil {
-		return obj
-	}
-
-	return flow.info.Uses[ident]
 }
 
 func (flow bodyFlow) needs(index int) []int {

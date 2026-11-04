@@ -6,50 +6,23 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"strconv"
-	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 const (
 	minStatements = 2
 )
 
-type stubImporter struct{}
-
-func (stubImporter) Import(path string) (*types.Package, error) {
-	pkg := types.NewPackage(path, path[strings.LastIndex(path, "/")+1:])
-	pkg.MarkComplete()
-
-	return pkg, nil
-}
-
-func typeLocals(fset *token.FileSet, file *ast.File) *types.Info {
-	info := &types.Info{
-		Defs: map[*ast.Ident]types.Object{},
-		Uses: map[*ast.Ident]types.Object{},
-	}
-	conf := types.Config{
-		Importer:    stubImporter{},
-		Error:       func(error) {},
-		FakeImportC: true,
-	}
-
-	// The error is the point: the stubs make the check fail, and the objects are
-	// recorded anyway.
-	_, _ = conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
-
-	return info
-}
-
 func Slice(
 	_ context.Context,
 	fn entities.Decl,
 	source []byte,
+	policy sliceconf.Config,
 ) (indexing.Sliced, bool, error) {
 	if fn.Key.Kind != entities.KindFunc && fn.Key.Kind != entities.KindMethod {
 		return indexing.Sliced{}, false, nil
@@ -67,7 +40,7 @@ func Slice(
 		return indexing.Sliced{}, false, nil
 	}
 
-	cut := bodyCut{fset: fset, fn: fn, decl: decl, stmts: decl.Body.List}
+	cut := bodyCut{fset: fset, fn: fn, decl: decl, stmts: decl.Body.List, policy: policy}
 
 	// A registration table that grows one element per feature is cut by element.
 	if elements, _ := syntax.ReturnedElements(decl.Body); len(elements) >= syntax.MinGroup {
@@ -87,6 +60,8 @@ func Slice(
 }
 
 func findFuncDecl(file *ast.File, key entities.DeclKey) *ast.FuncDecl {
+	var found *ast.FuncDecl
+
 	for _, decl := range file.Decls {
 		fn, isFunc := decl.(*ast.FuncDecl)
 		if !isFunc {
@@ -94,12 +69,20 @@ func findFuncDecl(file *ast.File, key entities.DeclKey) *ast.FuncDecl {
 		}
 
 		ident := syntax.FuncIdent(fn)
-		if ident.Kind == key.Kind && ident.Name == key.Name {
-			return fn
+		if ident.Kind != key.Kind || ident.Name != key.Name {
+			continue
 		}
+
+		// Two functions share a key (init, or _), and the statements of one would be
+		// filtered out of both, so neither is cut.
+		if found != nil {
+			return nil
+		}
+
+		found = fn
 	}
 
-	return nil
+	return found
 }
 
 func cuttable(body *ast.BlockStmt) bool {
@@ -138,7 +121,8 @@ type bodyCut struct {
 	stmts    []ast.Stmt
 	elements []ast.Expr
 	comments ast.CommentMap
-	info     *types.Info
+	info     localTypes
+	policy   sliceconf.Config
 }
 
 func (cut bodyCut) slice() indexing.Sliced {
@@ -156,6 +140,10 @@ func (cut bodyCut) slice() indexing.Sliced {
 
 	groups.join(head, anchor)
 	flow.joinDeclarations(groups)
+
+	if cut.policy.Errcheck {
+		cut.joinReassigns(flow, groups)
+	}
 
 	out := indexing.Sliced{Head: cut.head(), Members: cut.members()}
 	out.Edges = cut.edges(flow)

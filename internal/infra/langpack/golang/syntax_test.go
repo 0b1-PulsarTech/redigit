@@ -2,9 +2,11 @@ package golang
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 const composedSource = `package app
@@ -112,5 +114,75 @@ func TestSyntaxCarriesImportsThroughTheRenderPackage(t *testing.T) {
 
 	if _, err = syntax.Admit(context.Background(), source, []string{"=="}); err == nil {
 		t.Fatalf("Admit() error = nil, want a spec that does not parse refused")
+	}
+}
+
+func TestSyntaxCarriesTheSliceSection(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		syntax        Syntax
+		wantFunctions []string
+		wantJoined    bool
+	}{
+		{name: "no section selects nothing and joins nothing", syntax: NewSyntax()},
+		{
+			name:          "functions are the globs the section named",
+			syntax:        NewSyntaxWith(sliceconf.Config{Functions: []string{"Run", "Mount*"}}),
+			wantFunctions: []string{"Run", "Mount*"},
+		},
+		{
+			name:       "errcheck joins a reassign with its check",
+			syntax:     NewSyntaxWith(sliceconf.Config{Errcheck: true}),
+			wantJoined: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := testCase.syntax.Functions(); !slices.Equal(got, testCase.wantFunctions) {
+				t.Fatalf("Functions() = %v, want %v", got, testCase.wantFunctions)
+			}
+
+			ctx := context.Background()
+
+			const reassignSource = `package app
+
+func Run() error {
+	err := one()
+	if err != nil {
+		return err
+	}
+
+	err = two()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+`
+
+			source := []byte(reassignSource)
+
+			decls, err := testCase.syntax.Declarations(ctx, "app/app.go", source)
+			if err != nil {
+				t.Fatalf("Declarations() error = %v", err)
+			}
+
+			sliced, found, err := testCase.syntax.Slice(ctx, decls[0], source)
+			if err != nil || !found {
+				t.Fatalf("Slice() found = %v, error = %v", found, err)
+			}
+
+			pair, check := sliced.Members[2].Atom, sliced.Members[3].Atom
+			if joined := pair != "" && pair == check; joined != testCase.wantJoined {
+				t.Fatalf("atoms = %q and %q, joined = %v, want %v",
+					pair, check, joined, testCase.wantJoined)
+			}
+		})
 	}
 }

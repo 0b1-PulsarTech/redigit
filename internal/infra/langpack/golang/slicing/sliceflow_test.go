@@ -8,6 +8,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 func atomShape(sliced indexing.Sliced) []int {
@@ -84,7 +85,7 @@ func TestSliceJoinsLocalsInSourceOrder(t *testing.T) {
 			}
 
 			for run := range runs {
-				sliced, ok, err := Slice(context.Background(), fn, source)
+				sliced, ok, err := Slice(context.Background(), fn, source, sliceconf.Config{})
 				if err != nil || !ok {
 					t.Fatalf("Slice() ok = %v, error = %v", ok, err)
 				}

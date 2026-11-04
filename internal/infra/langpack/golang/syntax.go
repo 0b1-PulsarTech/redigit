@@ -9,15 +9,21 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/render"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/slicing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/syntax"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
-type Syntax struct{}
+type Syntax struct{ slice sliceconf.Config }
 
 func NewSyntax() Syntax { return Syntax{} }
 
+func NewSyntaxWith(slice sliceconf.Config) Syntax { return Syntax{slice: slice} }
+
+func (pack Syntax) Functions() []string { return pack.slice.Functions }
+
 var (
-	_ indexing.Syntax = Syntax{}
-	_ indexing.Slicer = Syntax{}
+	_ indexing.Syntax   = Syntax{}
+	_ indexing.Slicer   = Syntax{}
+	_ indexing.Selector = Syntax{}
 )
 
 func (Syntax) Declarations(
@@ -42,12 +48,12 @@ func (Syntax) Render(ctx context.Context, source []byte, keep []entities.DeclKey
 	return rendered, nil
 }
 
-func (Syntax) Slice(
+func (pack Syntax) Slice(
 	ctx context.Context,
 	fn entities.Decl,
 	source []byte,
 ) (indexing.Sliced, bool, error) {
-	sliced, found, err := slicing.Slice(ctx, fn, source)
+	sliced, found, err := slicing.Slice(ctx, fn, source, pack.slice)
 	if err != nil {
 		return indexing.Sliced{}, false, fmt.Errorf("go slice: %w", err)
 	}
