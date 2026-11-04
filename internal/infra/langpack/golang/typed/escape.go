@@ -1,54 +1,13 @@
 package typed
 
 import (
-	"go/ast"
 	"go/token"
 	"go/types"
 	"path"
 	"strings"
 
-	"golang.org/x/tools/go/packages"
-
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
-
-var protocolMethods = map[string]bool{
-	"Error": true, "Unwrap": true, "Is": true, "As": true,
-	"String": true, "GoString": true, "Format": true,
-	"MarshalJSON": true, "UnmarshalJSON": true,
-	"MarshalText": true, "UnmarshalText": true,
-	"Scan": true, "Value": true,
-}
-
-func dynamicNames(pkgs []*packages.Package) map[string]bool {
-	// Dynamic methods stay reachable through an interface: stdlib protocols plus the tree's own.
-	names := map[string]bool{}
-
-	for name := range protocolMethods {
-		names[name] = true
-	}
-
-	for _, pkg := range pkgs {
-		for _, file := range pkg.Syntax {
-			ast.Inspect(file, func(node ast.Node) bool {
-				iface, isInterface := node.(*ast.InterfaceType)
-				if !isInterface {
-					return true
-				}
-
-				for _, field := range iface.Methods.List {
-					for _, name := range field.Names {
-						names[name.Name] = true
-					}
-				}
-
-				return true
-			})
-		}
-	}
-
-	return names
-}
 
 func (scan *factScan) escape(dependent entities.DeclKey, value types.Type) {
 	if value == nil || !isConcrete(value) {
