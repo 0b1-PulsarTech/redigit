@@ -25,6 +25,7 @@ type Config struct {
 	// reason as Unseen: which extensions a language owns is a per-language
 	// question, and this package knows no language.
 	Unclaimed []Unclaimed
+	Gates     []Gate
 }
 
 func (c Config) withDefaults() Config {
@@ -66,11 +67,11 @@ func (a Auditor) Audit(graph entities.Graph, order entities.Ordering) (Result, e
 
 	result := Result{
 		Report: entities.Report{
-			Integrity: []entities.Measure{
+			Integrity: append([]entities.Measure{
 				a.placed(graph, order),
 				a.cyclesNamed(graph, order),
 				a.resolverCouldSee(graph),
-			},
+			}, a.gateMeasures(graph, order)...),
 			Shape: []entities.Measure{
 				a.nearTheirReader(graph, order, found),
 				a.testsWithSubject(graph, order),

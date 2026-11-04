@@ -1,0 +1,74 @@
+{
+  "Report": {
+    "Integrity": [
+      {
+        "Name": "declarations placed",
+        "Value": 5,
+        "Total": 5,
+        "Excluded": [
+          "nothing"
+        ]
+      },
+      {
+        "Name": "declarations free of a cycle",
+        "Value": 5,
+        "Total": 5,
+        "Excluded": [
+          "declarations the ordering never placed",
+          "a cycle the graph does not represent, which is the defect this cannot see"
+        ]
+      },
+      {
+        "Name": "declarations in a file the reference queries could read",
+        "Value": 5,
+        "Total": 5,
+        "Excluded": [
+          "whether a readable file's queries came back empty for some other reason",
+          "a constraint this run DID satisfy, which hides nothing and is not counted",
+          "a file no language pack reports a constraint for, which is assumed readable"
+        ]
+      }
+    ],
+    "Shape": [
+      {
+        "Name": "born within 25 positions of the first outside reader",
+        "Value": 1,
+        "Total": 2,
+        "Excluded": [
+          "declarations nothing outside their unit reads",
+          "declarations the ordering never placed",
+          "readers inside the same unit, which is the whole point"
+        ]
+      },
+      {
+        "Name": "tests born in the same commit as their subject",
+        "Value": 0,
+        "Total": 0,
+        "Excluded": [
+          "tests whose subject no rule could identify",
+          "tests the ordering never placed",
+          "integration suites, which boot a harness and belong with it"
+        ]
+      }
+    ]
+  },
+  "Drifts": [
+    {
+      "Decl": {
+        "File": "apps/molecwire/config.go",
+        "Kind": "func",
+        "Name": "Environment"
+      },
+      "BornAt": 129,
+      "FirstRead": 738,
+      "Reader": {
+        "File": "cmd/app/main.go",
+        "Kind": "func",
+        "Name": "main"
+      },
+      "Reason": "reference"
+    }
+  ],
+  "Unseen": null,
+  "Unclaimed": null
+}
