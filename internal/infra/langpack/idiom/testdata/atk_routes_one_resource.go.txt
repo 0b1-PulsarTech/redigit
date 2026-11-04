@@ -1,0 +1,27 @@
+package app
+
+import (
+	"example.com/atk/billing"
+	"example.com/atk/orders"
+	"example.com/atk/router"
+	"example.com/atk/users"
+)
+
+func Routes() *router.Router {
+	mux := router.New()
+
+	mux.Route("/a", func(api *router.Router) {
+		api.GET("/x", users.H1)
+		users.Mount(api, users.Config{})
+	})
+	mux.Route("/a", func(api *router.Router) {
+		api.POST("/x", orders.H1)
+		orders.Mount(api, orders.Config{})
+	})
+	mux.Route("/a", func(api *router.Router) {
+		api.GET("/y", billing.H1)
+		billing.Mount(api, billing.Config{})
+	})
+
+	return mux
+}
