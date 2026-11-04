@@ -44,7 +44,7 @@ func (sweep Sweep) checkCommit(
 
 	// Resolved before the filter, so an excluded dependency still reaches a module that needs it.
 	for _, unit := range Resolve(listing.Modules) {
-		if isExcluded(unit.Dir, exclude) {
+		if IsExcluded(unit.Dir, exclude) {
 			continue
 		}
 

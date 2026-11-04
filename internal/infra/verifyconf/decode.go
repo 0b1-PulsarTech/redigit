@@ -1,4 +1,4 @@
-package verify
+package verifyconf
 
 import (
 	"encoding/json"
@@ -70,13 +70,13 @@ func decodeParallel(raw json.RawMessage, target *int) error {
 	return nil
 }
 
-func decodeLanguages(raw json.RawMessage, target *settings) error {
+func decodeLanguages(raw json.RawMessage, target *Settings) error {
 	var named map[string]json.RawMessage
 	if err := decodeAs(raw, &named, "an object"); err != nil {
 		return err
 	}
 
-	target.languages = map[string]checkrun.Language{}
+	target.Languages = map[string]checkrun.Language{}
 
 	for _, name := range slices.Sorted(maps.Keys(named)) {
 		if err := decodeLanguage(name, named[name], target); err != nil {
@@ -87,10 +87,10 @@ func decodeLanguages(raw json.RawMessage, target *settings) error {
 	return nil
 }
 
-func decodeLanguage(name string, raw json.RawMessage, target *settings) error {
+func decodeLanguage(name string, raw json.RawMessage, target *Settings) error {
 	var marker string
-	if name == goName {
-		marker = goMarker
+	if name == GoName {
+		marker = GoMarker
 	}
 
 	var language checkrun.Language
@@ -105,7 +105,7 @@ func decodeLanguage(name string, raw json.RawMessage, target *settings) error {
 		return err
 	}
 
-	owner, isTaken := target.markers[marker]
+	owner, isTaken := target.Markers[marker]
 
 	switch {
 	case marker == "" || strings.Contains(marker, "/"):
@@ -116,8 +116,8 @@ func decodeLanguage(name string, raw json.RawMessage, target *settings) error {
 		return fmt.Errorf("marker %q already belongs to %q", marker, owner)
 	}
 
-	target.markers[marker] = name
-	target.languages[name] = language
+	target.Markers[marker] = name
+	target.Languages[name] = language
 
 	return nil
 }

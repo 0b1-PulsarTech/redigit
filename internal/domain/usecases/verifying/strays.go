@@ -16,7 +16,7 @@ func strayRow(base Row, strays, exclude []string) (Row, bool) {
 	kept := make([]string, 0, len(strays))
 
 	for _, file := range strays {
-		if !isExcluded(path.Dir(file), exclude) {
+		if !IsExcluded(path.Dir(file), exclude) {
 			kept = append(kept, file)
 		}
 	}

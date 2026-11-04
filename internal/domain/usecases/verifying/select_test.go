@@ -54,8 +54,8 @@ func TestIsExcluded(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := isExcluded(testCase.dir, testCase.prefixes); got != testCase.want {
-				t.Fatalf("isExcluded(%q, %q) = %v, want %v",
+			if got := IsExcluded(testCase.dir, testCase.prefixes); got != testCase.want {
+				t.Fatalf("IsExcluded(%q, %q) = %v, want %v",
 					testCase.dir, testCase.prefixes, got, testCase.want)
 			}
 		})

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/wrapped-owls/redigit/internal/infra/verifyconf"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/write"
 )
 
@@ -131,7 +132,7 @@ func withDefaults(opts options) (options, error) {
 		return options{}, fmt.Errorf("%w: --parallel above the %d cpus", ErrUsage, runtime.NumCPU())
 	case opts.from < 0 || opts.to < 0:
 		return options{}, fmt.Errorf("%w: --from and --to cannot be negative", ErrUsage)
-	case hasRootExclude(splitList(opts.exclude)):
+	case verifyconf.HasRootExclude(splitList(opts.exclude)):
 		return options{}, fmt.Errorf("%w: --exclude cannot name the repository root", ErrUsage)
 	case opts.to > 0 && opts.from > opts.to:
 		return options{}, fmt.Errorf("%w: --from is after --to", ErrUsage)

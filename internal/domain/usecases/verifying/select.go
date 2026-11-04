@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func isExcluded(dir string, prefixes []string) bool {
+func IsExcluded(dir string, prefixes []string) bool {
 	dir = path.Clean(dir)
 
 	for _, raw := range prefixes {
