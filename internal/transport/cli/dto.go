@@ -68,6 +68,7 @@ type commitDTO struct {
 	Feature  string   `json:"feature,omitempty"`
 	Reason   string   `json:"reason,omitempty"`
 	Decls    []string `json:"decls"`
+	Changes  []string `json:"changes,omitempty"`
 }
 
 type planDTO struct {

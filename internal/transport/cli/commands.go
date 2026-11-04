@@ -169,6 +169,7 @@ func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer, start sta
 				Feature:  commit.Feature,
 				Reason:   commit.Reason,
 				Decls:    toKeys(commit.Decls),
+				Changes:  toKeys(commit.Changes),
 			})
 		}
 
