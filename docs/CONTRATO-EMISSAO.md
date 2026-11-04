@@ -25,6 +25,36 @@ Uma aresta que morde: um arquivo cujas declaracoes ainda nao nasceram renderiza
 vazio e e PULADO - exceto um que a arvore final guarda vazio, que e escrito,
 porque o git o rastreia e pular deixaria a arvore com um caminho a menos.
 
+Um bloco `const` com especificacao implicita (um nome sem tipo nem valor, como
+o iota exige) e UM so `Atom`: seus nomes nascem juntos, na mesma linha, e o
+renderizador entrega o bloco inteiro. Sem isso, o primeiro nome renderizava o
+bloco todo antes de as constantes que ele le existirem (medido com `iota + C01`:
+as linhas 1 e 2 nao compilavam) e um nome posterior caia numa linha de blob igual
+ao do pai (arvore igual a do pai).
+
+Duas regras da mesma natureza. Uma especificacao que liga mais de um nome
+(`const A, B = 1, C01`, `var X, Y = 1, f()`) e UM so `Atom`: o renderizador
+entrega a especificacao inteira se um nome sobrevive, entao os nomes tem de
+nascer juntos. Um bloco `const` em que uma especificacao explicita, depois da
+primeira, le `iota` e UM so `Atom`, como o implicito: `KeyB = iota` sozinho
+vale 0 e nao 1. Fora esses casos, valores explicitos continuam um nome por
+declaracao, sem `Atom`. O rotulo e `const-group:` (bloco) ou `spec-group:`
+(especificacao) mais o arquivo relativo e a posicao fisica (uma diretiva
+`//line` nao conta), sem tempo, ordem de mapa nem caminho absoluto. As linhas de
+membros que dividem um `Span` contam uma vez, no primeiro membro na ordem das
+declaracoes, para a conta do teto de um commit.
+
+Limite: um `Atom` que uma cadeia de leitores le de volta fecha um ciclo no
+grafo, mesmo quando a linguagem nao o tem (`KeyA = iota + C01` e `KeyB = iota`,
+com `C01` lendo `KeyB` ao fim de uma cadeia). O ordenador avisa (`ordering holds
+1 cycle`) e o plano sai; o caso medido sai verde.
+
+Se todos os blobs de uma linha forem iguais ao handle
+que o mesmo caminho tinha na ultima linha anterior, o emissor emite um
+`slog.Warn` com a posicao e as chaves dos chunks; nao recusa nem omite a linha.
+Um caminho visto pela primeira vez ou um handle diferente nao avisam, e o
+manifesto nao muda.
+
 ## 2. Data e autor nao viajam
 
 Nao ha campo de data nem de autor no manifesto. Uma varredura por
@@ -129,7 +159,9 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
   da ancora renderiza o texto final. O planejador compara a declaracao com todo o
   espaco em branco removido, no pai contra a ancora e na pre-imagem contra o
   final: uma ancora que so reformata nao muda declaracao nenhuma e e descartada,
-  entao nao sai commit vazio. O emissor, por si, nao recusa um commit sem blobs.
+  entao nao sai commit vazio. O emissor recusa um commit sem blobs
+  (`ErrIncomplete`). Uma linha cujos blobs repetem o ultimo handle de cada
+  caminho (e nao os da linha anterior) passa: so avisa (secao 1).
 - Uma declaracao com pre-imagem ativa nao entra na conta de referencias para
   frente: a pre-imagem nao e o texto final, e as arestas do grafo dizem respeito
   a este.

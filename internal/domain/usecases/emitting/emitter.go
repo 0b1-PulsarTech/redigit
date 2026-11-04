@@ -48,7 +48,7 @@ func (e Emitter) Emit(
 	e.versions = newVersioning(plan, graph)
 	born := map[string][]entities.DeclKey{}
 	cache := map[string]sourceFile{}
-	commits := make([]Commit, 0, plan.Len())
+	commits, latest := make([]Commit, 0, plan.Len()), held{}
 
 	for _, planned := range plan.Commits {
 		touched := map[string]bool{}
@@ -109,6 +109,7 @@ func (e Emitter) Emit(
 		}
 
 		commits = append(commits, commit)
+		latest.observe(commit)
 	}
 
 	return commits, nil

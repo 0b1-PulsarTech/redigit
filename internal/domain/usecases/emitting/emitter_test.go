@@ -3,6 +3,7 @@ package emitting
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -397,5 +398,57 @@ func TestEmitMarksACommitThatLeavesAPieceIncomplete(t *testing.T) {
 	// The commit that needs nothing later stays unmarked.
 	if commits[1].IsWIP || entities.IsWIPSubject(commits[1].Subject) {
 		t.Fatalf("a complete commit was marked: %q", commits[1].Subject)
+	}
+}
+
+func TestEmitWarnsOnARowThatRepeatsTheLatestBlob(t *testing.T) {
+	testCases := []struct {
+		name        string
+		growing     bool
+		wantWarning string
+	}{
+		{name: "a row rendering the same text warns", growing: false, wantWarning: "position=1"},
+		{name: "a row that grows the file stays silent", growing: true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			logged := captureWarnings(t)
+			ctrl := gomock.NewController(t)
+
+			source := NewMockSource(ctrl)
+			source.EXPECT().
+				Read(gomock.Any(), "a.go").
+				Return([]byte("final"), FileMode("100644"), nil).
+				AnyTimes()
+
+			renderer := growingRenderer(ctrl)
+			if !testCase.growing {
+				renderer = NewMockRenderer(ctrl)
+				renderer.EXPECT().
+					Render(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return([]byte("same"), nil).
+					AnyTimes()
+			}
+
+			commits, err := New(source, renderer, countingSink(ctrl)).
+				Emit(t.Context(), reviewedPlan(), sampleGraph())
+			if err != nil {
+				t.Fatalf("Emit() = %v", err)
+			}
+
+			if len(commits) != 2 {
+				t.Fatalf("commits = %d, want the warning to drop none", len(commits))
+			}
+
+			got := logged.String()
+			if testCase.wantWarning == "" && got != "" {
+				t.Fatalf("warned %q, want nothing", got)
+			}
+
+			if !strings.Contains(got, testCase.wantWarning) {
+				t.Fatalf("log %q lacks %q", got, testCase.wantWarning)
+			}
+		})
 	}
 }
