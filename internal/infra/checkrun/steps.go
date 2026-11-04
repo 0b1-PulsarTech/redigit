@@ -99,9 +99,10 @@ func runStep(ctx context.Context, job stepRun) (verifying.Outcome, error) {
 		return verifying.Outcome{}, fmt.Errorf("run %s: %w", name, ctx.Err())
 	case errors.Is(stepCtx.Err(), context.DeadlineExceeded):
 		return verifying.Outcome{
-			IsFailed: true,
-			Step:     name,
-			Tail:     tail.String() + "\ntimed out after " + timeout.String(),
+			IsFailed:  true,
+			IsTimeout: true,
+			Step:      name,
+			Tail:      tail.String() + "\ntimed out after " + timeout.String(),
 		}, nil
 	case errors.As(err, &exit):
 		if isTolerated(exit.ExitCode(), tail.String(), job.step.Tolerate) {

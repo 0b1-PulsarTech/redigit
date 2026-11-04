@@ -54,9 +54,10 @@ type (
 	}
 
 	Outcome struct {
-		IsFailed bool
-		Step     string
-		Tail     string
+		IsFailed  bool
+		IsTimeout bool
+		Step      string
+		Tail      string
 	}
 
 	Row struct {
