@@ -54,3 +54,16 @@ func (Syntax) Slice(
 
 	return sliced, found, nil
 }
+
+func (Syntax) Needed(source []byte, text string) []string {
+	return render.Needed(source, text)
+}
+
+func (Syntax) Admit(_ context.Context, source []byte, specs []string) ([]byte, error) {
+	admitted, err := render.Admit(source, specs)
+	if err != nil {
+		return nil, fmt.Errorf("go imports: %w", err)
+	}
+
+	return admitted, nil
+}

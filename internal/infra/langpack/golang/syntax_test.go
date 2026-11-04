@@ -94,3 +94,23 @@ func TestSyntaxPassesErrorsThrough(t *testing.T) {
 		t.Fatal("Slice() error = nil, want a parse error")
 	}
 }
+
+func TestSyntaxCarriesImportsThroughTheRenderPackage(t *testing.T) {
+	t.Parallel()
+
+	syntax := NewSyntax()
+	source := []byte("package p\n\nimport \"bytes\"\n\nfunc F() {}\n")
+
+	if got := syntax.Needed(source, "func G() { _ = bytes.Equal(nil, nil) }"); len(got) != 1 {
+		t.Fatalf("Needed() = %q, want the bytes import", got)
+	}
+
+	admitted, err := syntax.Admit(context.Background(), source, []string{`"os"`})
+	if err != nil || string(admitted) == string(source) {
+		t.Fatalf("Admit() = %q, %v, want the os import added", admitted, err)
+	}
+
+	if _, err = syntax.Admit(context.Background(), source, []string{"=="}); err == nil {
+		t.Fatalf("Admit() error = nil, want a spec that does not parse refused")
+	}
+}
