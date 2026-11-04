@@ -10,6 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/gofacts"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/di"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/router"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
@@ -53,5 +54,8 @@ func ruleHook(ctx context.Context, cfg *Config, env stageEnv, built *stages) err
 
 func ruleConstructors() map[string]rules.Constructor {
 	// Each idiom pack registers its own constructor here.
-	return map[string]rules.Constructor{"go-di": di.Constructor("go-di", slog.Default())}
+	return map[string]rules.Constructor{
+		"go-di":     di.Constructor("go-di", slog.Default()),
+		"go-router": router.Constructor("go-router"),
+	}
 }

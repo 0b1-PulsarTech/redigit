@@ -144,7 +144,7 @@ func TestLoadConfigFileRendersTheKnownRuleTypes(t *testing.T) {
 
 	_, err := LoadConfigFile(path)
 
-	want := "config file " + path + `: rules[0]: unknown type "no-such-rule" (known: go-di)`
+	want := "config file " + path + `: rules[0]: unknown type "no-such-rule" (known: go-di, go-router)`
 	if !errors.Is(err, ErrConfig) || !errors.Is(err, rules.ErrUnknownType) || err.Error() != want {
 		t.Fatalf("LoadConfigFile() err = %v, want %q", err, want)
 	}

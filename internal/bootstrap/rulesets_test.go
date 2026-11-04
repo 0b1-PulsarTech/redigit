@@ -11,10 +11,14 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/di"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/router"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
-const goDIRule = `{"type":"go-di","registerFuncs":["Register*"],"resolveFuncs":["Get"]}`
+const (
+	goDIRule     = `{"type":"go-di","registerFuncs":["Register*"],"resolveFuncs":["Get"]}`
+	goRouterRule = `{"type":"go-router","handle":["*.GET"],"mount":["Mount*"],"groupMethods":true}`
+)
 
 func TestRuleHook(t *testing.T) {
 	t.Parallel()
@@ -38,6 +42,7 @@ func TestRuleHook(t *testing.T) {
 func TestRuleHookWiresGoIdioms(t *testing.T) {
 	t.Parallel()
 
+	diSpec := rules.Spec{Type: "go-di", Raw: []byte(goDIRule)}
 	testCases := []struct {
 		name          string
 		specs         []rules.Spec
@@ -62,6 +67,18 @@ func TestRuleHookWiresGoIdioms(t *testing.T) {
 			specs: []rules.Spec{
 				{Type: "go-di", Raw: []byte(goDIRule)}, {Type: "go-di", Raw: []byte(goDIRule)},
 			},
+			wantLanguages: []string{"kept", "go-idioms"},
+			wantGates:     2,
+		},
+		{
+			name:          "go-router adds one language and one gate",
+			specs:         []rules.Spec{{Type: "go-router", Raw: []byte(goRouterRule)}},
+			wantLanguages: []string{"kept", "go-idioms"},
+			wantGates:     1,
+		},
+		{
+			name:          "go-di and go-router share one language",
+			specs:         []rules.Spec{diSpec, {Type: "go-router", Raw: []byte(goRouterRule)}},
 			wantLanguages: []string{"kept", "go-idioms"},
 			wantGates:     2,
 		},
@@ -184,7 +201,7 @@ func TestRuleConstructors(t *testing.T) {
 			name:     "a rule type nobody registered is refused and the known ones listed",
 			specs:    []rules.Spec{{Type: "no-such-rule"}},
 			wantErr:  rules.ErrUnknownType,
-			wantText: "known: go-di",
+			wantText: "known: go-di, go-router",
 		},
 		{
 			name:    "go-di builds a rule",
@@ -197,10 +214,23 @@ func TestRuleConstructors(t *testing.T) {
 			wantErr:  di.ErrConfig,
 			wantText: "rules[0] (go-di)",
 		},
+		{
+			name:    "go-router builds a rule",
+			specs:   []rules.Spec{{Type: "go-router", Raw: []byte(goRouterRule)}},
+			wantLen: 1,
+		},
+		{
+			name: "go-router names the rule it refuses",
+			specs: []rules.Spec{
+				{Type: "go-router", Raw: []byte(`{"type":"go-router","mount":["M*"]}`)},
+			},
+			wantErr:  router.ErrNoHandle,
+			wantText: "rules[0] (go-router)",
+		},
 	}
 
-	if got := len(ruleConstructors()); got != 1 {
-		t.Fatalf("len(ruleConstructors()) = %d, want 1", got)
+	if got := len(ruleConstructors()); got != 2 {
+		t.Fatalf("len(ruleConstructors()) = %d, want 2", got)
 	}
 
 	for _, testCase := range testCases {

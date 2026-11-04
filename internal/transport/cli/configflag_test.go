@@ -91,7 +91,7 @@ func TestParseConfigFileKeepsTheCause(t *testing.T) {
 		{"a missing file", missing, os.ErrNotExist, ": no such file or directory"},
 		{
 			"an unknown rule type", unknown, rules.ErrUnknownType,
-			`: rules[0]: unknown type "no-such-rule" (known: go-di)`,
+			`: rules[0]: unknown type "no-such-rule" (known: go-di, go-router)`,
 		},
 		{"a malformed file", malformed, rules.ErrMalformed, ": invalid JSON at offset 13"},
 		{
