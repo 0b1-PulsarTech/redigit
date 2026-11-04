@@ -71,7 +71,7 @@ func (scan *factScan) escape(dependent entities.DeclKey, value types.Type) {
 			continue
 		}
 
-		if key, inTree := scan.where.DeclAt(scan.pkg.Fset, fn.Origin().Pos()); inTree {
+		if key, inTree := scan.where.ObjectAt(scan.pkg.Fset, fn.Origin()); inTree {
 			methods = append(methods, key)
 		}
 	}
@@ -121,7 +121,7 @@ func (scan *factScan) require(
 			continue
 		}
 
-		if key, inTree := scan.where.DeclAt(scan.pkg.Fset, fn.Origin().Pos()); inTree {
+		if key, inTree := scan.where.ObjectAt(scan.pkg.Fset, fn.Origin()); inTree {
 			methods = append(methods, key)
 		}
 	}
@@ -147,7 +147,7 @@ func (scan *factScan) ownerOf(value types.Type) entities.DeclKey {
 		return entities.DeclKey{}
 	}
 
-	key, _ := scan.where.DeclAt(scan.pkg.Fset, named.Origin().Obj().Pos())
+	key, _ := scan.where.ObjectAt(scan.pkg.Fset, named.Origin().Obj())
 
 	return key
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"strings"
 	"sync"
 
@@ -50,10 +51,12 @@ func (source *Source) Facts(
 	// Packages stay loaded: the same facts are asked again per statement, each one a dependent.
 	locator := NewDeclLocator(decls)
 
+	dynamic := dynamicNames(slices.Concat(loaded...))
+
 	var facts Facts
 
 	for _, pkgs := range loaded {
-		facts = facts.merged(collectFacts(pkgs, snap.Root, locator))
+		facts = facts.merged(collectFacts(pkgs, snap.Root, locator, dynamic))
 	}
 
 	source.facts[shape] = facts.sorted()

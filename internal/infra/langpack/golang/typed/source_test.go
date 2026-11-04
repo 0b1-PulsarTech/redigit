@@ -137,3 +137,62 @@ func TestTypedSourceAttributesUsesToTheDeclarationsAsked(t *testing.T) {
 		t.Fatalf("Uses = %v, want the statement to use One and the head not", got.Uses)
 	}
 }
+
+func TestSourceEscapesThroughAnInterfaceOnlyAnotherPassDeclares(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		visible    string
+		hidden     string
+		wantEscape bool
+	}{
+		{
+			name:       "a method an interface of the same pass names",
+			visible:    "Do()",
+			hidden:     "Other()",
+			wantEscape: true,
+		},
+		{
+			name:       "a method an interface only the hidden file names",
+			visible:    "Other()",
+			hidden:     "Do()",
+			wantEscape: true,
+		},
+		{
+			name:       "a method no interface names",
+			visible:    "Other()",
+			hidden:     "Another()",
+			wantEscape: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap, decls := testkit.Fixture(t, map[string]string{
+				"a/a.go": "package a\n\ntype I interface{ " + testCase.visible + " }\n\n" +
+					"type Impl struct{}\n\nfunc (Impl) Do() {}\n",
+				"b/b.go": "package b\n\nimport (\n\t\"fmt\"\n\n\t\"example.test/fixture/a\"\n)\n\n" +
+					"func UseEsc() {\n\tfmt.Println(a.Impl{})\n}\n",
+				"b/hidden.go": "//go:build hid\n\npackage b\n\n" +
+					"type Hidden interface{ " + testCase.hidden + " }\n",
+			})
+
+			facts, err := NewSource(nil).Facts(context.Background(), snap, decls)
+			if err != nil {
+				t.Fatalf("Facts() error = %v", err)
+			}
+
+			method := testkit.DeclKey("a/a.go", entities.KindMethod, "Impl.Do")
+			escaped := slices.ContainsFunc(facts.Escaped, func(req Requirement) bool {
+				return req.Dependent.Name == "UseEsc" && slices.Contains(req.Methods, method)
+			})
+
+			if escaped != testCase.wantEscape {
+				t.Fatalf("Escaped = %+v, %v escaped = %v", facts.Escaped, method, escaped)
+			}
+		})
+	}
+}

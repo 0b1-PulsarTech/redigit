@@ -45,8 +45,14 @@ type Use struct {
 	Dependent, Provider entities.DeclKey
 }
 
-func collectFacts(pkgs []*packages.Package, root string, locator DeclLocator) Facts {
-	scan := &factScan{where: NewPositions(root, locator), dynamic: dynamicNames(pkgs)}
+func collectFacts(
+	pkgs []*packages.Package,
+	root string,
+	locator DeclLocator,
+	dynamic map[string]bool,
+) Facts {
+	where := NewPositions(root, locator).Parsing(pkgs)
+	scan := &factScan{where: where, dynamic: dynamic}
 
 	for _, pkg := range pkgs {
 		if pkg.TypesInfo == nil {
@@ -161,7 +167,7 @@ func (scan *factScan) uses() {
 			continue
 		}
 
-		provider, found := scan.where.DeclAt(scan.pkg.Fset, obj.Pos())
+		provider, found := scan.where.ObjectAt(scan.pkg.Fset, obj)
 		if !found || provider == dependent {
 			continue
 		}
