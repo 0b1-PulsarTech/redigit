@@ -54,8 +54,12 @@ func sampleEntry() Entry {
 		Commits: []entities.PlannedCommit{{
 			Position: 1, Subject: "DRAFT: add", Shape: entities.ShapeFeature, Feature: "f",
 			Decls: []entities.DeclKey{declKey("A")}, Reason: "why", IsWIP: true,
+			Changes: []entities.DeclKey{declKey("B")},
 		}},
 		Unplaced: []entities.DeclKey{declKey("B")},
+		Versions: map[entities.DeclKey][]entities.Version{
+			declKey("B"): {{Text: "func B() {}", Until: 1}},
+		},
 	}
 	entry.Unseen = []auditing.Unseen{
 		{File: "x.go", Constraint: "//go:build x", Tags: []string{"x"}},
@@ -141,6 +145,20 @@ func TestSampleEntryFillsEveryField(t *testing.T) {
 	for idx := range decl.NumField() {
 		if decl.Field(idx).IsZero() {
 			t.Errorf("sampleEntry() leaves Decl.%s empty", decl.Type().Field(idx).Name)
+		}
+	}
+
+	plan := reflect.ValueOf(entry.Plan)
+	for idx := range plan.NumField() {
+		if plan.Field(idx).IsZero() {
+			t.Errorf("sampleEntry() leaves Plan.%s empty", plan.Type().Field(idx).Name)
+		}
+	}
+
+	commit := reflect.ValueOf(entry.Plan.Commits[0])
+	for idx := range commit.NumField() {
+		if commit.Field(idx).IsZero() {
+			t.Errorf("sampleEntry() leaves PlannedCommit.%s empty", commit.Type().Field(idx).Name)
 		}
 	}
 }

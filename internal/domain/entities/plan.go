@@ -1,6 +1,9 @@
 package entities
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // CommitShape says whether a commit was cut along a feature or along a layer.
 // Both are legitimate and the planner records which it chose, because a history
@@ -28,8 +31,14 @@ type PlannedCommit struct {
 	Shape    CommitShape
 	Feature  string
 	Decls    []DeclKey
+	Changes  []DeclKey
 	Reason   string
 	IsWIP    bool
+}
+
+type Version struct {
+	Text  string
+	Until Position
 }
 
 // DraftMarker prefixes every subject a planner invents: a generated subject is
@@ -84,19 +93,30 @@ type Plan struct {
 	// silently: a declaration the planner could not place is a hole in the
 	// final tree, and the caller must see it before writing anything.
 	Unplaced []DeclKey
+	Versions map[DeclKey][]Version
 }
 
-func (p Plan) Len() int { return len(p.Commits) }
+func (plan Plan) Len() int { return len(plan.Commits) }
+
+func (plan Plan) PreimageAt(key DeclKey, at Position) (string, bool) {
+	for _, version := range plan.Versions[key] {
+		if at < version.Until {
+			return version.Text, true
+		}
+	}
+
+	return "", false
+}
 
 // Files reports every path the plan touches, which is what the shape measures
 // count over.
-func (p Plan) Files() []string {
+func (plan Plan) Files() []string {
 	seen := map[string]bool{}
 
 	var out []string
 
-	for _, commit := range p.Commits {
-		for _, key := range commit.Decls {
+	for _, commit := range plan.Commits {
+		for _, key := range slices.Concat(commit.Decls, commit.Changes) {
 			if !seen[key.File] {
 				seen[key.File] = true
 

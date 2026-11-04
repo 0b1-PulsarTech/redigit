@@ -50,6 +50,87 @@ func TestPlanFiles(t *testing.T) {
 	}
 }
 
+func TestPlanFilesCountsChangedDeclarations(t *testing.T) {
+	t.Parallel()
+
+	first := DeclKey{File: "a.go", Kind: KindFunc, Name: "A"}
+	second := DeclKey{File: "b.go", Kind: KindFunc, Name: "B"}
+
+	testCases := []struct {
+		name string
+		plan Plan
+		want []string
+	}{
+		{
+			name: "a change counts its file like a declaration does",
+			plan: Plan{Commits: []PlannedCommit{
+				{Decls: []DeclKey{first}},
+				{Changes: []DeclKey{first, second}},
+			}},
+			want: []string{"a.go", "b.go"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := testCase.plan.Files()
+			slices.Sort(got)
+
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("Files() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestPlanPreimageAt(t *testing.T) {
+	t.Parallel()
+
+	key := DeclKey{File: "a.go", Kind: KindFunc, Name: "A"}
+	plan := Plan{Versions: map[DeclKey][]Version{key: {
+		{Text: "first", Until: 4},
+		{Text: "second", Until: 9},
+	}}}
+
+	testCases := []struct {
+		name      string
+		key       DeclKey
+		at        Position
+		want      string
+		wantFound bool
+	}{
+		{name: "before the first anchor", key: key, at: 2, want: "first", wantFound: true},
+		{
+			name: "the commit before the first anchor", key: key, at: 3,
+			want: "first", wantFound: true,
+		},
+		{
+			name: "at the first anchor the final text holds", key: key, at: 4,
+			want: "second", wantFound: true,
+		},
+		{name: "between anchors", key: key, at: 8, want: "second", wantFound: true},
+		{name: "at the last anchor", key: key, at: 9, want: "", wantFound: false},
+		{name: "after the last anchor", key: key, at: 20, want: "", wantFound: false},
+		{name: "a declaration with no versions", key: DeclKey{File: "b.go"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, isFound := plan.PreimageAt(testCase.key, testCase.at)
+			if got != testCase.want || isFound != testCase.wantFound {
+				t.Fatalf(
+					"PreimageAt = %q, %v, want %q, %v",
+					got, isFound, testCase.want, testCase.wantFound,
+				)
+			}
+		})
+	}
+}
+
 func TestPlanLen(t *testing.T) {
 	t.Parallel()
 
