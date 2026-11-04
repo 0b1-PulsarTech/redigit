@@ -333,7 +333,7 @@ func (s *Session) Close(ctx context.Context) error {
 	s.cancel()
 	s.client.waitBackground()
 
-	if err := s.group.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+	if err := s.group.Wait(); err != nil && !readerEndedCleanly(err) {
 		errs = append(errs, fmt.Errorf("reader: %w", err))
 	}
 

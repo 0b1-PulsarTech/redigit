@@ -1,7 +1,9 @@
 package lsp
 
 import (
+	"context"
 	"errors"
+	"io"
 	"os/exec"
 )
 
@@ -13,4 +15,9 @@ func cleanExit(waitErr error) error {
 	}
 
 	return waitErr
+}
+
+func readerEndedCleanly(readErr error) bool {
+	// A server may end first once exit is sent; a frame cut short is io.ErrUnexpectedEOF, an error.
+	return errors.Is(readErr, context.Canceled) || errors.Is(readErr, io.EOF)
 }
