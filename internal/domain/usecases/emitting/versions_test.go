@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -28,57 +29,44 @@ func TestSplice(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name    string
-		source  string
-		edits   []edit
-		want    string
-		wantErr error
+		name   string
+		source string
+		edits  []Piece
+		want   string
 	}{
 		{name: "no edit keeps the text", source: "aaa bbb", want: "aaa bbb"},
 		{
 			name:   "one span is replaced",
 			source: "aaa bbb",
-			edits:  []edit{{span: entities.Span{Start: 0, End: 3}, text: "PRE"}},
+			edits:  []Piece{{Span: entities.Span{Start: 0, End: 3}, Text: "PRE"}},
 			want:   "PRE bbb",
 		},
 		{
 			name:   "two spans given out of order, one longer than its original",
 			source: "aaa bbb",
-			edits: []edit{
-				{span: entities.Span{Start: 4, End: 7}, text: "LONGER"},
-				{span: entities.Span{Start: 0, End: 3}, text: "x"},
+			edits: []Piece{
+				{Span: entities.Span{Start: 4, End: 7}, Text: "LONGER"},
+				{Span: entities.Span{Start: 0, End: 3}, Text: "x"},
 			},
 			want: "x LONGER",
 		},
 		{
 			name:   "two declarations sharing one span are replaced once",
 			source: "aaa bbb",
-			edits: []edit{
-				{span: entities.Span{Start: 0, End: 3}, text: "PRE"},
-				{span: entities.Span{Start: 0, End: 3}, text: "PRE"},
+			edits: []Piece{
+				{Span: entities.Span{Start: 0, End: 3}, Text: "PRE"},
+				{Span: entities.Span{Start: 0, End: 3}, Text: "PRE"},
 			},
 			want: "PRE bbb",
 		},
 		{
-			name:   "overlapping spans",
-			source: "aaa bbb",
-			edits: []edit{
-				{span: entities.Span{Start: 0, End: 5}, text: "x"},
-				{span: entities.Span{Start: 4, End: 7}, text: "y"},
+			name:   "adjacent spans",
+			source: "aaa bbb ccc",
+			edits: []Piece{
+				{Span: entities.Span{Start: 0, End: 3}, Text: "1"},
+				{Span: entities.Span{Start: 3, End: 4}, Text: "-"},
 			},
-			wantErr: ErrSplice,
-		},
-		{
-			name:    "a span past the end of the file",
-			source:  "aaa",
-			edits:   []edit{{span: entities.Span{Start: 2, End: 9}, text: "x"}},
-			wantErr: ErrSplice,
-		},
-		{
-			name:    "an inverted span",
-			source:  "aaa",
-			edits:   []edit{{span: entities.Span{Start: 2, End: 1}, text: "x"}},
-			wantErr: ErrSplice,
+			want: "1-bbb ccc",
 		},
 	}
 
@@ -87,12 +75,61 @@ func TestSplice(t *testing.T) {
 			t.Parallel()
 
 			got, err := splice([]byte(testCase.source), testCase.edits)
-			if !errors.Is(err, testCase.wantErr) {
-				t.Fatalf("splice() error = %v, want %v", err, testCase.wantErr)
+			if err != nil || string(got) != testCase.want {
+				t.Fatalf("splice() = %q, %v, want %q", got, err, testCase.want)
 			}
+		})
+	}
+}
 
-			if string(got) != testCase.want {
-				t.Fatalf("splice() = %q, want %q", got, testCase.want)
+func TestSpliceRefusals(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		source string
+		edits  []Piece
+	}{
+		{
+			name:   "two declarations sharing one span with differing text",
+			source: "aaa bbb",
+			edits: []Piece{
+				{Span: entities.Span{Start: 0, End: 3}, Text: "1"},
+				{Span: entities.Span{Start: 0, End: 3}, Text: "2"},
+			},
+		},
+		{
+			name:   "overlapping spans",
+			source: "aaa bbb",
+			edits: []Piece{
+				{Span: entities.Span{Start: 0, End: 5}, Text: "x"},
+				{Span: entities.Span{Start: 4, End: 7}, Text: "y"},
+			},
+		},
+		{
+			name:   "a span past the end of the file",
+			source: "aaa",
+			edits:  []Piece{{Span: entities.Span{Start: 2, End: 9}, Text: "x"}},
+		},
+		{
+			name:   "an inverted span",
+			source: "aaa",
+			edits:  []Piece{{Span: entities.Span{Start: 2, End: 1}, Text: "x"}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := splice(
+				[]byte(testCase.source),
+				testCase.edits,
+			); !errors.Is(
+				err,
+				ErrSplice,
+			) {
+				t.Fatalf("splice() error = %v, want %v", err, ErrSplice)
 			}
 		})
 	}
@@ -277,5 +314,146 @@ func TestEmitterRefusesAVersionOfAnUnknownDeclaration(t *testing.T) {
 				t.Fatalf("Emit() error = %v, want ErrIncomplete", err)
 			}
 		})
+	}
+}
+
+type admittingRenderer struct {
+	*MockRenderer
+
+	files   []string
+	specs   [][]string
+	failure error
+}
+
+func (renderer *admittingRenderer) Admit(
+	_ context.Context,
+	file string,
+	source []byte,
+	specs []string,
+) ([]byte, error) {
+	renderer.files = append(renderer.files, file)
+	renderer.specs = append(renderer.specs, specs)
+
+	return append([]byte("+"), source...), renderer.failure
+}
+
+func admitFixture(ctrl *gomock.Controller) (entities.Plan, entities.Graph, *MockSource) {
+	plan, graph := anchoredFixture()
+	plan.Versions[key("a.go", "A")][0].Imports = []string{"bytes"}
+	plan.Versions[key("a.go", "B")][0].Imports = []string{"bytes", `str "strings"`}
+
+	source := NewMockSource(ctrl)
+	source.EXPECT().
+		Read(gomock.Any(), gomock.Any()).
+		Return([]byte("aaa bbb"), FileMode("100644"), nil).
+		AnyTimes()
+
+	return plan, graph, source
+}
+
+type admitCase struct {
+	name      string
+	position  int
+	failure   error
+	plain     bool
+	noImports bool
+	want      string
+	wantSpecs [][]string
+	wantErr   error
+}
+
+func TestEmitterAdmitsThePreimageImports(t *testing.T) {
+	t.Parallel()
+
+	failure := errors.New("clash")
+	both := [][]string{{"bytes"}, {"bytes", `str "strings"`}}
+
+	testCases := []admitCase{
+		{
+			name:      "the imports of the active pre-images are admitted before the render",
+			position:  1,
+			want:      "+preA preB",
+			wantSpecs: both,
+		},
+		{
+			name: "one active pre-image admits only its own imports", position: 0,
+			want: "+preA bbb", wantSpecs: both,
+		},
+		{
+			name: "no admission once the anchor writes the final text", position: 2,
+			want: "aaa bbb", wantSpecs: both,
+		},
+		{
+			name: "a pre-image with no imports admits nothing", position: 1, noImports: true,
+			want: "preA preB",
+		},
+		{
+			name: "a renderer that cannot admit leaves the splice as it is", position: 1,
+			plain: true, want: "preA preB",
+		},
+		{
+			name: "a refused admission is reported", position: 1, failure: failure,
+			wantErr: failure,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			plan, graph, source := admitFixture(ctrl)
+
+			if testCase.noImports {
+				dropImports(plan)
+			}
+
+			admitting := &admittingRenderer{
+				MockRenderer: echoRenderer(ctrl),
+				failure:      testCase.failure,
+			}
+
+			var renderer Renderer = admitting
+			if testCase.plain {
+				renderer = admitting.MockRenderer
+			}
+
+			commits, err := New(source, renderer, countingSink(ctrl)).
+				Emit(context.Background(), plan, graph)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("Emit() error = %v, want %v", err, testCase.wantErr)
+			}
+
+			if err != nil {
+				return
+			}
+
+			assertAdmitted(t, commits[testCase.position], admitting, testCase)
+		})
+	}
+}
+
+func assertAdmitted(
+	t *testing.T,
+	commit Commit,
+	admitting *admittingRenderer,
+	testCase admitCase,
+) {
+	t.Helper()
+
+	for _, blob := range commit.Blobs {
+		if blob.Path == "a.go" && string(blob.Handle) != testCase.want {
+			t.Fatalf("a.go = %q, want %q", blob.Handle, testCase.want)
+		}
+	}
+
+	if !reflect.DeepEqual(admitting.specs, testCase.wantSpecs) {
+		t.Fatalf("Admit() specs = %v, want %v", admitting.specs, testCase.wantSpecs)
+	}
+}
+
+func dropImports(plan entities.Plan) {
+	for _, versions := range plan.Versions {
+		versions[0].Imports = nil
 	}
 }

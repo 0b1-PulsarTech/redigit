@@ -1,6 +1,9 @@
 package entities
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // DraftMarker prefixes every subject a planner invents: a generated subject is
 // evidence for a reviewer, not a commit message. The previous rebuild ended up
@@ -94,4 +97,25 @@ func typeLength(text string) int {
 	}
 
 	return len(line) - len(rest) + len(": ")
+}
+
+func Redraft(subject string, keys []DeclKey) string {
+	const shown = 3
+
+	head, _, isCut := strings.Cut(subject, "): ")
+	if !IsDraft(subject) || !isCut || len(keys) == 0 {
+		return subject
+	}
+
+	names := make([]string, 0, shown)
+	for _, key := range keys[:min(shown, len(keys))] {
+		names = append(names, key.Name)
+	}
+
+	text := strings.Join(names, ", ")
+	if len(keys) > shown {
+		text = fmt.Sprintf("%s and %d more", text, len(keys)-shown)
+	}
+
+	return head + "): " + text
 }

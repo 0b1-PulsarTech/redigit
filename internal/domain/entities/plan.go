@@ -34,8 +34,9 @@ type PlannedCommit struct {
 }
 
 type Version struct {
-	Text  string
-	Until Position
+	Text    string
+	Until   Position
+	Imports []string
 }
 
 // Plan is the reviewable artifact. No history is ever written straight from
@@ -53,13 +54,19 @@ type Plan struct {
 func (plan Plan) Len() int { return len(plan.Commits) }
 
 func (plan Plan) PreimageAt(key DeclKey, at Position) (string, bool) {
+	version, isHeld := plan.VersionAt(key, at)
+
+	return version.Text, isHeld
+}
+
+func (plan Plan) VersionAt(key DeclKey, at Position) (Version, bool) {
 	for _, version := range plan.Versions[key] {
 		if at < version.Until {
-			return version.Text, true
+			return version, true
 		}
 	}
 
-	return "", false
+	return Version{}, false
 }
 
 // Files reports every path the plan touches, which is what the shape measures

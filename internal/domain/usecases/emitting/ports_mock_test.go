@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	entities "github.com/wrapped-owls/redigit/internal/domain/entities"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockSource is a mock of Source interface.
@@ -134,4 +133,71 @@ func (m *MockSink) Write(ctx context.Context, path string, content []byte, mode 
 func (mr *MockSinkMockRecorder) Write(ctx, path, content, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockSink)(nil).Write), ctx, path, content, mode)
+}
+
+// MockDeriver is a mock of Deriver interface.
+type MockDeriver struct {
+	ctrl     *gomock.Controller
+	recorder *MockDeriverMockRecorder
+	isgomock struct{}
+}
+
+// MockDeriverMockRecorder is the mock recorder for MockDeriver.
+type MockDeriverMockRecorder struct {
+	mock *MockDeriver
+}
+
+// NewMockDeriver creates a new mock instance.
+func NewMockDeriver(ctrl *gomock.Controller) *MockDeriver {
+	mock := &MockDeriver{ctrl: ctrl}
+	mock.recorder = &MockDeriverMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDeriver) EXPECT() *MockDeriverMockRecorder {
+	return m.recorder
+}
+
+// Derive mocks base method.
+func (m *MockDeriver) Derive(output string, inputs map[string][]byte) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Derive", output, inputs)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Derive indicates an expected call of Derive.
+func (mr *MockDeriverMockRecorder) Derive(output, inputs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Derive", reflect.TypeOf((*MockDeriver)(nil).Derive), output, inputs)
+}
+
+// Feeds mocks base method.
+func (m *MockDeriver) Feeds(output, input string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Feeds", output, input)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Feeds indicates an expected call of Feeds.
+func (mr *MockDeriverMockRecorder) Feeds(output, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Feeds", reflect.TypeOf((*MockDeriver)(nil).Feeds), output, input)
+}
+
+// Output mocks base method.
+func (m *MockDeriver) Output(path string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Output", path)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Output indicates an expected call of Output.
+func (mr *MockDeriverMockRecorder) Output(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Output", reflect.TypeOf((*MockDeriver)(nil).Output), path)
 }

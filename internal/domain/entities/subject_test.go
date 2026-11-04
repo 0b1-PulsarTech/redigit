@@ -294,3 +294,45 @@ func TestIsDraft(t *testing.T) {
 		})
 	}
 }
+
+func TestRedraft(t *testing.T) {
+	t.Parallel()
+
+	keys := []DeclKey{{Name: "A"}, {Name: "B"}, {Name: "C"}, {Name: "D"}, {Name: "E"}}
+
+	testCases := []struct {
+		name    string
+		subject string
+		keys    []DeclKey
+		want    string
+	}{
+		{
+			name: "a draft names its first three declarations", subject: "DRAFT: feat(p): old",
+			keys: keys[:2], want: "DRAFT: feat(p): A, B",
+		},
+		{
+			name: "a longer draft counts the rest", subject: "DRAFT: feat(p): old",
+			keys: keys, want: "DRAFT: feat(p): A, B, C and 2 more",
+		},
+		{
+			name:    "a final subject is kept",
+			subject: "feat(p): old",
+			keys:    keys,
+			want:    "feat(p): old",
+		},
+		{
+			name: "no declarations keep the subject", subject: "DRAFT: feat(p): old",
+			want: "DRAFT: feat(p): old",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := Redraft(testCase.subject, testCase.keys); got != testCase.want {
+				t.Fatalf("Redraft = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}

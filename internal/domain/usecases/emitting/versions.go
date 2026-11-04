@@ -2,6 +2,7 @@ package emitting
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -13,9 +14,21 @@ import (
 var ErrSplice = errors.New("pre-image splice")
 
 type (
-	edit struct {
-		span entities.Span
-		text string
+	Piece struct {
+		Span    entities.Span
+		Text    string
+		Imports []string
+	}
+
+	Layout struct {
+		File   string
+		Source []byte
+		Pieces []Piece
+		Keep   []entities.DeclKey
+	}
+
+	Admitter interface {
+		Admit(ctx context.Context, file string, source []byte, specs []string) ([]byte, error)
 	}
 
 	versioning struct {
@@ -55,15 +68,15 @@ func (run *versioning) settled(planned entities.PlannedCommit) entities.PlannedC
 	return planned
 }
 
-func (run *versioning) apply(source []byte, born []entities.DeclKey) ([]byte, error) {
+func (run *versioning) pieces(born []entities.DeclKey) ([]Piece, error) {
 	if run == nil {
-		return source, nil
+		return nil, nil
 	}
 
-	var edits []edit
+	var layers []Piece
 
 	for _, key := range born {
-		text, isActive := run.plan.PreimageAt(key, run.at)
+		version, isActive := run.plan.VersionAt(key, run.at)
 		if !isActive {
 			continue
 		}
@@ -76,38 +89,69 @@ func (run *versioning) apply(source []byte, born []entities.DeclKey) ([]byte, er
 			)
 		}
 
-		edits = append(edits, edit{span: decl.Span, text: text})
+		layers = append(
+			layers,
+			Piece{Span: decl.Span, Text: version.Text, Imports: version.Imports},
+		)
 	}
 
-	return splice(source, edits)
+	return layers, nil
 }
 
-func splice(source []byte, edits []edit) ([]byte, error) {
-	if len(edits) == 0 {
+func Compose(ctx context.Context, renderer Renderer, layout Layout) ([]byte, error) {
+	spliced, err := splice(layout.Source, layout.Pieces)
+	if err != nil {
+		return nil, fmt.Errorf("splice %s: %w", layout.File, err)
+	}
+
+	var imports []string
+	for _, piece := range layout.Pieces {
+		imports = append(imports, piece.Imports...)
+	}
+
+	imports = slices.Compact(slices.Sorted(slices.Values(imports)))
+
+	if admitter, isAdmitter := renderer.(Admitter); isAdmitter && len(imports) > 0 {
+		if spliced, err = admitter.Admit(ctx, layout.File, spliced, imports); err != nil {
+			return nil, fmt.Errorf("splice %s: admit imports: %w", layout.File, err)
+		}
+	}
+
+	rendered, err := renderer.Render(ctx, spliced, layout.Keep)
+	if err != nil {
+		return nil, fmt.Errorf("render %s: %w", layout.File, err)
+	}
+
+	return rendered, nil
+}
+
+func splice(source []byte, pieces []Piece) ([]byte, error) {
+	if len(pieces) == 0 {
 		return source, nil
 	}
 
-	ordered := slices.SortedFunc(slices.Values(edits), func(left, right edit) int {
-		return cmp.Compare(left.span.Start, right.span.Start)
+	ordered := slices.SortedFunc(slices.Values(pieces), func(left, right Piece) int {
+		return cmp.Compare(left.Span.Start, right.Span.Start)
 	})
 	ordered = slices.CompactFunc(
 		ordered,
-		func(left, right edit) bool { return left.span == right.span },
+		func(left, right Piece) bool { return left.Span == right.Span && left.Text == right.Text },
 	)
 	out := make([]byte, 0, len(source))
 	cursor := 0
 
 	for _, one := range ordered {
-		if one.span.Start < cursor || one.span.End < one.span.Start || one.span.End > len(source) {
+		if one.Span.Start < cursor || one.Span.End < one.Span.Start ||
+			one.Span.End > len(source) {
 			return nil, fmt.Errorf(
 				"%w: span %d-%d overlaps an earlier one or leaves the %d-byte file",
-				ErrSplice, one.span.Start, one.span.End, len(source),
+				ErrSplice, one.Span.Start, one.Span.End, len(source),
 			)
 		}
 
-		out = append(out, source[cursor:one.span.Start]...)
-		out = append(out, one.text...)
-		cursor = one.span.End
+		out = append(out, source[cursor:one.Span.Start]...)
+		out = append(out, one.Text...)
+		cursor = one.Span.End
 	}
 
 	return append(out, source[cursor:]...), nil

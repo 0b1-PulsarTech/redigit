@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -96,3 +97,28 @@ func (p *Pipeline) Emit(
 }
 
 var errNoMode = errors.New("path has no mode in the target tree")
+
+type importAdmitter interface {
+	Admit(ctx context.Context, source []byte, specs []string) ([]byte, error)
+}
+
+func (dispatch byExtension) Admit(
+	ctx context.Context,
+	file string,
+	source []byte,
+	specs []string,
+) ([]byte, error) {
+	ext := path.Ext(file)
+
+	admitter, isAdmitter := dispatch.byExt[ext].(importAdmitter)
+	if !isAdmitter {
+		return source, nil
+	}
+
+	out, err := admitter.Admit(ctx, source, specs)
+	if err != nil {
+		return nil, fmt.Errorf("admit into a %q file: %w", ext, err)
+	}
+
+	return out, nil
+}

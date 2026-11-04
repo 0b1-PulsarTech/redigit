@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -156,6 +157,48 @@ func TestPlanLen(t *testing.T) {
 
 			if got := testCase.plan.Len(); got != testCase.want {
 				t.Fatalf("Len() = %d, want %d", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestPlanVersionAt(t *testing.T) {
+	t.Parallel()
+
+	key := DeclKey{File: "a.go", Kind: KindFunc, Name: "A"}
+	plan := Plan{Versions: map[DeclKey][]Version{key: {
+		{Text: "first", Until: 4, Imports: []string{"bytes"}},
+		{Text: "second", Until: 9},
+	}}}
+
+	testCases := []struct {
+		name      string
+		at        Position
+		want      Version
+		wantFound bool
+	}{
+		{
+			name: "the first version carries its imports", at: 2,
+			want:      Version{Text: "first", Until: 4, Imports: []string{"bytes"}},
+			wantFound: true,
+		},
+		{
+			name: "the second version has none", at: 5,
+			want: Version{Text: "second", Until: 9}, wantFound: true,
+		},
+		{name: "past the last anchor nothing is held", at: 9},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, isFound := plan.VersionAt(key, testCase.at)
+			if !reflect.DeepEqual(got, testCase.want) || isFound != testCase.wantFound {
+				t.Fatalf(
+					"VersionAt = %+v, %v, want %+v, %v",
+					got, isFound, testCase.want, testCase.wantFound,
+				)
 			}
 		})
 	}
