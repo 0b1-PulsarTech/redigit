@@ -3,9 +3,11 @@ package idiom
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"maps"
 	"path"
 	"slices"
+	"sync/atomic"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
@@ -14,6 +16,8 @@ import (
 )
 
 type Pack struct {
+	logger     *slog.Logger
+	reported   *atomic.Int64
 	provider   Provider
 	extensions []string
 	built      []rules.Rule
