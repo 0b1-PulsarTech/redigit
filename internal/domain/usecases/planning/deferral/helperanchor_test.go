@@ -33,7 +33,7 @@ func TestAnchorHelpersKeepsAHelperOnlyWithAChosenReader(t *testing.T) {
 		prod.Key: true, chosenTest.Key: true, read.Key: true, unread.Key: true,
 	}
 
-	got := anchorHelpers(graph, own, chosen, pool)
+	got := anchorHelpers(graph, own, nil, chosen, pool)
 
 	for _, want := range []entities.Decl{prod, chosenTest, read, nested} {
 		if !got[want.Key] {

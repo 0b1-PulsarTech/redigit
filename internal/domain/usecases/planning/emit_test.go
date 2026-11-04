@@ -35,30 +35,7 @@ func TestPlannerBirthsEachRegistrationWithItsFeature(t *testing.T) {
 		needs(bill, named["billAPI"]),
 	)
 
-	at := map[entities.DeclKey]entities.Position{}
-	for index, d := range decls {
-		at[d.Key] = entities.Position(index)
-	}
-
-	plan, err := New(Config{}).Plan(
-		entities.NewGraph(decls, edges, nil),
-		entities.Ordering{At: at},
-	)
-	if err != nil {
-		t.Fatalf("Plan() = %v", err)
-	}
-
-	bornAt := map[entities.DeclKey]int{}
-
-	for index, commit := range plan.Commits {
-		for _, key := range commit.Decls {
-			bornAt[key] = index
-		}
-	}
-
-	if len(plan.Unplaced) != 0 {
-		t.Fatalf("Unplaced = %v, want none", plan.Unplaced)
-	}
+	bornAt := bornAtOf(t, decls, edges)
 
 	testCases := []struct {
 		name         string
@@ -324,5 +301,162 @@ func TestPlannerBuildsEachHandlerAsItsOwnArc(t *testing.T) {
 	first := plan.Commits[bornAt[named["kernel"].Key]].Feature
 	if first != "bill/api" {
 		t.Fatalf("the shared declaration is born by %q, want the first feature built", first)
+	}
+}
+
+func bornAtOf(t *testing.T, decls []entities.Decl, edges []entities.Edge) map[entities.DeclKey]int {
+	t.Helper()
+
+	at := map[entities.DeclKey]entities.Position{}
+	for index, item := range decls {
+		at[item.Key] = entities.Position(index)
+	}
+
+	graph := entities.NewGraph(decls, edges, nil)
+
+	plan, err := New(Config{}).Plan(graph, entities.Ordering{At: at})
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	if len(plan.Unplaced) != 0 {
+		t.Fatalf("Unplaced = %v, want none", plan.Unplaced)
+	}
+
+	bornAt := map[entities.DeclKey]int{}
+
+	for index, commit := range plan.Commits {
+		for _, key := range commit.Decls {
+			bornAt[key] = index
+		}
+	}
+
+	return bornAt
+}
+
+func TestPlannerBirthsATestReadingOnlyMatesWithTheirAtom(t *testing.T) {
+	t.Parallel()
+
+	base, _, named := twoFeatures()
+	mockA := testDecl("lead/mocks/mock_test.go", "MockA", "lead/mocks")
+	mockB := testDecl("lead/mocks/mock_test.go", "MockB", "lead/mocks")
+	reader := testDecl("bill/api/reader_test.go", "TestReader", "bill/api")
+	mockA.Atom, mockB.Atom = "mock", "mock"
+
+	bornAt := bornAtOf(
+		t,
+		append(base.Decls(), mockA, mockB, reader),
+		append(
+			base.Edges(),
+			needs(mockA, named["leadUse"]),
+			needs(mockB, named["kernel"]),
+			needs(reader, mockB),
+			needs(reader, named["kernel"]),
+		),
+	)
+
+	testCases := []struct {
+		name string
+		left entities.Decl
+		with entities.Decl
+	}{
+		{name: "the mates are born in one commit", left: mockA, with: mockB},
+		{name: "the test reading a mate is born with them", left: reader, with: mockB},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			left, with := bornAt[testCase.left.Key], bornAt[testCase.with.Key]
+			if left != with {
+				t.Fatalf(
+					"%v is born at %d, want %d with %v",
+					testCase.left.Key, left, with, testCase.with.Key,
+				)
+			}
+		})
+	}
+}
+
+func TestPlannerBirthsAMatesScaffoldingWithTheAtom(t *testing.T) {
+	t.Parallel()
+
+	base, _, named := twoFeatures()
+	first := testDecl("lead/mocks/mock_test.go", "First", "lead/mocks")
+	second := testDecl("lead/mocks/mock_test.go", "Second", "lead/mocks")
+	scaffold := decl("lead/testkit/scaffold.go", "scaffold", "lead/testkit")
+	first.Atom, second.Atom = "mock", "mock"
+
+	bornAt := bornAtOf(
+		t,
+		append(base.Decls(), first, second, scaffold),
+		append(
+			base.Edges(),
+			needs(first, named["leadUse"]),
+			needs(second, named["kernel"]),
+			needs(second, scaffold),
+		),
+	)
+
+	testCases := []struct {
+		name string
+		decl entities.Decl
+	}{
+		{name: "the member that reads fresh code", decl: first},
+		{name: "the member that reads the kernel", decl: second},
+		{name: "the scaffolding that member reads", decl: scaffold},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got, want := bornAt[testCase.decl.Key], bornAt[named["leadUse"].Key]; got != want {
+				t.Fatalf(
+					"%v is born at %d, want %d with the lead feature",
+					testCase.decl.Key, got, want,
+				)
+			}
+		})
+	}
+}
+
+func TestPlannerKeepsAnAtomWhoseMateProductionReads(t *testing.T) {
+	t.Parallel()
+
+	base, _, named := twoFeatures()
+	mockA := decl("lead/mocks/mock.go", "MockA", "lead/mocks")
+	mockB := decl("lead/mocks/mock.go", "MockB", "lead/mocks")
+	create := testDecl("lead/api/create_test.go", "TestCreate", "lead/api")
+	mockA.Atom, mockB.Atom = "mock", "mock"
+
+	testCases := []struct {
+		name  string
+		edges []entities.Edge
+	}{
+		{
+			name:  "production reads the mate the test does not",
+			edges: []entities.Edge{needs(named["billUse"], mockB)},
+		},
+		{
+			name:  "production reads the mate the test reads",
+			edges: []entities.Edge{needs(named["billUse"], mockA)},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			edges := append(base.Edges(), needs(create, mockA), needs(create, named["leadAPI"]))
+			bornAt := bornAtOf(
+				t, append(base.Decls(), mockA, mockB, create), append(edges, testCase.edges...),
+			)
+
+			if left, right := bornAt[mockA.Key], bornAt[mockB.Key]; left != right {
+				t.Fatalf("MockA is born at %d, MockB at %d, want one commit", left, right)
+			}
+		})
 	}
 }

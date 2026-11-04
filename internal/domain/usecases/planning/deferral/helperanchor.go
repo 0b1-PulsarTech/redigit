@@ -8,6 +8,7 @@ import (
 func anchorHelpers(
 	graph entities.Graph,
 	own owners.Ownership,
+	atoms map[string][]entities.DeclKey,
 	chosen, pool map[entities.DeclKey]bool,
 ) map[entities.DeclKey]bool {
 	kept := map[entities.DeclKey]bool{}
@@ -24,6 +25,15 @@ func anchorHelpers(
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
+
+		// Anchoring would drop a helper nothing chosen reads and split its atom.
+		for _, mate := range atomMembers(graph, atoms, current) {
+			if !kept[mate] && pool[mate] {
+				kept[mate] = true
+
+				queue = append(queue, mate)
+			}
+		}
 
 		for _, edge := range graph.Needs(current) {
 			provider := edge.Provider

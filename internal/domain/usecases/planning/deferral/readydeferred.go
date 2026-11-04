@@ -14,8 +14,16 @@ func ReadyDeferred(
 	born map[entities.DeclKey]bool,
 	fresh map[entities.DeclKey]bool,
 ) []entities.DeclKey {
+	return readyWithin(graph, own, reach.AtomGroups(graph), born, fresh)
+}
+
+func readyWithin(
+	graph entities.Graph,
+	own owners.Ownership,
+	atoms map[string][]entities.DeclKey,
+	born, fresh map[entities.DeclKey]bool,
+) []entities.DeclKey {
 	subjects := sharedSubjects(graph, own)
-	atoms := reach.AtomGroups(graph)
 	ready := map[entities.DeclKey]bool{}
 
 	for key := range own.Deferred {
@@ -44,13 +52,14 @@ func ReadyDeferred(
 
 	for changed := true; changed; {
 		changed = false
+		memos := map[bool]map[string]bool{false: {}, true: {}}
 
 		for key := range ready {
 			strict := !own.Roots[key]
+			blocked := func(provider entities.DeclKey) bool { return waits(provider, strict) }
 
-			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
-				return waits(provider, strict)
-			}) && !atomWaits(atomMembers(graph, atoms, key), own, born, ready) {
+			if !waitsOn(graph, subjects, key, blocked) &&
+				!atomBlocked(graph, atoms, key, memos[strict], blocked) {
 				continue
 			}
 
@@ -62,9 +71,10 @@ func ReadyDeferred(
 
 	// Only what needs something fresh is ready: otherwise whatever needs only
 	// shared code is ready at the first feature and drags that code in.
-	return owners.SortedKeys(
-		anchorHelpers(graph, own, touched(graph, subjects, own, ready, fresh), ready),
-	)
+	links := touchLinks{subjects: subjects, atoms: atoms}
+	chosen := anchorHelpers(graph, own, atoms, touched(graph, links, own, ready, fresh), ready)
+
+	return owners.SortedKeys(chosen)
 }
 
 func waitsOn(
@@ -95,20 +105,6 @@ func atomMembers(
 	return atoms[decl.Atom]
 }
 
-func atomWaits(
-	members []entities.DeclKey,
-	own owners.Ownership,
-	born, ready map[entities.DeclKey]bool,
-) bool {
-	for _, member := range members {
-		if own.Deferred[member] && !born[member] && !ready[member] {
-			return true
-		}
-	}
-
-	return false
-}
-
 func usedBeyondWiring(graph entities.Graph, own owners.Ownership, key entities.DeclKey) bool {
 	for _, edge := range graph.Consumers(key) {
 		consumer, found := graph.Decl(edge.Dependent)
@@ -128,4 +124,26 @@ func isManifestKey(graph entities.Graph, key entities.DeclKey) bool {
 	decl, found := graph.Decl(key)
 
 	return found && reach.IsManifestLine(graph, decl)
+}
+
+func atomBlocked(
+	graph entities.Graph,
+	atoms map[string][]entities.DeclKey,
+	key entities.DeclKey,
+	memo map[string]bool,
+	blocked func(entities.DeclKey) bool,
+) bool {
+	decl, found := graph.Decl(key)
+	if !found || decl.Atom == "" {
+		return false
+	}
+
+	// Members of an atom ask the same question per strict value, so one answer serves the pass.
+	held, seen := memo[decl.Atom]
+	if !seen {
+		held = slices.ContainsFunc(atoms[decl.Atom], blocked)
+		memo[decl.Atom] = held
+	}
+
+	return held
 }

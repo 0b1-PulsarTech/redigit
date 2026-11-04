@@ -1,14 +1,21 @@
 package deferral
 
 import (
+	"slices"
+
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
 )
 
+type touchLinks struct {
+	subjects map[entities.DeclKey][]entities.DeclKey
+	atoms    map[string][]entities.DeclKey
+}
+
 func touched(
 	graph entities.Graph,
-	subjects map[entities.DeclKey][]entities.DeclKey,
+	links touchLinks,
 	own owners.Ownership,
 	ready, fresh map[entities.DeclKey]bool,
 ) map[entities.DeclKey]bool {
@@ -22,7 +29,8 @@ func touched(
 				continue
 			}
 
-			needed := needsFresh(graph, subjects, key, fresh, out)
+			needed := needsFresh(graph, links.subjects, key, fresh, out) ||
+				mateTouched(graph, links.atoms, key, out)
 			if own.Loose[key] {
 				needed = needed || reach.TiedToFresh(graph, key, fresh, out)
 			}
@@ -83,4 +91,15 @@ func consumedBy(
 	}
 
 	return false
+}
+
+func mateTouched(
+	graph entities.Graph,
+	atoms map[string][]entities.DeclKey,
+	key entities.DeclKey,
+	touched map[entities.DeclKey]bool,
+) bool {
+	return slices.ContainsFunc(atomMembers(graph, atoms, key), func(mate entities.DeclKey) bool {
+		return touched[mate]
+	})
 }

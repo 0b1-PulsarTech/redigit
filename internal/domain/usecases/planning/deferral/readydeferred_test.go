@@ -214,3 +214,143 @@ func TestReadyDeferredBringsWhatNoBuiltFeatureReaches(t *testing.T) {
 		})
 	}
 }
+
+func TestReadyDeferredReleasesAnAtomTogether(t *testing.T) {
+	t.Parallel()
+
+	fresh := decl("a/code.go", "Code", "a")
+	old := decl("a/old.go", "Old", "a")
+	first := testDecl("a/gen_test.go", "First", "a")
+	second := testDecl("a/gen_test.go", "Second", "a")
+	loner := testDecl("a/loner_test.go", "Loner", "a")
+	reader := testDecl("a/reader_test.go", "TestReader", "a")
+	mate := decl("a/mate.go", "Mate", "a")
+	parts := decl("a/gen_test.go", "Parts", "a")
+	late := decl("a/late.go", "Late", "a")
+	rig := decl("a/rig_test.go", "rig", "a")
+
+	for _, member := range []*entities.Decl{&first, &second, &mate, &parts} {
+		member.Atom = "mock:a"
+	}
+
+	testCases := []struct {
+		name  string
+		extra []entities.Decl
+		edges []entities.Edge
+		born  []entities.DeclKey
+		want  []entities.DeclKey
+	}{
+		{
+			name: "a member that reads only old code comes with the one that reads fresh code",
+			want: []entities.DeclKey{first.Key, second.Key},
+		},
+		{
+			name:  "a test that reads only a mate and old code is released with the atom",
+			extra: []entities.Decl{reader},
+			edges: []entities.Edge{needs(reader, second), needs(reader, old)},
+			want:  []entities.DeclKey{first.Key, second.Key, reader.Key},
+		},
+		{
+			name:  "a mate that waits on unbuilt code holds the whole atom back",
+			extra: []entities.Decl{late},
+			edges: []entities.Edge{needs(second, late)},
+		},
+		{
+			name:  "a mate no test defers and nobody has built holds the whole atom back",
+			extra: []entities.Decl{mate},
+		},
+		{
+			name:  "a helper mate nothing in the atom reads comes with it and its own helper",
+			extra: []entities.Decl{parts, late, rig},
+			edges: []entities.Edge{needs(late, parts), needs(parts, rig)},
+			want:  []entities.DeclKey{first.Key, parts.Key, second.Key, rig.Key},
+		},
+		{
+			name:  "the atom is released once that mate is built",
+			extra: []entities.Decl{mate},
+			born:  []entities.DeclKey{mate.Key},
+			want:  []entities.DeclKey{first.Key, second.Key},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decls := append([]entities.Decl{fresh, old, first, second, loner}, testCase.extra...)
+			edges := append(
+				[]entities.Edge{needs(first, fresh), needs(second, old), needs(loner, old)},
+				testCase.edges...,
+			)
+
+			born := append([]entities.DeclKey{fresh.Key, old.Key}, testCase.born...)
+			got := readyAfter(decls, edges, born, fresh, old, late)
+
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("readyDeferred() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestReadyDeferredHoldsAnAtomOnlyForAMateAFeatureReaches(t *testing.T) {
+	t.Parallel()
+
+	fresh := decl("a/code.go", "Code", "a")
+	first := testDecl("a/gen_test.go", "First", "a")
+	mate := decl("a/mock.go", "Mock", "a")
+	run := decl("cmd/main.go", "Run", "cmd")
+
+	for _, member := range []*entities.Decl{&first, &mate, &run} {
+		member.Atom = "mock:a"
+	}
+
+	testCases := []struct {
+		name  string
+		reach int
+		roots []entities.Decl
+		want  []entities.DeclKey
+	}{
+		{
+			name:  "a mate nothing reaches is not waited for",
+			reach: 0,
+			want:  []entities.DeclKey{first.Key},
+		},
+		{name: "a mate a feature reaches is waited for", reach: 1},
+		{
+			name:  "a root and a test share an atom whose mate only wiring reads",
+			reach: 1,
+			roots: []entities.Decl{run},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			decls := append([]entities.Decl{fresh, first, mate}, testCase.roots...)
+			own := sharedTestOwnership(decls, fresh)
+			own.Reach[mate.Key] = testCase.reach
+
+			for _, root := range testCase.roots {
+				own.Roots[root.Key] = true
+				own.Deferred[root.Key] = true
+			}
+
+			got := ReadyDeferred(
+				entities.NewGraph(
+					decls,
+					[]entities.Edge{needs(first, fresh)},
+					nil,
+				),
+				own,
+				map[entities.DeclKey]bool{fresh.Key: true},
+				map[entities.DeclKey]bool{fresh.Key: true},
+			)
+
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("readyDeferred() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
