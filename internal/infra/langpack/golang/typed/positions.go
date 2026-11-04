@@ -80,6 +80,7 @@ func (where Positions) DeclAt(fset *token.FileSet, pos token.Pos) (entities.Decl
 }
 
 func (where Positions) Parsing(pkgs []*packages.Package) Positions {
+	where.files = where.files.Reading(pkgs)
 	where.parsed = map[*token.File]bool{}
 
 	for _, pkg := range pkgs {

@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed/modmap"
 )
 
 type usage struct {
@@ -31,6 +32,7 @@ type collector struct {
 }
 
 func collectUses(pkgs []*packages.Package, where *places) usage {
+	modmap.Seed(where.root, pkgs, where.names)
 	gather := collector{
 		usage: usage{
 			refs: map[site][]entities.Location{},
