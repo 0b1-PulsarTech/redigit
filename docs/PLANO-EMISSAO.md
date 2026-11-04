@@ -237,13 +237,40 @@ falha no fim sem dizer por que. Isso ja mordeu uma vez aqui.
 
 Deliberado, e vale escrever para nao voltar por engano:
 
-- **nao escreve commit, ref nem historia**
-- **nao escolhe emoji nem autoria**
-- **nao decide `[wip]`** - reporta risco, o agente decide
+- **nao decide a historia** - `emit` entrega o plano; quem escreve commits e o
+  verbo `write`, a partir de um manifesto. Um manifesto sem edicao tambem
+  escreve, com `--allow-draft`, e os assuntos saem como rascunho (T no
+  157d218 escreve f750f82): o agrupamento automatico nunca chega sozinho a um
+  commit sem esse flag
+- **nao escolhe emoji nem autoria** - o emoji vem do assunto que o agente
+  escreve, a autoria vem da configuracao
+- **nao decide `[wip]`** - reporta risco e `is_wip`, o agente decide. Decidido
+  o marcador, ele e verdade: `write` o recoloca mesmo quando o agente escreveu
+  o assunto a mao, sem duplicar, no comeco da descricao, depois de `DRAFT: `,
+  do `:emoji: ` e do `tipo(escopo): `, que e o lugar (o "slot") onde `verify`
+  o le (`:bug: fix(b): [wip] Mao`). O tipo e letras minusculas e o `(escopo)`
+  e opcional e pode ter espacos e `: ` (`fix(meu escopo): `); parentese sem
+  fechar nao e tipo. Varios `[wip] ` no slot viram um. O marcador na posicao
+  antiga, antes do tipo ou antes do emoji, conta como marcado e `write` o
+  move para o slot. O mesmo texto em qualquer outro lugar
+  da linha e palavra comum: nunca e apagado nem conta como marcador. O
+  assunto e o que o git mostra em `%s` (linhas ate a primeira em branco,
+  unidas por um espaco); `check`, `write` e `verify` leem esse mesmo texto.
+  Sem isso um assunto a mao apagaria o `[wip]` e a linha passaria a contar
+  como falha real
 - **nao conserta import, comentario nem nada** - o renderizador poda import
   alcancavel, mas quem repara o que sobra e o agente, que tem o fonte
 - **nao autoriza assunto** - emite rascunho marcado, e o marcador existe para
-  o agente recusar o que nao foi revisado
+  o agente recusar o que nao foi revisado. `subjects check` recusa o que ainda
+  e rascunho, o formato errado, assunto repetido (comparado sem o `[wip]`, ele
+  e verdade da linha e nao do texto) e `[wip]` em linha que nao e
+  wip
+- **nao confia em assunto carregado de um plano velho** - `subjects carry`
+  so move sem revisao o que tem o mesmo `id` (chaves de pedaco e caminhos de
+  blob, sem spans); semelhanca de 0,8 ou mais e "review", e o resto volta a
+  rascunho. O valor carregado nunca leva o `[wip]` (a verdade e da linha nova
+  e `write` a aplica), e qualquer chave sem destino ou em conflito recusa como
+  `check`, sem escrever nada
 
 ## 7. O que falta construir, em ordem
 
