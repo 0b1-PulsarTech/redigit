@@ -499,6 +499,17 @@ por atribuicao, prefixo de grupo aninhado, caminho nao constante, constante que
 nao e caminho, handler anonimo, montagem passada por variavel, rota de modulo
 aninhado e padrao de `handle` que nao casa chamada alguma.
 
+### 3.9 Pin: a espera declarada a mao
+
+A regra `pin` (config `{decl, after}`, cada alvo `arquivo:tipo:nome` com globs por parte) acrescenta uma aresta dura `pin` de `decl` para `after`. O que o usuario declara vale ou falha alto:
+
+- Um alvo que nao casa declaracao alguma falha ao montar o grafo (`graph`, rc=1); uma parte de arquivo que nao casa arquivo algum da arvore falha antes, em `bootstrap start` (rc=2).
+- Um alvo cuja parte de tipo e literalmente `stmt` e recusado ao carregar a regra, dos dois lados: um pin nomeia a declaracao inteira e as instrucoes cortadas ainda nao existem quando as regras rodam pela primeira vez, entao se nomeia a funcao. Um glob de tipo so vale se tambem casar algo inteiro: um alvo que so casa instrucoes (`main.go:*:main#1`) morre na primeira passada, com a mensagem `pin matches no declaration before the cut`, e `main.go:*:*` passa porque casa tambem a cabeca.
+- Uma declaracao de producao depois de uma de teste e recusada, nomeando as duas chaves: o planejamento de testes descarta a espera de producao por teste, e o pin se perderia em silencio. Teste depois de producao e teste depois de teste seguem permitidos.
+- Um pin depois de uma funcao que foi cortada em instrucoes espera a funcao inteira: a assinatura e cada instrucao `Funcao#N` do mesmo arquivo, vistas na segunda passada das regras. Uma instrucao da propria funcao de quem espera nao cria aresta dela mesma.
+
+Um pin que fecha um ciclo entre arquivos nao e desfeito nem recusado: `graph`, `plan`, `audit` e `emit` seguem adiante com um WARN ("the ordering settled with complaints ... ordering holds 1 cycle(s) across files, of 1"), `report` nao imprime aviso, e todos os comandos (`graph`, `plan`, `audit`, `report`, `emit`, `write`, `verify`) terminam com rc=0. A aresta com a razao `pin` aparece em `graph` e em `report`; o ciclo nomeado, com membros e razoes, so no `audit`.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

@@ -57,6 +57,7 @@ func TestIsHard(t *testing.T) {
 		{ReasonBody, true},
 		{ReasonProvides, true},
 		{ReasonRegistered, true},
+		{ReasonPin, true},
 		{EdgeReason("unknown"), false},
 	}
 

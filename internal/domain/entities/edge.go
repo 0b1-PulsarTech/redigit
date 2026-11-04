@@ -81,6 +81,7 @@ const (
 	ReasonBody       EdgeReason = "body"
 	ReasonProvides   EdgeReason = "provides"   // a register needs its constructor's argument types
 	ReasonRegistered EdgeReason = "registered" // a resolve site needs the registration of its type
+	ReasonPin        EdgeReason = "pin"        // a hand-declared wait the config states
 )
 
 // Edge records that Dependent cannot be born before Provider. The field names
@@ -131,7 +132,7 @@ func IsHard(reason EdgeReason) bool {
 		ReasonQuery, ReasonSchema, ReasonEncloses,
 		ReasonMethodSet, ReasonHosts, ReasonBody,
 		ReasonMirrors, ReasonChecksum, ReasonWorkspace,
-		ReasonEmbed, ReasonProvides, ReasonRegistered:
+		ReasonEmbed, ReasonProvides, ReasonRegistered, ReasonPin:
 		return true
 	default:
 		return false

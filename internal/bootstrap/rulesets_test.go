@@ -12,12 +12,14 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/di"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/router"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/pinrule"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
 const (
 	goDIRule     = `{"type":"go-di","registerFuncs":["Register*"],"resolveFuncs":["Get"]}`
 	goRouterRule = `{"type":"go-router","handle":["*.GET"],"mount":["Mount*"],"groupMethods":true}`
+	pinRule      = `{"type":"pin","decl":"a.go:func:A","after":"b.go:func:B"}`
 )
 
 func TestRuleHook(t *testing.T) {
@@ -88,33 +90,83 @@ func TestRuleHookWiresGoIdioms(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			built, err := compiledRegistry().Build(testCase.specs)
-			if err != nil {
-				t.Fatalf("Build() = %v", err)
-			}
-
-			cfg := Defaults()
-			cfg.Rules = slices.Concat(built, testCase.extra)
-			stage := identityStages(errors.New("kept"))
-			env := stageEnv{goSource: typed.NewSource(nil)}
-
-			if err = ruleHook(t.Context(), &cfg, env, stage); err != nil {
-				t.Fatalf("ruleHook() = %v", err)
-			}
-
-			names := make([]string, 0, len(stage.languages))
-			for _, language := range stage.languages {
-				names = append(names, language.Name)
-			}
-
-			if !slices.Equal(names, testCase.wantLanguages) {
-				t.Fatalf("languages = %v, want %v", names, testCase.wantLanguages)
-			}
-
-			if got := len(cfg.Auditing.Gates); got != testCase.wantGates {
-				t.Fatalf("gates = %d, want %d", got, testCase.wantGates)
-			}
+			checkHook(t, testCase.specs, testCase.extra, testCase.wantLanguages, testCase.wantGates)
 		})
+	}
+}
+
+func TestRuleHookWiresPins(t *testing.T) {
+	t.Parallel()
+
+	diSpec := rules.Spec{Type: "go-di", Raw: []byte(goDIRule)}
+	pinSpec := rules.Spec{Type: "pin", Raw: []byte(pinRule)}
+	testCases := []struct {
+		name          string
+		specs         []rules.Spec
+		wantLanguages []string
+		wantGates     int
+	}{
+		{
+			name:          "a pin adds the pins language and no idiom language or gate",
+			specs:         []rules.Spec{pinSpec},
+			wantLanguages: []string{"kept", "pins"},
+		},
+		{
+			name:          "a pin beside go-di adds both languages",
+			specs:         []rules.Spec{diSpec, pinSpec},
+			wantLanguages: []string{"kept", "go-idioms", "pins"},
+			wantGates:     1,
+		},
+		{
+			name:          "two pins share one language",
+			specs:         []rules.Spec{pinSpec, pinSpec},
+			wantLanguages: []string{"kept", "pins"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			checkHook(t, testCase.specs, nil, testCase.wantLanguages, testCase.wantGates)
+		})
+	}
+}
+
+func checkHook(
+	t *testing.T,
+	specs []rules.Spec,
+	extra []rules.Rule,
+	wantLanguages []string,
+	wantGates int,
+) {
+	t.Helper()
+
+	built, err := compiledRegistry().Build(specs)
+	if err != nil {
+		t.Fatalf("Build() = %v", err)
+	}
+
+	cfg := Defaults()
+	cfg.Rules = slices.Concat(built, extra)
+	stage := identityStages(errors.New("kept"))
+	env := stageEnv{goSource: typed.NewSource(nil)}
+
+	if err = ruleHook(t.Context(), &cfg, env, stage); err != nil {
+		t.Fatalf("ruleHook() = %v", err)
+	}
+
+	names := make([]string, 0, len(stage.languages))
+	for _, language := range stage.languages {
+		names = append(names, language.Name)
+	}
+
+	if !slices.Equal(names, wantLanguages) {
+		t.Fatalf("languages = %v, want %v", names, wantLanguages)
+	}
+
+	if got := len(cfg.Auditing.Gates); got != wantGates {
+		t.Fatalf("gates = %d, want %d", got, wantGates)
 	}
 }
 
@@ -201,7 +253,7 @@ func TestRuleConstructors(t *testing.T) {
 			name:     "a rule type nobody registered is refused and the known ones listed",
 			specs:    []rules.Spec{{Type: "no-such-rule"}},
 			wantErr:  rules.ErrUnknownType,
-			wantText: "known: go-di, go-router",
+			wantText: "known: go-di, go-router, pin",
 		},
 		{
 			name:    "go-di builds a rule",
@@ -227,10 +279,21 @@ func TestRuleConstructors(t *testing.T) {
 			wantErr:  router.ErrNoHandle,
 			wantText: "rules[0] (go-router)",
 		},
+		{
+			name:    "pin builds a rule",
+			specs:   []rules.Spec{{Type: "pin", Raw: []byte(pinRule)}},
+			wantLen: 1,
+		},
+		{
+			name:     "pin names the rule it refuses",
+			specs:    []rules.Spec{{Type: "pin", Raw: []byte(`{"type":"pin","decl":"a"}`)}},
+			wantErr:  pinrule.ErrMissingField,
+			wantText: "rules[0] (pin)",
+		},
 	}
 
-	if got := len(ruleConstructors()); got != 2 {
-		t.Fatalf("len(ruleConstructors()) = %d, want 2", got)
+	if got := len(ruleConstructors()); got != 3 {
+		t.Fatalf("len(ruleConstructors()) = %d, want 3", got)
 	}
 
 	for _, testCase := range testCases {
