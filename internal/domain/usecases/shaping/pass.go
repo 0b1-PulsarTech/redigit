@@ -59,6 +59,12 @@ func (draft *Draft) Spawn(
 	return moves, true
 }
 
+func (draft *Draft) Retitle(id int, subject string) {
+	if rank, live := draft.Rank(id); live {
+		draft.slots[rank].Commit.Subject = subject
+	}
+}
+
 func (draft *Draft) Merge(from, into int) (Moves, bool) {
 	// The old id stays an alias so a pass holding it still finds the decls.
 	from, into = draft.at.Resolve(from), draft.at.Resolve(into)

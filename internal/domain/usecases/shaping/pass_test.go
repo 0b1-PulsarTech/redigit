@@ -16,6 +16,32 @@ func subjects(draft *Draft) []string {
 	return out
 }
 
+func TestDraftRetitle(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		id   int
+		want []string
+	}{
+		{name: "changes the row of that id", id: 1, want: []string{"row a", "new", "row c"}},
+		{name: "ignores an unknown id", id: 9, want: []string{"row a", "row b", "row c"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			draft := buildDraft([][]string{{"a"}, {"b"}, {"c"}}, nil)
+			draft.Retitle(testCase.id, "new")
+
+			if got := subjects(draft); !slices.Equal(got, testCase.want) {
+				t.Fatalf("subjects = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestDraftSpawn(t *testing.T) {
 	t.Parallel()
 
