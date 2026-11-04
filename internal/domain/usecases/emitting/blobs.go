@@ -51,7 +51,12 @@ func (e Emitter) renderTouched(
 			cache[path] = file
 		}
 
-		rendered, err := e.renderer.Render(ctx, file.content, born[path])
+		content, err := e.versions.apply(file.content, born[path])
+		if err != nil {
+			return nil, fmt.Errorf("splice %s: %w", path, err)
+		}
+
+		rendered, err := e.renderer.Render(ctx, content, born[path])
 		if err != nil {
 			return nil, fmt.Errorf("render %s: %w", path, err)
 		}

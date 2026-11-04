@@ -19,7 +19,8 @@ type Emitter struct {
 	sink     Sink
 	derivers []Deriver
 	// derived is set by Emit for the run in flight; see deriving.
-	derived *derivation
+	derived  *derivation
+	versions *versioning
 }
 
 func New(source Source, renderer Renderer, sink Sink, derivers ...Deriver) Emitter {
@@ -44,6 +45,7 @@ func (e Emitter) Emit(
 	}
 
 	e = e.deriving(plan)
+	e.versions = newVersioning(plan, graph)
 	born := map[string][]entities.DeclKey{}
 	cache := map[string]sourceFile{}
 	commits := make([]Commit, 0, plan.Len())
@@ -55,6 +57,12 @@ func (e Emitter) Emit(
 			born[key.File] = append(born[key.File], key)
 			touched[key.File] = true
 		}
+
+		for _, key := range planned.Changes {
+			touched[key.File] = true
+		}
+
+		e.versions.advance(planned.Position)
 
 		blobs, err := e.renderTouched(ctx, touched, born, cache)
 		if err != nil {
@@ -71,7 +79,7 @@ func (e Emitter) Emit(
 			return nil, err
 		}
 
-		risks := risksFor(planned, graph, positions)
+		risks := risksFor(e.versions.settled(planned), graph, positions)
 
 		// A commit that leaves a piece incomplete says so. Only the final tree
 		// has to be green; a vertical slice routinely lands one that is not,

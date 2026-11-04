@@ -2,6 +2,7 @@ package emitting
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/apperr"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -34,6 +35,15 @@ func check(plan entities.Plan) error {
 			)
 		}
 
+		for _, key := range commit.Changes {
+			if !placed[key] {
+				return fmt.Errorf(
+					"%w: commit %d changes %s before any commit births it",
+					apperr.ErrIncomplete, commit.Position, key,
+				)
+			}
+		}
+
 		for _, key := range commit.Decls {
 			if placed[key] {
 				return fmt.Errorf(
@@ -43,6 +53,22 @@ func check(plan entities.Plan) error {
 			}
 
 			placed[key] = true
+		}
+	}
+
+	return checkVersions(plan)
+}
+
+func checkVersions(plan entities.Plan) error {
+	for key, versions := range plan.Versions {
+		for _, version := range versions {
+			at := int(version.Until)
+			if at < 0 || at >= plan.Len() || !slices.Contains(plan.Commits[at].Changes, key) {
+				return fmt.Errorf(
+					"%w: a pre-image of %s ends at %d, which is no commit changing it",
+					apperr.ErrIncomplete, key, version.Until,
+				)
+			}
 		}
 	}
 
