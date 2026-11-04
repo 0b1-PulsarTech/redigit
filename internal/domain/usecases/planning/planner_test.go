@@ -361,3 +361,108 @@ func TestPlanIgnoresInputOrder(t *testing.T) {
 		})
 	}
 }
+
+func TestPlannerBirthsAWholeAtomWithTheTestThatPullsIt(t *testing.T) {
+	t.Parallel()
+
+	base, _, named := twoFeatures()
+	charge, create, handle := named["billUse"], named["leadUse"], named["leadAPI"]
+	first := testDecl("lead/mocks/gen_test.go", "First", "lead/mocks")
+	second := decl("lead/mocks/gen_test.go", "Second", "lead/mocks")
+	third := decl("lead/mocks/gen_test.go", "Third", "lead/mocks")
+	rig := decl("lead/mocks/rig_test.go", "rig", "lead/mocks")
+	later := testDecl("lead/api/later_test.go", "TestLater", "lead/api")
+	kept := testDecl("bill/api/kept_test.go", "TestKept", "bill/api")
+	port := decl("mocks/mock.go", "NewMockPort", "mocks")
+	get := decl("mocks/mock.go", "MockPort.Get", "mocks")
+	kind := decl("mocks/mock.go", "MockPort", "mocks")
+	rearm := decl("mocks/mock.go", "rearm", "mocks")
+	settle := decl("mocks/mock.go", "settle", "mocks")
+	testCharge := testDecl("bill/api/charge_test.go", "TestCharge", "bill/api")
+	testCreate := testDecl("lead/api/create_test.go", "TestCreate", "lead/api")
+
+	first.Atom, second.Atom, third.Atom = "gen", "gen", "gen"
+
+	for _, member := range []*entities.Decl{&port, &get, &kind, &rearm, &settle} {
+		member.Atom = "mock"
+	}
+
+	testCases := []struct {
+		name     string
+		extra    []entities.Decl
+		edges    []entities.Edge
+		together []entities.Decl
+		with     entities.Decl
+		after    []entities.Decl
+	}{
+		{
+			name:  "a mate that needs a rig only a later test reads",
+			extra: []entities.Decl{first, second, rig, later},
+			edges: []entities.Edge{
+				needs(first, charge), needs(second, rig),
+				needs(later, second), needs(later, handle),
+			},
+			together: []entities.Decl{first, second, rig},
+			after:    []entities.Decl{later},
+			with:     charge,
+		},
+		{
+			name:  "a kept test reads one mate while another mate needs the rig",
+			extra: []entities.Decl{second, third, rig, kept},
+			edges: []entities.Edge{
+				needs(kept, second), needs(kept, charge), needs(third, rig),
+			},
+			together: []entities.Decl{second, third, rig, kept},
+			with:     charge,
+		},
+		{
+			name:  "a mate no feature reaches does not keep the atom from the test that pulls it",
+			extra: []entities.Decl{port, get, kind, rearm, settle, testCharge, testCreate},
+			edges: []entities.Edge{
+				needs(port, kind), needs(port, get), needs(get, kind), needs(get, rearm),
+				needs(rearm, settle), needs(settle, rearm), needs(kind, charge),
+				needs(testCharge, port), needs(testCharge, charge), needs(testCreate, port),
+				needs(testCreate, create),
+			},
+			together: []entities.Decl{port, get, kind, rearm, settle},
+			after:    []entities.Decl{testCreate},
+			with:     testCharge,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			bornAt := bornAtOf(
+				t,
+				append(base.Decls(), testCase.extra...),
+				append(base.Edges(), testCase.edges...),
+			)
+			assertBornTogether(t, bornAt, testCase.with, testCase.together, testCase.after)
+		})
+	}
+}
+
+func assertBornTogether(
+	t testing.TB,
+	bornAt map[entities.DeclKey]int,
+	with entities.Decl,
+	together, after []entities.Decl,
+) {
+	t.Helper()
+
+	want := bornAt[with.Key]
+
+	for _, member := range together {
+		if got := bornAt[member.Key]; got != want {
+			t.Fatalf("%v is born at %d, want %d with %v", member.Key, got, want, with.Key)
+		}
+	}
+
+	for _, member := range after {
+		if got := bornAt[member.Key]; got <= want {
+			t.Fatalf("%v is born at %d, want after %d", member.Key, got, want)
+		}
+	}
+}

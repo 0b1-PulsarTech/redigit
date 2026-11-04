@@ -13,20 +13,27 @@ func OwnTests(
 ) []entities.DeclKey {
 	subjects := reach.TestSubjects(graph)
 	taken := map[entities.DeclKey]bool{}
+	atoms := reach.AtomGroups(graph)
 
-	for _, key := range ReadyDeferred(graph, own, born, fresh) {
+	for _, key := range readyWithin(graph, own, atoms, born, fresh) {
 		if !own.Roots[key] && !born[key] {
 			taken[key] = true
 		}
 	}
 
+	// An atom is born in one commit: a member held back holds its mates back.
+	held := func(mate entities.DeclKey) bool {
+		return !born[mate] && !taken[mate]
+	}
+
 	for changed := true; changed; {
 		changed = false
+		memo := map[string]bool{}
 
 		for key := range taken {
 			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
 				return !born[provider] && !taken[provider] && own.Deferred[provider]
-			}) {
+			}) && !atomBlocked(graph, atoms, key, memo, held) {
 				continue
 			}
 
