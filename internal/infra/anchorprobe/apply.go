@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 )
 
 func apply(
@@ -68,15 +69,20 @@ func rewrite(
 		return fmt.Errorf("read %s: %w", file, err)
 	}
 
-	spliced, err := splice(original, group)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrUnfit, err)
+	pieces := make([]emitting.Piece, 0, len(group))
+	for _, edit := range group {
+		pieces = append(
+			pieces,
+			emitting.Piece{Span: edit.Span, Text: edit.Text, Imports: edit.Imports},
+		)
 	}
 
 	// The emitter renders every file, dropping the imports nothing uses any more.
-	changed, err := renderer.Render(ctx, spliced, group[0].Keep)
+	changed, err := emitting.Compose(ctx, renderer, emitting.Layout{
+		File: file, Source: original, Pieces: pieces, Keep: group[0].Keep,
+	})
 	if err != nil {
-		return fmt.Errorf("%w: render %s: %w", ErrUnfit, file, err)
+		return fmt.Errorf("%w: %w", ErrUnfit, err)
 	}
 
 	originals[file] = original

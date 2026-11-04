@@ -183,3 +183,62 @@ func TestReadsDeclinesWhatItCannotParse(t *testing.T) {
 
 	checkReads(t, testCases)
 }
+
+func TestReadsHoldsEverySelectorOfAnExpression(t *testing.T) {
+	t.Parallel()
+
+	testCases := []readsCase{
+		{
+			name: "a selector on a resolved local", file: "h.go", isParsed: true,
+			text:    "func H(t *T) int { return t.M() }",
+			present: []string{".M"}, absent: []string{"t.M", "M"},
+		},
+		{
+			name: "a selector on a field of a local", file: "h.go", isParsed: true,
+			text:    "func H(s *S) int { return s.bbb.M() }",
+			present: []string{".M", ".bbb"}, absent: []string{"bbb.M", "s.bbb"},
+		},
+		{
+			name: "a selector on a selector of a package", file: "h.go", isParsed: true,
+			text:    "func H() int { return lib.Var.M() }",
+			present: []string{".M", "lib.Var"}, absent: []string{"lib.M"},
+		},
+		{
+			name: "a selector on a call", file: "h.go", isParsed: true,
+			text:    "func H() int { return build().M() }",
+			present: []string{".M", "build"},
+		},
+		{
+			name: "a selector on an index", file: "h.go", isParsed: true,
+			text:    "func H(xs []T) int { return xs[0].M() }",
+			present: []string{".M"},
+		},
+		{
+			name: "a selector on a literal", file: "h.go", isParsed: true,
+			text:    "func H() int { return lib.U{}.M() }",
+			present: []string{".M", "lib.U"},
+		},
+		{
+			name: "a selector split over two lines", file: "h.go", isParsed: true,
+			text:    "func H(t *T) int {\n\treturn t.\n\t\tM()\n}",
+			present: []string{".M"},
+		},
+		{
+			name: "a selector on a free name keeps its qualifier", file: "h.go", isParsed: true,
+			text:    "func H() int { return pkgvar.M() }",
+			present: []string{"pkgvar.M"}, absent: []string{".M"},
+		},
+		{
+			name: "a selector named only in a comment", file: "h.go", isParsed: true,
+			text:   "// t.M is gone\nfunc H(t *T) int { return 1 }",
+			absent: []string{".M", "t.M"},
+		},
+		{
+			name: "a selector named only in a string", file: "h.go", isParsed: true,
+			text:   "func H() string { return \"t.M\" }",
+			absent: []string{".M", "t.M"},
+		},
+	}
+
+	checkReads(t, testCases)
+}

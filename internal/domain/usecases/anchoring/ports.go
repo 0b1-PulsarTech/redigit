@@ -24,8 +24,38 @@ type (
 		Reads(file, text string) ([]string, bool)
 	}
 
+	Importer interface {
+		Needed(source []byte, text string) []string
+	}
+
 	Probe interface {
 		Builds(ctx context.Context, edits []Edit) (Verdict, error)
+	}
+)
+
+type (
+	Revision struct {
+		Subject string
+		Files   []FileChange
+	}
+
+	FileChange struct {
+		Path, OldPath, Blob, OldBlob string
+	}
+
+	Edit struct {
+		File    string
+		Span    entities.Span
+		Text    string
+		Imports []string
+		Keep    []entities.DeclKey
+	}
+
+	Verdict struct {
+		IsBuilt     bool
+		IsUnchecked bool
+		IsUnfit     bool
+		Detail      string
 	}
 )
 

@@ -17,9 +17,10 @@ const (
 
 type (
 	entry struct {
-		key      entities.DeclKey
-		span     entities.Span
-		preimage string
+		key             entities.DeclKey
+		span            entities.Span
+		preimage, final string
+		imports         []string
 	}
 
 	skip struct {
@@ -102,6 +103,12 @@ func (planner Planner) fileDelta(
 	}
 
 	for _, one := range found {
+		if one.isTwice {
+			out.skipped = append(out.skipped, skip{key: one.atAnchor, reason: reasonTwice})
+
+			continue
+		}
+
 		final := planner.cfg.Renames.Final(one.atAnchor, view.anchor.Position)
 
 		var (
@@ -124,8 +131,12 @@ func (planner Planner) fileDelta(
 			continue
 		}
 
+		placed.imports = one.imports
 		out.entries = append(out.entries, placed)
 	}
+
+	kept, split := apart(view.graph, out.entries, out.skipped)
+	out.entries, out.skipped = kept, append(out.skipped, split...)
 
 	return out, nil
 }
@@ -160,9 +171,10 @@ func (planner Planner) resolve(
 		return entry{}, "", fmt.Errorf("%w: %s spans past its final file", ErrAnchor, final)
 	}
 
-	if squeezed(string(text[decl.Span.Start:decl.Span.End])) == squeezed(one.preimage) {
+	finalText := string(text[decl.Span.Start:decl.Span.End])
+	if squeezed(finalText) == squeezed(one.preimage) {
 		return entry{}, reasonReverted, nil
 	}
 
-	return entry{key: final, span: decl.Span, preimage: one.preimage}, "", nil
+	return entry{key: final, span: decl.Span, preimage: one.preimage, final: finalText}, "", nil
 }

@@ -2,6 +2,7 @@ package anchorprobe
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -15,15 +16,12 @@ type Settings struct {
 	Rev      string
 	CacheDir string
 	Tags     []string
+	Verify   json.RawMessage
 	Renderer Renderer
 }
 
 func Open(ctx context.Context, settings Settings) (*Probe, error) {
-	const (
-		goName     = "go"
-		goModName  = "go.mod"
-		slotsInDir = "anchor-slots"
-	)
+	const slotsInDir = "anchor-slots"
 
 	gitDir, err := slots.GitDir(ctx, settings.Repo)
 	if err != nil {
@@ -37,10 +35,12 @@ func Open(ctx context.Context, settings Settings) (*Probe, error) {
 		}
 	}
 
-	builder, err := checkrun.New(checkrun.Config{
-		Languages: map[string]checkrun.Language{goName: checkrun.GoDefault(settings.Tags)},
-		CacheDir:  root,
-	})
+	verify, err := configure(settings.Tags, settings.Verify)
+	if err != nil {
+		return nil, err
+	}
+
+	builder, err := checkrun.New(checkrun.Config{Languages: verify.languages, CacheDir: root})
 	if err != nil {
 		return nil, fmt.Errorf("create builder: %w", err)
 	}
@@ -49,10 +49,11 @@ func Open(ctx context.Context, settings Settings) (*Probe, error) {
 	probe := New(ctx, Config{
 		Commits:  slots.NewCommits(gitDir),
 		Checkout: trees,
-		Modules:  slots.NewModules(gitDir, map[string]string{goModName: goName}),
+		Modules:  slots.NewModules(gitDir, verify.markers),
 		Builder:  builder,
 		Renderer: settings.Renderer,
 		Rev:      settings.Rev,
+		Exclude:  verify.exclude,
 	})
 	probe.release = trees.Close
 

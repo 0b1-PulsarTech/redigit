@@ -172,15 +172,19 @@ func TestPolicyTrialsHoldOnlyAnchorsJudgedBuilt(t *testing.T) {
 		name      string
 		newer     Verdict
 		wantEdits int
+		wantCalls int
 	}{
-		{name: "a newer anchor that builds is in the older trial", newer: built, wantEdits: 2},
+		{
+			name:  "a newer anchor that builds is in the older trial and its window is probed too",
+			newer: built, wantEdits: 2, wantCalls: 3,
+		},
 		{
 			name:  "a newer wip anchor is left out of the older trial",
-			newer: Verdict{Detail: "no"}, wantEdits: 1,
+			newer: Verdict{Detail: "no"}, wantEdits: 1, wantCalls: 2,
 		},
 		{
 			name:  "a newer unchecked anchor is left out of the older trial",
-			newer: Verdict{IsUnchecked: true}, wantEdits: 1,
+			newer: Verdict{IsUnchecked: true}, wantEdits: 1, wantCalls: 2,
 		},
 	}
 
@@ -200,7 +204,8 @@ func TestPolicyTrialsHoldOnlyAnchorsJudgedBuilt(t *testing.T) {
 				t.Fatalf("Plan() = %v", err)
 			}
 
-			if len(record.edits) != 2 || len(record.edits[1]) != testCase.wantEdits {
+			if len(record.edits) != testCase.wantCalls ||
+				len(record.edits[1]) != testCase.wantEdits {
 				t.Fatalf(
 					"probe edits = %+v, want the older trial to hold %d",
 					record.edits, testCase.wantEdits,
@@ -306,6 +311,85 @@ func TestEditsOf(t *testing.T) {
 			got := editsOf(testCase.active, nil)
 			if !reflect.DeepEqual(got, testCase.want) {
 				t.Fatalf("editsOf() = %+v, want %+v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestEditsOfCarryTheImports(t *testing.T) {
+	t.Parallel()
+
+	active := map[entities.DeclKey]entry{
+		fkey("A"): {
+			key: fkey("A"), span: entities.Span{End: 6}, preimage: "A one",
+			imports: []string{"bytes"},
+		},
+	}
+	want := []Edit{{
+		File: "a.go", Span: entities.Span{End: 6}, Text: "A one", Imports: []string{"bytes"},
+		Keep: []entities.DeclKey{fkey("A")},
+	}}
+
+	got := editsOf(active, map[string][]entities.DeclKey{"a.go": {fkey("A")}})
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("editsOf() = %+v, want %+v", got, want)
+	}
+}
+
+func TestOverlapped(t *testing.T) {
+	t.Parallel()
+
+	mine := entry{key: fkey("a"), span: entities.Span{Start: 15, End: 26}, preimage: "a = 1"}
+
+	testCases := []struct {
+		name    string
+		claimed []entry
+		want    string
+	}{
+		{name: "nothing claimed"},
+		{
+			name: "the same span with another text",
+			claimed: []entry{
+				{key: fkey("b"), span: mine.span, preimage: "b = 2"},
+			},
+			want: "a.go:func:b",
+		},
+		{
+			name: "a span that starts inside",
+			claimed: []entry{
+				{key: fkey("b"), span: entities.Span{Start: 20, End: 40}, preimage: "b = 2"},
+			},
+			want: "a.go:func:b",
+		},
+		{
+			name:    "the same span with the same text is one splice",
+			claimed: []entry{{key: fkey("b"), span: mine.span, preimage: mine.preimage}},
+		},
+		{
+			name:    "the same key is replaced, not overlapped",
+			claimed: []entry{{key: mine.key, span: mine.span, preimage: "a = 2"}},
+		},
+		{
+			name:    "a span that only touches",
+			claimed: []entry{{key: fkey("b"), span: entities.Span{Start: 26, End: 30}}},
+		},
+		{
+			name: "another file",
+			claimed: []entry{
+				{
+					key:  entities.DeclKey{File: "b.go", Kind: entities.KindFunc, Name: "b"},
+					span: mine.span, preimage: "b = 2",
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := overlapped(testCase.claimed, []entry{mine}); got != testCase.want {
+				t.Fatalf("overlapped() = %q, want %q", got, testCase.want)
 			}
 		})
 	}

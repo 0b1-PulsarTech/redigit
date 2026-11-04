@@ -117,101 +117,11 @@ func TestChangedDeclarationsFailures(t *testing.T) {
 	}
 }
 
-type readsAfterCase struct {
-	name      string
-	candidate entities.Decl
-	preimage  string
-	at        int
-	homeAt    int
-	homeFile  string
-	homeKind  entities.DeclKind
-	reads     []string
-	asks      int
-	isReading bool
-	isParsed  bool
-	isMoving  bool
-	isMissing bool
-	isTested  bool
-	want      bool
-}
-
-func readsAfterHome() entities.Decl {
-	return entities.Decl{
-		Key:  entities.DeclKey{File: "h/h.go", Kind: entities.KindFunc, Name: "H"},
-		Unit: "h",
-	}
-}
-
-func readsAfterOther(kind entities.DeclKind, unit entities.UnitID, name string) entities.Decl {
-	key := entities.DeclKey{File: "x.go", Kind: kind, Name: name}
-
-	return entities.Decl{Key: key, Unit: unit}
-}
-
-func readsAfterTesting(decl entities.Decl) entities.Decl {
-	decl.IsTest = true
-
-	return decl
-}
-
-func readsAfterHelper(name string) entities.Decl {
-	key := entities.DeclKey{File: "h/h_test.go", Kind: entities.KindFunc, Name: name}
-
-	return entities.Decl{Key: key, Unit: "h"}
-}
-
-func checkReadsAfter(t *testing.T, testCases []readsAfterCase) {
-	t.Helper()
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			home := readsAfterHome()
-			home.IsTest = testCase.isTested
-
-			if testCase.homeKind != "" {
-				home.Key.Kind = testCase.homeKind
-			}
-
-			if testCase.homeFile != "" {
-				home.Key.File = testCase.homeFile
-			}
-
-			graph := entities.NewGraph([]entities.Decl{home, testCase.candidate}, nil, nil)
-			view := scene{graph: graph, decls: graph.Decls()}
-
-			if testCase.isReading {
-				reader := NewMockReader(gomock.NewController(t))
-				reader.EXPECT().
-					Reads(home.Key.File, testCase.preimage).
-					Return(testCase.reads, testCase.isParsed).
-					Times(testCase.asks)
-
-				view.reader = reader
-			}
-
-			index := map[entities.DeclKey]int{home.Key: testCase.homeAt}
-
-			if !testCase.isMissing {
-				index[testCase.candidate.Key] = testCase.at
-			}
-
-			moving := map[entities.DeclKey]bool{testCase.candidate.Key: testCase.isMoving}
-			placed := entry{key: home.Key, preimage: testCase.preimage}
-
-			got := view.readsAfter(placed, index, moving, 1)
-			if (got != "") != testCase.want {
-				t.Fatalf("readsAfter() = %q, want a hit: %t", got, testCase.want)
-			}
-		})
-	}
-}
-
 func TestReadsAfterNames(t *testing.T) {
 	t.Parallel()
 
 	other := readsAfterOther
+	libImport := []string{`"example.com/p/pkg/lib"`}
 
 	testCases := []readsAfterCase{
 		{
@@ -227,9 +137,9 @@ func TestReadsAfterNames(t *testing.T) {
 			preimage: "H uses Limit", at: 3, want: true,
 		},
 		{
-			name:      "a method placed after is not scanned",
+			name:      "a method placed after is read through its selector",
 			candidate: other("method", "h", "Box.Run"),
-			preimage:  "H calls Box.Run", at: 3,
+			preimage:  "H calls Box.Run", at: 3, want: true,
 		},
 		{
 			name:      "a statement placed after is not scanned",
@@ -246,12 +156,72 @@ func TestReadsAfterNames(t *testing.T) {
 		},
 		{
 			name: "a qualified name of another unit", candidate: other("func", "pkg/lib", "Run"),
-			preimage: "H calls lib.Run", at: 3, want: true,
+			preimage: "H calls lib.Run", imports: libImport, at: 3, want: true,
 		},
 		{
 			name:      "a test package of the unit reads by the directory name",
 			candidate: other("func", "pkg/lib#lib_test", "Run"),
-			preimage:  "H calls lib.Run", at: 3, want: true,
+			preimage:  "H calls lib.Run", imports: libImport, at: 3, want: true,
+		},
+	}
+
+	checkReadsAfter(t, testCases)
+}
+
+func TestReadsAfterFalseFolds(t *testing.T) {
+	t.Parallel()
+
+	other := readsAfterOther
+	entitiesImport := []string{`"example.com/p/entities"`}
+
+	testCases := []readsAfterCase{
+		{
+			name:      "a selector the final text still holds is not a read",
+			candidate: other("method", "h", "assertionRule.Name"),
+			preimage:  "H uses d.Key.Name", final: "H uses d.Key.Name", at: 3,
+		},
+		{
+			name:      "a selector the fix removed is a read",
+			candidate: other("method", "h", "assertionRule.Name"),
+			preimage:  "H uses d.Key.Name", final: "H uses d.Key", at: 3, want: true,
+		},
+		{
+			name:      "a selector with no final text counts",
+			candidate: other("method", "h", "assertionRule.Name"),
+			preimage:  "H uses d.Key.Name", at: 3, want: true,
+		},
+		{
+			name:      "a package qualifier is not a method selector",
+			candidate: other("method", "h", "Planner.Plan"),
+			preimage:  "p := entities.Plan{}", final: "p := 1", imports: entitiesImport, at: 3,
+		},
+		{
+			name:      "a qualifier that is no package still selects a method",
+			candidate: other("method", "h", "Planner.Plan"),
+			preimage:  "p := planner.Plan()", final: "p := 1", imports: entitiesImport, at: 3,
+			want: true,
+		},
+		{
+			name:      "a package qualifier beside a real selector still reads it",
+			candidate: other("method", "h", "Planner.Plan"),
+			preimage:  "entities.Plan(x.Plan())", final: "p := 1", imports: entitiesImport, at: 3,
+			want: true,
+		},
+		{
+			name:      "a type outside the imports of a plain directory is not read by a qualifier",
+			candidate: other("type", "infra/lsp", "Position"),
+			preimage:  "p := entities.Position{}", imports: entitiesImport, at: 3,
+		},
+		{
+			name:      "a module root answers to any import",
+			candidate: other("func", "aaext", "Run"),
+			preimage:  "H calls ext.Run", imports: []string{`ext "example.com/ext"`},
+			isModule: true, at: 3, want: true,
+		},
+		{
+			name:      "a plain directory does not answer to a differing import",
+			candidate: other("func", "aaext", "Run"),
+			preimage:  "H calls ext.Run", imports: []string{`ext "example.com/ext"`}, at: 3,
 		},
 	}
 
@@ -329,6 +299,7 @@ func TestReadsAfterByParsing(t *testing.T) {
 	t.Parallel()
 
 	other := readsAfterOther
+	libImport := []string{`"example.com/p/pkg/lib"`}
 
 	testCases := []readsAfterCase{
 		{
@@ -381,20 +352,20 @@ func TestReadsAfterByParsing(t *testing.T) {
 		},
 		{
 			name: "a qualified read of another unit", candidate: other("func", "pkg/lib", "Run"),
-			preimage: "H calls lib.Run",
-			at:       3, isReading: true, isParsed: true, asks: 1,
+			preimage: "H calls lib.Run", imports: libImport,
+			at: 3, isReading: true, isParsed: true, asks: 1,
 			reads: []string{"lib", "lib.Run"}, want: true,
 		},
 		{
 			name: "a qualified read on two lines", candidate: other("func", "pkg/lib", "Run"),
-			preimage: "H calls lib.\n\tRun",
-			at:       3, isReading: true, isParsed: true, asks: 1,
+			preimage: "H calls lib.\n\tRun", imports: libImport,
+			at: 3, isReading: true, isParsed: true, asks: 1,
 			reads: []string{"lib", "lib.Run"}, want: true,
 		},
 		{
 			name: "a bare name is not another unit", candidate: other("func", "pkg/lib", "Run"),
-			preimage: "H calls lib.Run",
-			at:       3, isReading: true, isParsed: true, asks: 1, reads: []string{"Run"},
+			preimage: "H calls lib.Run", imports: libImport,
+			at: 3, isReading: true, isParsed: true, asks: 1, reads: []string{"Run"},
 		},
 		{
 			name: "no word match asks nothing", candidate: other("func", "h", "step"),
@@ -409,6 +380,7 @@ func TestReadsAfterFallsBackToTheWordMatch(t *testing.T) {
 	t.Parallel()
 
 	other := readsAfterOther
+	libImport := []string{`"example.com/p/pkg/lib"`}
 
 	testCases := []readsAfterCase{
 		{
@@ -456,8 +428,10 @@ func TestReadsAfterFallsBackToTheWordMatch(t *testing.T) {
 			preimage: "total += step\u00e3", at: 3,
 		},
 		{
-			name: "a qualified read of it", candidate: other("func", "pkg/lib", "\u00c9xito"),
-			preimage: "H calls lib.\u00c9xito", at: 3, isReading: true, isParsed: true, asks: 1,
+			name:      "a qualified read of it",
+			candidate: other("func", "pkg/lib", "\u00c9xito"),
+			preimage:  "H calls lib.\u00c9xito", imports: libImport,
+			at: 3, isReading: true, isParsed: true, asks: 1,
 			reads: []string{"lib", "lib.\u00c9xito"}, want: true,
 		},
 	}

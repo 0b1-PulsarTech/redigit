@@ -31,10 +31,12 @@ func (linesParser) Declarations(
 		}
 
 		if name, _, found := strings.Cut(text, " "); found {
-			decls = append(decls, entities.Decl{
-				Key:  entities.DeclKey{File: path, Kind: entities.KindFunc, Name: name},
-				Span: entities.Span{Start: offset, End: offset + len(text)},
-			})
+			for one := range strings.SplitSeq(name, ",") {
+				decls = append(decls, entities.Decl{
+					Key:  entities.DeclKey{File: path, Kind: entities.KindFunc, Name: one},
+					Span: entities.Span{Start: offset, End: offset + len(text)},
+				})
+			}
 		}
 
 		offset += len(line)
@@ -84,4 +86,23 @@ func mapFinals(ctrl *gomock.Controller, files map[string]string) *MockFinals {
 		AnyTimes()
 
 	return finals
+}
+
+type importingParser struct{ linesParser }
+
+func (importingParser) Needed(source []byte, text string) []string {
+	var specs []string
+
+	for line := range strings.Lines(string(source)) {
+		if spec, isImport := strings.CutPrefix(strings.TrimSpace(line), "import "); isImport &&
+			strings.Contains(text, spec) {
+			specs = append(specs, spec)
+		}
+	}
+
+	return specs
+}
+
+func importingLanguages() []lineage.Language {
+	return []lineage.Language{{Extensions: []string{".go"}, Parser: importingParser{}}}
 }

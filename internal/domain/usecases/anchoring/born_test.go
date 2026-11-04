@@ -275,3 +275,94 @@ func TestMentionsSkipsAMethodOnlyWhenItsReceiverInTheSameFileMoves(t *testing.T)
 		})
 	}
 }
+
+func TestMisfitProbesTheDeclarationsBornBeforeTheAnchor(t *testing.T) {
+	t.Parallel()
+
+	built := Verdict{IsBuilt: true}
+	failed := Verdict{Detail: "undefined: foo"}
+	unfit := Verdict{IsUnfit: true, Detail: "pre-image cannot be rendered"}
+
+	testCases := []struct {
+		name        string
+		window      Verdict
+		older       Policy
+		wantCommits int
+		wantMarked  bool
+	}{
+		{name: "a window that builds keeps both anchors", window: built, wantCommits: 4},
+		{name: "a failing window folds the anchor it belongs to", window: failed, wantCommits: 3},
+		{
+			name: "a window that fails marks the anchor it belongs to under wip", window: failed,
+			older: PolicyWIP, wantCommits: 4, wantMarked: true,
+		},
+		{
+			name: "a window the renderer refuses still follows the wip policy", window: unfit,
+			older: PolicyWIP, wantCommits: 4, wantMarked: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var record probeLog
+
+			ctrl := gomock.NewController(t)
+			probe := scripted(ctrl, &record, []Verdict{built, built, testCase.window}, nil)
+			older := Anchor{Rev: "fix", Position: 5, Policy: testCase.older}
+			newer := Anchor{Rev: "fixb", Position: 7}
+
+			got, err := planOf(fixture(ctrl, probe, "", older, newer), finalFiles())
+			if err != nil {
+				t.Fatalf("Plan() = %v", err)
+			}
+
+			if got.Len() != testCase.wantCommits {
+				t.Fatalf("commits = %d, want %d", got.Len(), testCase.wantCommits)
+			}
+
+			isMarked := slices.ContainsFunc(got.Commits, func(commit entities.PlannedCommit) bool {
+				return commit.IsWIP
+			})
+			if isMarked != testCase.wantMarked {
+				t.Fatalf(
+					"a marked commit = %v, want %v: %+v",
+					isMarked,
+					testCase.wantMarked,
+					got.Commits,
+				)
+			}
+		})
+	}
+}
+
+func TestMisfitBlamesTheNewestWindowThatFails(t *testing.T) {
+	t.Parallel()
+
+	built := Verdict{IsBuilt: true}
+	failed := Verdict{Detail: "undefined: foo"}
+
+	var record probeLog
+
+	ctrl := gomock.NewController(t)
+	probe := scripted(ctrl, &record, []Verdict{built, built, built, failed, built}, nil)
+	oldest := Anchor{Rev: "fix", Position: 5}
+	middle := Anchor{Rev: "fix2", Position: 6}
+	newest := Anchor{Rev: "fixb", Position: 7}
+
+	got, err := planOf(fixture(ctrl, probe, "", oldest, middle, newest), finalFiles())
+	if err != nil {
+		t.Fatalf("Plan() = %v", err)
+	}
+
+	subjects := make([]string, 0, got.Len())
+	for _, commit := range got.Commits {
+		subjects = append(subjects, commit.Subject)
+	}
+
+	if !slices.Contains(subjects, "fix(golang): repair A") ||
+		slices.Contains(subjects, "perf(golang): speed up A") {
+		t.Fatalf("the newer anchor whose window fails must fall and the older stay: %q", subjects)
+	}
+}

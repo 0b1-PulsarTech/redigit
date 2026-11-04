@@ -25,10 +25,7 @@ func (planner Planner) Plan(
 	}
 
 	// The planner port carries no context, so the run context is bound when the planner is built.
-	ctx := planner.cfg.Bound
-	if ctx == nil {
-		ctx = context.Background()
-	}
+	ctx := cmp.Or(planner.cfg.Bound, context.Background())
 
 	list, err := planner.collect(ctx, graph, placedIn(plan))
 	if err != nil {
@@ -77,11 +74,11 @@ func (planner Planner) collect(
 		)
 		one := found{
 			anchor: anchor, revision: revision, entries: entries, skipped: len(part.skipped),
-			born: born,
+			born: born, lone: placedSkips(part.skipped, placed),
 		}
 
 		if len(entries) == 0 && len(born) == 0 {
-			planner.summarize(one, "dropped", "it changes no placed declaration")
+			planner.summarize(one, "dropped", droppedBecause(one))
 
 			continue
 		}
@@ -123,14 +120,13 @@ func (planner Planner) insert(
 
 	for idx, one := range chosen {
 		if slots[idx] < 0 {
-			planner.summarize(one.found, "dropped", "it changes no placed declaration")
+			planner.summarize(one.found, "dropped", "it would leave an empty commit")
 
 			continue
 		}
 
 		for _, placed := range live[idx] {
-			version := entities.Version{Text: placed.preimage, Until: entities.Position(slots[idx])}
-			versions[placed.key] = append(versions[placed.key], version)
+			versions[placed.key] = append(versions[placed.key], versionOf(placed, slots[idx]))
 		}
 
 		marked := 0
@@ -166,7 +162,11 @@ func (planner Planner) settle(
 			return nil, err
 		}
 
-		rev, reason := quiet.misfit(plan, graph, chosen)
+		rev, reason, err := quiet.misfit(ctx, plan, graph, chosen, judge)
+		if err != nil {
+			return nil, err
+		}
+
 		if rev == "" {
 			break
 		}

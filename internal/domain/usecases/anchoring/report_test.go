@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -58,16 +59,18 @@ func TestSummaryPerAnchor(t *testing.T) {
 			wantOutcome: "wip", wantReason: "undefined: Z",
 		},
 		{
-			name:        "a tree that gives no verdict",
-			anchor:      fix,
-			verdict:     Verdict{IsUnchecked: true, Detail: "fails before"},
-			wantOutcome: "unchecked", wantReason: "fails before",
+			name: "a tree that gives no verdict", anchor: fix, wantOutcome: "unchecked",
+			verdict: Verdict{IsUnchecked: true, Detail: "stale"}, wantReason: "stale",
 		},
 		{
-			name:        "an anchor that changes nothing",
-			anchor:      Anchor{Rev: "noop", Position: 5},
-			verdict:     Verdict{IsBuilt: true},
-			wantOutcome: "dropped", wantReason: "it changes no placed declaration",
+			name: "an anchor that changes nothing", anchor: Anchor{Rev: "noop", Position: 5},
+			verdict: Verdict{IsBuilt: true}, wantOutcome: "dropped",
+			wantReason: "it changes no placed declaration",
+		},
+		{
+			name: "a declaration the final tree lost", anchor: Anchor{Rev: "lost", Position: 5},
+			verdict: Verdict{IsBuilt: true}, wantOutcome: "dropped",
+			wantReason: "it changes no placed declaration",
 		},
 	}
 
@@ -410,6 +413,51 @@ func TestSummaryDropsAnAnchorThatCancelsAgainstTheNext(t *testing.T) {
 				if outcomes[rev] != want {
 					t.Fatalf("outcomes = %v, want %v", outcomes, testCase.wantOutcomes)
 				}
+			}
+		})
+	}
+}
+
+func TestVersionOfCarriesTheImports(t *testing.T) {
+	t.Parallel()
+
+	placed := entry{preimage: "A one", imports: []string{"bytes", `str "strings"`}}
+	want := entities.Version{Text: "A one", Until: 3, Imports: []string{"bytes", `str "strings"`}}
+
+	if got := versionOf(placed, 3); !reflect.DeepEqual(got, want) {
+		t.Fatalf("versionOf() = %+v, want %+v", got, want)
+	}
+}
+
+func TestTouches(t *testing.T) {
+	t.Parallel()
+
+	home := entities.Decl{Key: fkey("H"), Unit: "h"}
+	alias := []string{`z "example.com/p/lib"`}
+
+	testCases := []struct {
+		name     string
+		preimage string
+		unit     entities.UnitID
+		imports  []string
+		want     bool
+	}{
+		{name: "a method of any receiver", preimage: "b.Run()", unit: "h", want: true},
+		{name: "a method named but not selected", preimage: "Run(b)", unit: "h"},
+		{name: "an imported method", preimage: "b.Run()", unit: "lib", imports: alias, want: true},
+		{name: "an unrelated method", preimage: "b.Run()", unit: "lib", imports: []string{`"os"`}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			key := entities.DeclKey{File: "x.go", Kind: entities.KindMethod, Name: "Box.Run"}
+			placed := entry{key: home.Key, preimage: testCase.preimage, imports: testCase.imports}
+			decl := entities.Decl{Key: key, Unit: testCase.unit}
+
+			if got := (scene{}).touches(placed, home, decl); got != testCase.want {
+				t.Fatalf("touches() = %t, want %t", got, testCase.want)
 			}
 		})
 	}

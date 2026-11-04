@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring/selector"
 )
 
 type scene struct {
@@ -15,7 +16,9 @@ type scene struct {
 	owned   map[entities.DeclKey]bool
 	holders []entry
 	reader  Reader
+	memo    *selector.Memo
 	atoms   map[string][]entities.DeclKey
+	modules map[string]bool
 }
 
 func newScene(graph entities.Graph, reader Reader) scene {
@@ -28,17 +31,16 @@ func newScene(graph entities.Graph, reader Reader) scene {
 		}
 	}
 
-	return scene{graph: graph, decls: decls, atoms: atoms, reader: reader}
+	return scene{
+		graph: graph, decls: decls, atoms: atoms, reader: reader,
+		modules: selector.ModuleDirs(graph), memo: selector.NewMemo(reader),
+	}
 }
 
 func holdersBefore(chosen []kept, at int) []entry {
 	var out []entry
 
-	own := map[entities.DeclKey]bool{}
-	for _, placed := range chosen[at].entries {
-		own[placed.key] = true
-	}
-
+	own := keySet(chosen[at : at+1])
 	newer := map[entities.DeclKey]bool{}
 
 	for idx, one := range chosen {
@@ -159,7 +161,7 @@ func (view scene) preimages(
 		}
 
 		if hit := view.readsAfter(holder, index, moving, slot); hit != "" {
-			return "its own pre-image reads " + hit
+			return "its own pre-image may read " + hit
 		}
 	}
 

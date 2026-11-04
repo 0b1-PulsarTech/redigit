@@ -3,6 +3,7 @@
 package anchorprobe
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +25,7 @@ func gitIn(t testing.TB, dir string, args ...string) {
 	}
 }
 
-func openOn(t *testing.T, files map[string]string) *Probe {
+func openOn(t *testing.T, files map[string]string, verify string) *Probe {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -33,6 +34,10 @@ func openOn(t *testing.T, files map[string]string) *Probe {
 	gitIn(t, dir, "config", "user.name", "Tester")
 
 	for name, text := range files {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o700); err != nil {
+			t.Fatalf("mkdir %s: %v", name, err)
+		}
+
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o600); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
@@ -43,6 +48,7 @@ func openOn(t *testing.T, files map[string]string) *Probe {
 
 	probe, err := Open(t.Context(), Settings{
 		Repo: dir, Rev: "HEAD", CacheDir: t.TempDir(), Renderer: golang.NewSyntax(),
+		Verify: json.RawMessage(verify),
 	})
 	if err != nil {
 		t.Fatalf("Open() = %v", err)
@@ -62,7 +68,7 @@ func TestOpenBuildsARealTreeWithEditsSpliced(t *testing.T) {
 		body    = "func A() int { n, _ := strconv.Atoi(\"1\"); return n }"
 	)
 
-	probe := openOn(t, map[string]string{"go.mod": modFile, "a.go": header + body + "\n"})
+	probe := openOn(t, map[string]string{"go.mod": modFile, "a.go": header + body + "\n"}, "")
 	span := entities.Span{Start: len(header), End: len(header) + len(body)}
 	keep := []entities.DeclKey{{File: "a.go", Kind: entities.KindFunc, Name: "A"}}
 	atoi := "func A() int { n, _ := strconv.Atoi(\"0\"); return n }"
@@ -122,13 +128,85 @@ func TestOpenGivesNoVerdictOnATreeThatAlreadyFails(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			probe := openOn(t, testCase.files)
+			probe := openOn(t, testCase.files, "")
 
 			verdict, err := probe.Builds(t.Context(), []anchoring.Edit{
 				{File: "a.go", Span: span, Text: testCase.text, Keep: keep},
 			})
 			if err != nil || verdict.IsBuilt || !verdict.IsUnchecked {
 				t.Fatalf("Builds() = %+v, %v, want an unchecked verdict", verdict, err)
+			}
+		})
+	}
+}
+
+func TestOpenHonoursTheVerifySection(t *testing.T) {
+	t.Parallel()
+
+	const (
+		modFile  = "module example.com/p\n\ngo 1.21\n"
+		workFile = "go 1.21\n\nuse (\n\t.\n\t./gone\n)\n"
+		source   = "package p\n\nfunc A() int { return 1 }\n"
+		redefine = `{"languages":{"go":{` +
+			`"steps":[{"cmd":["env","GOWORK=off","go","build","./..."]}]}}}`
+	)
+
+	span := entities.Span{Start: len("package p\n\n"), End: len(source) - 1}
+	testCases := []struct {
+		name      string
+		files     map[string]string
+		verify    string
+		file      string
+		wantBuilt bool
+		wantNote  string
+	}{
+		{
+			name:  "a go.work naming a missing module leaves every anchor unchecked",
+			files: map[string]string{"go.mod": modFile, "go.work": workFile, "a.go": source},
+			file:  "a.go",
+		},
+		{
+			name:      "the section's steps and env check the tree with GOWORK off",
+			files:     map[string]string{"go.mod": modFile, "go.work": workFile, "a.go": source},
+			verify:    redefine,
+			file:      "a.go",
+			wantBuilt: true,
+		},
+		{
+			name: "an edit only in an excluded module reads unchecked and says so",
+			files: map[string]string{
+				"app/go.mod": modFile, "app/a.go": source,
+				"lifted/go.mod": "module example.com/lifted\n\ngo 1.21\n", "lifted/a.go": source,
+			},
+			verify:   `{"exclude":["lifted"]}`,
+			file:     "lifted/a.go",
+			wantNote: "verify.exclude",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			probe := openOn(t, testCase.files, testCase.verify)
+
+			verdict, err := probe.Builds(t.Context(), []anchoring.Edit{
+				{
+					File: testCase.file,
+					Span: span,
+					Text: "func A() int { return 0 }",
+					Keep: []entities.DeclKey{
+						{File: testCase.file, Kind: entities.KindFunc, Name: "A"},
+					},
+				},
+			})
+			if err != nil || verdict.IsBuilt != testCase.wantBuilt ||
+				verdict.IsUnchecked == testCase.wantBuilt {
+				t.Fatalf("Builds() = %+v, %v, want built = %v", verdict, err, testCase.wantBuilt)
+			}
+
+			if !strings.Contains(verdict.Detail, testCase.wantNote) {
+				t.Fatalf("detail = %q, want %q", verdict.Detail, testCase.wantNote)
 			}
 		})
 	}

@@ -112,7 +112,7 @@ func lineageStage(
 func openProbe(ctx context.Context, cfg *Config, env stageEnv) (anchoring.Config, closers, error) {
 	renderers := renderersByExtension(env.specific)
 	settings := anchorprobe.Settings{
-		Repo: env.root, Rev: cfg.Rev, Tags: cfg.BuildTags,
+		Repo: env.root, Rev: cfg.Rev, Tags: cfg.BuildTags, Verify: cfg.Sections.Verify,
 		Renderer: newRenderer(renderers[".go"], renderers),
 	}
 

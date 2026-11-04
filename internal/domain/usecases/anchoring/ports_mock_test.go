@@ -188,6 +188,44 @@ func (mr *MockReaderMockRecorder) Reads(file, text any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reads", reflect.TypeOf((*MockReader)(nil).Reads), file, text)
 }
 
+// MockImporter is a mock of Importer interface.
+type MockImporter struct {
+	ctrl     *gomock.Controller
+	recorder *MockImporterMockRecorder
+	isgomock struct{}
+}
+
+// MockImporterMockRecorder is the mock recorder for MockImporter.
+type MockImporterMockRecorder struct {
+	mock *MockImporter
+}
+
+// NewMockImporter creates a new mock instance.
+func NewMockImporter(ctrl *gomock.Controller) *MockImporter {
+	mock := &MockImporter{ctrl: ctrl}
+	mock.recorder = &MockImporterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockImporter) EXPECT() *MockImporterMockRecorder {
+	return m.recorder
+}
+
+// Needed mocks base method.
+func (m *MockImporter) Needed(source []byte, text string) []string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Needed", source, text)
+	ret0, _ := ret[0].([]string)
+	return ret0
+}
+
+// Needed indicates an expected call of Needed.
+func (mr *MockImporterMockRecorder) Needed(source, text any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Needed", reflect.TypeOf((*MockImporter)(nil).Needed), source, text)
+}
+
 // MockProbe is a mock of Probe interface.
 type MockProbe struct {
 	ctrl     *gomock.Controller

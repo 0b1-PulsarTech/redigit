@@ -37,27 +37,27 @@ type (
 		Policy   Policy
 	}
 
-	Revision struct {
-		Subject string
-		Files   []FileChange
+	found struct {
+		anchor   Anchor
+		revision Revision
+		entries  []entry
+		skipped  int
+		lone     int
+		born     []entities.DeclKey
 	}
 
-	FileChange struct {
-		Path, OldPath, Blob, OldBlob string
+	kept struct {
+		found
+
+		isWIP   bool
+		outcome string
+		reason  string
+		trial   map[entities.DeclKey]entry
 	}
 
-	Edit struct {
-		File string
-		Span entities.Span
-		Text string
-		Keep []entities.DeclKey
-	}
-
-	Verdict struct {
-		IsBuilt     bool
-		IsUnchecked bool
-		IsUnfit     bool
-		Detail      string
+	judgement struct {
+		forced map[string]string
+		memo   map[string]Verdict
 	}
 
 	Config struct {
@@ -162,4 +162,16 @@ func Locate(specs []Spec, history []entities.SourceTouch) ([]Anchor, error) {
 	}
 
 	return anchors, nil
+}
+
+func (planner Planner) languageFor(path string) (lineage.Language, bool) {
+	for _, language := range planner.cfg.Languages {
+		for _, ext := range language.Extensions {
+			if strings.HasSuffix(path, ext) {
+				return language, true
+			}
+		}
+	}
+
+	return lineage.Language{}, false
 }

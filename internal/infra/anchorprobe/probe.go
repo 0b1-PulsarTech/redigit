@@ -28,6 +28,7 @@ type (
 		Builder  Builder
 		Renderer Renderer
 		Rev      string
+		Exclude  []string
 	}
 
 	Probe struct {
@@ -73,7 +74,13 @@ func (probe *Probe) Builds(
 		files = append(files, edit.File)
 	}
 
-	units := affectedBy(ready.units, files)
+	units, left := trialled(affectedBy(ready.units, files), probe.cfg.Exclude, files)
+	if len(units) == 0 && len(left) > 0 {
+		return anchoring.Verdict{
+			IsUnchecked: true,
+			Detail:      "every module the edits touch is excluded by verify.exclude",
+		}, nil
+	}
 
 	if err = probe.baseline(ctx, ready.dir, units); err != nil {
 		return anchoring.Verdict{}, err
@@ -90,7 +97,7 @@ func (probe *Probe) Builds(
 
 	verdict, checkErr := probe.check(ctx, ready.dir, units)
 
-	return verdict, errors.Join(checkErr, restore())
+	return uncheckedBy(verdict, units, left), errors.Join(checkErr, restore())
 }
 
 func (probe *Probe) prepare(ctx context.Context) (prepared, error) {

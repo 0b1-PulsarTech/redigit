@@ -23,6 +23,7 @@ type deltaCase struct {
 	sliced    string
 	want      []entry
 	wantSkips []skip
+	importing bool
 }
 
 func runDelta(t *testing.T, testCase deltaCase) {
@@ -42,9 +43,14 @@ func runDelta(t *testing.T, testCase deltaCase) {
 		change.OldPath = testCase.oldPath
 	}
 
+	languages := goLanguages()
+	if testCase.importing {
+		languages = importingLanguages()
+	}
+
 	blobs := map[string]string{"old": testCase.oldSrc, "new": testCase.newSrc}
 	planner := New(Config{
-		Languages: goLanguages(),
+		Languages: languages,
 		Revisions: mapBlobs(ctrl, blobs),
 		Finals:    mapFinals(ctrl, files),
 		Renames:   testCase.renames,
@@ -67,6 +73,14 @@ func runDelta(t *testing.T, testCase deltaCase) {
 	)
 	if err != nil {
 		t.Fatalf("delta() = %v", err)
+	}
+
+	for idx, placed := range got.entries {
+		if want := testCase.finalSrc[placed.span.Start:placed.span.End]; placed.final != want {
+			t.Fatalf("entry %d final = %q, want %q", idx, placed.final, want)
+		}
+
+		got.entries[idx].final = ""
 	}
 
 	if !reflect.DeepEqual(got.entries, testCase.want) {
@@ -98,6 +112,45 @@ func TestDeltaChangedDeclarations(t *testing.T) {
 			oldSrc: "A one\nB two\n", newSrc: "A one\n", finalSrc: "A one\n",
 		},
 		{
+			name:   "names sharing one final span with one pre-image keep it",
+			oldSrc: "A,B one\n", newSrc: "A,B uno\n", finalSrc: "A,B last\n",
+			want: []entry{
+				{key: fkey("A"), preimage: "A,B one", span: entities.Span{End: 8}},
+				{key: fkey("B"), preimage: "A,B one", span: entities.Span{End: 8}},
+			},
+		},
+		{
+			name:   "names sharing one final span with different pre-images are all left alone",
+			oldSrc: "A one\nB two\n", newSrc: "A,B uno\n", finalSrc: "A,B last\n",
+			wantSkips: []skip{
+				{key: fkey("A"), reason: reasonShared}, {key: fkey("B"), reason: reasonShared},
+			},
+		},
+		{
+			name:   "a name sharing its final span with one born at the anchor keeps its pre-image",
+			oldSrc: "A one\n", newSrc: "A,B uno\n", finalSrc: "A,B last\n",
+			want: []entry{{key: fkey("A"), preimage: "A one", span: entities.Span{End: 8}}},
+		},
+		{
+			name:     "a name sharing its final span with one that is left alone is left alone too",
+			oldSrc:   "A one\nB two\nB six\n",
+			newSrc:   "A,B uno\nB two\nB six\n",
+			finalSrc: "A,B last\n",
+			wantSkips: []skip{
+				{key: fkey("B"), reason: reasonTwice},
+				{key: fkey("B"), reason: reasonTwice},
+				{key: fkey("B"), reason: reasonTwice},
+				{key: fkey("A"), reason: reasonLeft},
+			},
+		},
+		{
+			name:   "a name declared twice in one file is not paired with its parent text",
+			oldSrc: "A one\nA two\n", newSrc: "A one\nA three\n", finalSrc: "A last\n",
+			wantSkips: []skip{
+				{key: fkey("A"), reason: reasonTwice}, {key: fkey("A"), reason: reasonTwice},
+			},
+		},
+		{
 			name:   "only the changed declaration of a file is reported",
 			oldSrc: "A one\nB two\n", newSrc: "A one\nB three\n", finalSrc: "A one\nB three\n",
 			want: []entry{{
@@ -110,6 +163,38 @@ func TestDeltaChangedDeclarations(t *testing.T) {
 			oldSrc:  "A one\n", newSrc: "A uno\n", finalSrc: "A last\n",
 			want: []entry{{
 				key: fkey("A"), preimage: "A one", span: entities.Span{End: 6},
+			}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			runDelta(t, testCase)
+		})
+	}
+}
+
+func TestDeltaImports(t *testing.T) {
+	t.Parallel()
+
+	testCases := []deltaCase{
+		{
+			name:      "the imports a pre-image uses come from the parent file",
+			oldSrc:    "import bytes\nimport os\nA uses bytes\n",
+			newSrc:    "A uno\n",
+			finalSrc:  "A last\n",
+			importing: true,
+			want: []entry{{
+				key: fkey("A"), preimage: "A uses bytes", span: entities.Span{End: 6},
+				imports: []string{"bytes"},
+			}},
+		},
+		{
+			name:   "a parser that reads no imports carries none",
+			oldSrc: "import bytes\nA uses bytes\n", newSrc: "A uno\n", finalSrc: "A last\n",
+			want: []entry{{
+				key: fkey("A"), preimage: "A uses bytes", span: entities.Span{End: 6},
 			}},
 		},
 	}
@@ -148,6 +233,15 @@ func TestDeltaFinalKeys(t *testing.T) {
 			oldSrc: "A one\n", newSrc: "A uno\n", finalPath: "z.go", finalSrc: "A last\n",
 			renames: moved,
 			want:    []entry{{key: target, preimage: "A one", span: entities.Span{End: 6}}},
+		},
+		{
+			name:   "a moved declaration keeps the imports of the file it was in at the parent",
+			oldSrc: "import bytes\nA uses bytes\n", newSrc: "import bytes\nA uno\n",
+			finalPath: "z.go", finalSrc: "A last\n", renames: moved, importing: true,
+			want: []entry{{
+				key: target, preimage: "A uses bytes", span: entities.Span{End: 6},
+				imports: []string{"bytes"},
+			}},
 		},
 		{
 			name:   "a function the final tree cuts into statements",

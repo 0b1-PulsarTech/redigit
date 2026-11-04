@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -19,6 +17,8 @@ type (
 	changed struct {
 		atAnchor entities.DeclKey
 		preimage string
+		isTwice  bool
+		imports  []string
 	}
 
 	sliceKey struct{ file, name string }
@@ -55,20 +55,31 @@ func (planner Planner) changedDecls(
 		before[declName{string(decl.Key.Kind), decl.Key.Name}] = textOf(oldSrc, decl)
 	}
 
+	twice := repeated(oldDecls, newDecls)
+
 	var (
 		out  []changed
 		born []entities.DeclKey
 	)
 
 	for _, decl := range newDecls {
-		old, isKnown := before[declName{string(decl.Key.Kind), decl.Key.Name}]
+		name := declName{string(decl.Key.Kind), decl.Key.Name}
+
+		if twice[name] {
+			out = append(out, changed{atAnchor: decl.Key, isTwice: true})
+
+			continue
+		}
+
+		old, isKnown := before[name]
 		if !isKnown {
 			born = append(born, decl.Key)
 		}
 
 		// Moved whitespace renders to the same file, so it would make an empty commit.
 		if isKnown && squeezed(old) != squeezed(textOf(newSrc, decl)) {
-			out = append(out, changed{atAnchor: decl.Key, preimage: old})
+			imports := importsOf(parser, oldSrc, old)
+			out = append(out, changed{atAnchor: decl.Key, preimage: old, imports: imports})
 		}
 	}
 
@@ -95,18 +106,6 @@ func (planner Planner) parsed(
 
 func textOf(src []byte, decl entities.Decl) string {
 	return string(src[decl.Span.Start:decl.Span.End])
-}
-
-func (planner Planner) languageFor(path string) (lineage.Language, bool) {
-	for _, language := range planner.cfg.Languages {
-		for _, ext := range language.Extensions {
-			if strings.HasSuffix(path, ext) {
-				return language, true
-			}
-		}
-	}
-
-	return lineage.Language{}, false
 }
 
 func slicedFuncs(graph entities.Graph) map[sliceKey]bool {
@@ -157,22 +156,22 @@ func (view scene) readsAfter(
 			continue
 		}
 
-		if !slices.Contains(
-			[]entities.DeclKind{entities.KindFunc, entities.KindType, entities.KindValue},
-			decl.Key.Kind,
-		) {
-			continue
-		}
-
-		name := decl.Key.Name
-		if decl.Unit != home.Unit {
-			name = path.Base(decl.Unit.Dir()) + "." + name
-		}
-
-		if wordIn(placed.preimage, decl.Key.Name) && view.reads(placed, name) {
+		if view.touches(placed, home, decl) {
 			return decl.Key.String()
 		}
 	}
 
 	return ""
+}
+
+func placedSkips(skips []skip, placed map[entities.DeclKey]bool) int {
+	count := 0
+
+	for _, one := range skips {
+		if placed[one.key] {
+			count++
+		}
+	}
+
+	return count
 }

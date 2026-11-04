@@ -102,6 +102,8 @@ func TestPlanSlotsAfterRemovedCommits(t *testing.T) {
 	}
 	keep := []entities.DeclKey{fkey("A"), fkey("B"), fkey("H")}
 	again := Edit{File: "a.go", Span: entities.Span{End: 6}, Text: "A one", Keep: keep}
+	oldA := Edit{File: "a.go", Span: entities.Span{Start: 0, End: 6}, Text: "A old", Keep: keep}
+	oldB := Edit{File: "a.go", Span: entities.Span{Start: 7, End: 14}, Text: "B old", Keep: keep}
 
 	testCases := []planCase{
 		{
@@ -116,22 +118,7 @@ func TestPlanSlotsAfterRemovedCommits(t *testing.T) {
 				fkey("A"): {{Text: "A old", Until: 1}},
 				fkey("B"): {{Text: "B old", Until: 3}},
 			},
-			wantEdits: [][]Edit{
-				{{
-					File: "a.go", Span: entities.Span{Start: 7, End: 14}, Text: "B old",
-					Keep: keep,
-				}},
-				{
-					{
-						File: "a.go", Span: entities.Span{Start: 0, End: 6}, Text: "A old",
-						Keep: keep,
-					},
-					{
-						File: "a.go", Span: entities.Span{Start: 7, End: 14}, Text: "B old",
-						Keep: keep,
-					},
-				},
-			},
+			wantEdits: [][]Edit{{oldB}, {oldA, oldB}, {oldA}},
 		},
 		{
 			name:    "an anchor whose rewrite cancels against the next one is dropped",

@@ -1,11 +1,10 @@
 package anchoring
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
@@ -105,31 +104,10 @@ func withdraw(
 			slices.Clone(commits[idx].Decls),
 			func(key entities.DeclKey) bool { return moved[key] },
 		)
-		commits[idx].Subject = redraft(commits[idx].Subject, commits[idx].Decls)
+		commits[idx].Subject = entities.Redraft(commits[idx].Subject, commits[idx].Decls)
 	}
 
 	return commits
-}
-
-func redraft(subject string, keys []entities.DeclKey) string {
-	const shown = 3
-
-	head, _, isCut := strings.Cut(subject, "): ")
-	if !entities.IsDraft(subject) || !isCut || len(keys) == 0 {
-		return subject
-	}
-
-	names := make([]string, 0, shown)
-	for _, key := range keys[:min(shown, len(keys))] {
-		names = append(names, key.Name)
-	}
-
-	text := strings.Join(names, ", ")
-	if len(keys) > shown {
-		text = fmt.Sprintf("%s and %d more", text, len(keys)-shown)
-	}
-
-	return head + "): " + text
 }
 
 func (planner Planner) adoptAll(
@@ -153,10 +131,12 @@ func (planner Planner) adoptAll(
 }
 
 func (planner Planner) misfit(
+	ctx context.Context,
 	plan entities.Plan,
 	graph entities.Graph,
 	chosen []kept,
-) (rev, reason string) {
+	judge judgement,
+) (rev, reason string, err error) {
 	commits, slots := planner.place(slices.Clone(plan.Commits), chosen)
 	commits, _ = planner.adoptAll(commits, graph, chosen, slots)
 	index := indexOf(commits)
@@ -170,10 +150,31 @@ func (planner Planner) misfit(
 
 			hit := view.readsAfter(placed, index, nil, activation)
 			if hit != "" && chosen[idx].outcome == outcomeKept {
-				return chosen[idx].anchor.Rev, "its pre-image reads " + hit + ", born after it"
+				return chosen[idx].anchor.Rev, "its pre-image may read " + hit + ", born after it", nil
 			}
 		}
 	}
 
-	return "", ""
+	keep := keysByFile(graph)
+
+	// The emitter writes a commit from the declarations born by then, so the probe builds the
+	// state just before the slot; a method born after its caller is the read check's. Newest
+	// first: the anchor whose pre-image breaks the window falls, and an older one is judged again.
+	for idx, one := range slices.Backward(chosen) {
+		window := bornBefore(one, index, slots[idx])
+		if one.trial == nil || len(window) == len(one.trial) {
+			continue
+		}
+
+		verdict, probeErr := planner.verdictOf(ctx, one.found, editsOf(window, keep), judge)
+		if probeErr != nil {
+			return "", "", probeErr
+		}
+
+		if !verdict.IsBuilt && !verdict.IsUnchecked {
+			return one.anchor.Rev, verdict.Detail, nil
+		}
+	}
+
+	return "", "", nil
 }

@@ -35,9 +35,12 @@ func (*Probe) Reads(file, text string) ([]string, bool) {
 				names[key.Name] = true
 			}
 		case *ast.SelectorExpr:
-			// A selector on a resolved local names a field, so only a free qualifier reads Sel.
+			// A free qualifier may be a package, so it keeps its name; any other receiver is a value
+			// whose field or method Sel is named, so it is kept as .Sel.
 			if qualifier, isIdent := typed.X.(*ast.Ident); isIdent && free[qualifier] {
 				names[qualifier.Name+"."+typed.Sel.Name] = true
+			} else {
+				names["."+typed.Sel.Name] = true
 			}
 		}
 
