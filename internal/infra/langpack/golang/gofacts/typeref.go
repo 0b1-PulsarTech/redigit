@@ -28,7 +28,7 @@ func (scope refs) declOf(name *types.TypeName) entities.DeclKey {
 		return entities.DeclKey{}
 	}
 
-	key, _ := scope.where.DeclAt(scope.fset, name.Pos())
+	key, _ := scope.where.ObjectAt(scope.fset, name)
 
 	return key
 }

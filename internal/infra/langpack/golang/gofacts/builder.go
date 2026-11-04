@@ -40,7 +40,7 @@ func (builder *Builder) Index(
 		return known, nil
 	}
 
-	where := typed.NewPositions(snap.Root, typed.NewDeclLocator(decls))
+	where := typed.NewPositions(snap.Root, typed.NewDeclLocator(decls)).Parsing(pkgs)
 	index := &Index{
 		calls: map[entities.DeclKey][]facts.Call{},
 		ctors: map[entities.DeclKey][]facts.TypeRef{},

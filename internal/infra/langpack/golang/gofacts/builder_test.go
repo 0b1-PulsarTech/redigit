@@ -317,3 +317,75 @@ func TestBuilderIndexLoadFailure(t *testing.T) {
 		t.Fatal("Index() after Close error = nil, want the load failure")
 	}
 }
+
+func TestIndexNamesAnExportDataDeclByItsKey(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		dir  string
+	}{
+		{name: "a package under testdata", dir: "testdata/lib"},
+		{name: "a package under a dir the go tool skips", dir: "_dir/lib"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			file := testCase.dir + "/lib.go"
+			fix := indexOf(t, map[string]string{
+				file: "package lib\n\nfunc Big() {\n" + strings.Repeat("\n", 15) + "}\n\n" +
+					"func Small() {}\n\ntype Value struct{}\n\nfunc (Value) Method() {}\n",
+				"use/use.go": "package use\n\nimport \"" + module + "/" + testCase.dir +
+					"\"\n\nfunc Use() {\n\tlib.Small()\n\tlib.Value{}.Method()\n}\n",
+			})
+
+			var got []entities.DeclKey
+
+			for _, call := range fix.index.Calls(funcKey("use/use.go", "Use")) {
+				got = append(got, call.CalleeKey, call.Receiver.Key)
+			}
+
+			want := []entities.DeclKey{
+				funcKey(file, "Small"),
+				{},
+				testkit.DeclKey(file, entities.KindMethod, "Value.Method"),
+				testkit.DeclKey(file, entities.KindType, "Value"),
+			}
+
+			if !slices.Equal(got, want) {
+				t.Fatalf("callee and receiver keys = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestIndexKeysACalleeOfAParsedFileByItsPosition(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		repeats int
+	}{
+		{name: "a tree that lists each decl once", repeats: 1},
+		{name: "a tree that lists each decl twice", repeats: 2},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			fix := indexOf(t, map[string]string{
+				"a.go": "package fixture\n\nfunc Plain() {}\n\nfunc Use() {\n\tPlain()\n}\n",
+			})
+
+			listed := slices.Repeat(fix.decls, testCase.repeats)
+			calls := indexFor(t, fix.snap, listed).Calls(funcKey("a.go", "Use"))
+
+			if len(calls) != 1 || calls[0].CalleeKey != funcKey("a.go", "Plain") {
+				t.Fatalf("Calls(Use) = %+v, want one call keyed to Plain", calls)
+			}
+		})
+	}
+}

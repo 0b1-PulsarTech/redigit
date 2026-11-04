@@ -143,7 +143,7 @@ func (scan walker) funcKey(fn *types.Func) entities.DeclKey {
 		return entities.DeclKey{}
 	}
 
-	key, _ := scan.refs.where.DeclAt(scan.refs.fset, fn.Pos())
+	key, _ := scan.refs.where.ObjectAt(scan.refs.fset, fn)
 	if key.Kind != entities.KindFunc && key.Kind != entities.KindMethod {
 		return entities.DeclKey{}
 	}
