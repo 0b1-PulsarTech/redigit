@@ -79,9 +79,11 @@ func GoDefault(tags []string) Language {
 	}
 
 	// A module holding only go.mod (a tools module) has nothing to vet, and vet exits 1 for it.
+	// A module whose sole package is package main with only _test.go files makes go build ./...
+	// exit 1 with this line (go1.27.3 does), while go vet still compiles those tests.
 	return Language{
 		Steps: []Step{
-			step("build"),
+			step("build", "no packages to build"),
 			step("vet", "no packages to vet", `go: warning: "./..." matched no packages`),
 		},
 		Version: []string{"go", "version"},

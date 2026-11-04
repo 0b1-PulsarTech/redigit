@@ -359,3 +359,66 @@ func TestCheckRootsTheGoCacheAtTheAbsoluteCacheDir(t *testing.T) {
 		}
 	}
 }
+
+func TestGoDefaultToleratesOnlyWhatBuiltNothing(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		step   int
+		code   int
+		output string
+		want   bool
+	}{
+		{
+			name:   "a build of a sole test-only package main passes",
+			step:   0,
+			code:   1,
+			output: "no packages to build\n",
+			want:   true,
+		},
+		{
+			name:   "a compile error beside it still fails",
+			step:   0,
+			code:   1,
+			output: "no packages to build\n./a.go:3:1: undefined: x\n",
+		},
+		{
+			name:   "a compile error alone still fails",
+			step:   0,
+			code:   1,
+			output: "./a.go:3:1: undefined: x\n",
+		},
+		{
+			name:   "another exit code still fails",
+			step:   0,
+			code:   2,
+			output: "no packages to build\n",
+		},
+		{
+			name:   "a vet of a module with no package passes",
+			step:   1,
+			code:   1,
+			output: "no packages to vet\n",
+			want:   true,
+		},
+		{
+			name:   "vet does not tolerate the build text",
+			step:   1,
+			code:   1,
+			output: "no packages to build\n",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			tolerated := GoDefault(nil).Steps[testCase.step].Tolerate
+			if got := isTolerated(testCase.code, testCase.output, tolerated); got != testCase.want {
+				t.Fatalf("isTolerated(%d, %q) = %v, want %v",
+					testCase.code, testCase.output, got, testCase.want)
+			}
+		})
+	}
+}
