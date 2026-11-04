@@ -2,13 +2,13 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/manifest"
 )
 
 // sinkAdapter carries a blob store behind the emitter's Sink, which knows only
@@ -31,38 +31,6 @@ func (s sinkAdapter) Write(
 	}
 
 	return emitting.Handle(handle), nil
-}
-
-type chunkDTO struct {
-	Key  string `json:"key"`
-	Span [2]int `json:"span"`
-	Unit string `json:"unit"`
-}
-
-type blobDTO struct {
-	Path   string `json:"path"`
-	Mode   string `json:"mode"`
-	Handle string `json:"handle"`
-}
-
-type riskDTO struct {
-	Chunk  string `json:"chunk"`
-	Target string `json:"target"`
-	BornAt int    `json:"born_at"`
-}
-
-// commitDTO is one line of the manifest. Every list is present even when
-// empty, so a consumer never has to tell null from absent.
-type manifestDTO struct {
-	Position int        `json:"position"`
-	Subject  string     `json:"subject"`
-	Shape    string     `json:"shape"`
-	Feature  string     `json:"feature,omitempty"`
-	Reason   string     `json:"reason,omitempty"`
-	IsWIP    bool       `json:"is_wip"`
-	Chunks   []chunkDTO `json:"chunks"`
-	Blobs    []blobDTO  `json:"blobs"`
-	Risks    []riskDTO  `json:"risks"`
 }
 
 func runEmit(ctx context.Context, cfg bootstrap.Config, start starter, out io.Writer) error {
@@ -90,46 +58,43 @@ func runEmit(ctx context.Context, cfg bootstrap.Config, start starter, out io.Wr
 }
 
 func writeManifest(out io.Writer, commits []emitting.Commit) error {
-	encoder := json.NewEncoder(out)
-
+	rows := make([]manifest.Row, 0, len(commits))
 	for _, commit := range commits {
-		if err := encoder.Encode(toCommitDTO(commit)); err != nil {
-			return fmt.Errorf("write manifest line: %w", err)
-		}
+		rows = append(rows, toRow(commit))
 	}
 
-	return nil
+	return manifest.Encode(out, rows) //nolint:wrapcheck // Encode names its own failures
 }
 
-func toCommitDTO(commit emitting.Commit) manifestDTO {
-	chunks := make([]chunkDTO, 0, len(commit.Chunks))
+func toRow(commit emitting.Commit) manifest.Row {
+	chunks := make([]manifest.Chunk, 0, len(commit.Chunks))
 	for _, chunk := range commit.Chunks {
-		chunks = append(chunks, chunkDTO{
+		chunks = append(chunks, manifest.Chunk{
 			Key:  chunk.Key.String(),
 			Span: [2]int{chunk.Span.Start, chunk.Span.End},
 			Unit: string(chunk.Unit),
 		})
 	}
 
-	blobs := make([]blobDTO, 0, len(commit.Blobs))
+	blobs := make([]manifest.Blob, 0, len(commit.Blobs))
 	for _, blob := range commit.Blobs {
-		blobs = append(blobs, blobDTO{
+		blobs = append(blobs, manifest.Blob{
 			Path:   blob.Path,
 			Mode:   string(blob.Mode),
 			Handle: string(blob.Handle),
 		})
 	}
 
-	risks := make([]riskDTO, 0, len(commit.Risks))
+	risks := make([]manifest.Risk, 0, len(commit.Risks))
 	for _, risk := range commit.Risks {
-		risks = append(risks, riskDTO{
+		risks = append(risks, manifest.Risk{
 			Chunk:  risk.Chunk.String(),
 			Target: risk.Target.String(),
 			BornAt: int(risk.BornAt),
 		})
 	}
 
-	return manifestDTO{
+	return manifest.Row{
 		Position: int(commit.Position),
 		Subject:  commit.Subject,
 		Shape:    string(commit.Shape),
