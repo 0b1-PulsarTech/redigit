@@ -14,6 +14,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/web"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 // renderer is what byExtension dispatches to: the same Render the indexing
@@ -119,12 +120,13 @@ func specificLanguages(
 	configSyntax config.Syntax,
 	tree finalTree,
 	source *typed.Source,
+	slice sliceconf.Config,
 ) []indexing.Language {
 	return []indexing.Language{
 		{
 			Name:       goLanguage,
 			Extensions: []string{".go"},
-			Syntax:     golang.NewSyntax(),
+			Syntax:     golang.NewSyntaxWith(slice),
 			Rules:      golang.NewRulePackWith(source),
 			Resolved:   true,
 		},
@@ -161,4 +163,13 @@ func opaqueLanguage(configSyntax config.Syntax) indexing.Language {
 		Extensions: []string{indexing.AnyExtension},
 		Syntax:     configSyntax,
 	}
+}
+
+func decodeSlice(cfg Config) (sliceconf.Config, error) {
+	section, err := sliceconf.Decode(cfg.Sections.Slice)
+	if err != nil {
+		return sliceconf.Config{}, fileError(cfg.ConfigPath, err)
+	}
+
+	return section, nil
 }

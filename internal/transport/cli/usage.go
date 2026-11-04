@@ -45,15 +45,37 @@ Flags:
                 Every command now names those files on stderr, and audit lists
                 them under "unseen", so the choice is at least reported.
   --config FILE a redigit.json: per-language tags and virtual modules, plus
-                rules. A flag replaces the file's whole setting for it (a
-                --virtual drops every virtual module the file lists), and a
-                file that names an unknown rule type or a glob matching
-                nothing in the tree is refused before the language server
-                starts.
+                rules and a slice section. A flag replaces the file's whole
+                setting for it (a --virtual drops every virtual module the
+                file lists). A file that names an unknown rule type, a file
+                glob matching nothing in the tree, or a slice section it
+                cannot read is refused before the language server starts; a
+                declaration glob matching nothing (a pin target, a
+                slice.functions glob) fails after indexing.
 
                   {"languages": {
                     "go":  {"tags": ["integration"]},
                     "web": {"virtual": {"virtual:x": "web/x.dart"}}}}
+
+                The slice section cuts a function into the statements it is
+                made of, each born with what it reads. Go only.
+
+                  {"slice": {"functions": ["Mount*", "Server.Run"],
+                             "errcheck": true}}
+
+                "functions" are globs on declaration names. A method is
+                spelled Type.Method: Run matches the function Run and *.Run
+                the methods, and a bare name matches in every package and
+                module. Generated and test-side functions are never cut, and a
+                function the slicer cannot cut safely (a label or goto, an
+                early return, a body of one statement, a name that occurs
+                twice in its file such as init) is left whole. A glob that
+                cuts nothing fails the run after indexing, rc 1, naming the
+                glob. "errcheck" is off by default; on, an "err = ..." is born
+                with the next statement that reads err. An unknown key, a null
+                section or a bad glob is refused with rc 2 before anything
+                starts. verify checks compile and vet, not runtime, and a cut
+                is not proven safe in general: docs/PLANO.md, section 3.11.
   --resolver R  how reference queries are answered: typed (default) answers
                 from the type-check the rules already ran and starts the
                 language server only for a query it cannot cover; lsp starts

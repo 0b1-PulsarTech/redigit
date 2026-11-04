@@ -528,6 +528,18 @@ Tres casos acrescentam aresta errada ou deixam a rota certa sem aresta, sem avis
 - O primeiro literal de texto que comeca com `/` passado a uma chamada de montagem e tomado como prefixo, mesmo quando nao e: `reg.Mount(mux, "/etc/conf")` gera `/etc/conf/reg`, que ganha arestas, e a rota realmente servida, `/reg`, fica sem aresta e entra na lista do aviso.
 - Le-se so um nivel de `Route` aninhado: `Route("/n1", Route("/n2", GET("/deep")))` gera `/n2/deep`, que ganha aresta, e o caminho real `/n1/n2/deep` fica sem aresta e entra na lista.
 
+### 3.11 Slice: cortar uma funcao nas instrucoes que a formam
+
+A secao `slice` da config (`{"slice": {"functions": [...], "errcheck": bool}}`) e opcional e so vale para Go. Sem ela a saida e identica byte a byte a de antes: nos alvos medidos o grafo e o plano (T, 80 commits; amigonimo, 117) saem iguais aos da base. O que a secao faz e o que ela nao garante:
+
+- `functions` sao globs sobre nomes de declaracao. Um metodo se escreve `Tipo.Metodo`: `Run` casa a funcao `Run` e `*.Run` os metodos; um nome sem tipo casa em todo pacote e modulo. Funcao gerada ou de teste nunca e cortada.
+- Uma funcao que nao se corta com seguranca fica inteira: rotulo ou goto, return antecipado, corpo de uma instrucao, nome que ocorre duas vezes no arquivo (`init`). Um glob cujas casas ficaram todas inteiras falha a execucao depois da indexacao (rc=1), com o glob no texto: o usuario e avisado de que o pedido nao fez nada. Chave desconhecida, secao `null` ou glob invalido e recusado antes de tudo, com rc=2.
+- `errcheck` (desligado por padrao) junta `err = ...` com a proxima instrucao que le `err`, so no nivel de cima do corpo. Um `err` que e resultado nomeado ou parametro nao e juntado, e `x, err :=` tambem nao.
+- `verify` confere compilacao e vet, nao execucao. Um corte pode deixar `s.mu.Lock()` numa linha e `defer s.mu.Unlock()` em outra mais tarde.
+- Um corte expoe arestas que o grafo ja tinha perdido. No amigonimo com `*`, `undefined: mustHexIDFromBytes` aparece: o grafo sem secao nao tem aresta para esse provedor, e funcao e leitor so nasciam juntos por acaso. Aparecem tambem `undefined: DrawResult`, `Denylist`, `AuthToken` e `WishlistItem`, nao rastreados. A linha fica vermelha sem marca de causa, e por isso a secao e opt-in.
+
+Nao esta provada segura em geral. Medido, com a arvore final igual a original em todos os casos: T sem secao, 81 de 81 (arvore `3757eac`); T com `*`, plano de 95 commits, 96 de 96; amigonimo (`2502d84`, tag `integration`) sem secao 156 passam e 141 falham de 297, com `*` (136 commits) 159 passam e 199 falham de 360 (2 wip), com `*.Create*, New*, Register*` (124 commits) 260 passam e 61 falham de 321. Os fixtures pequenos com tudo selecionado passam, salvo o `sel`, cujo `unreachable code` ja vinha do fonte.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

@@ -2,11 +2,18 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/web"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 // stubRenderer reports which renderer was reached, which is the whole of what
@@ -122,6 +129,105 @@ func TestRenderersByExtensionFallsBackToConfig(t *testing.T) {
 
 			if string(got) != testCase.want {
 				t.Fatalf("reached the %q renderer, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestDecodeSliceReadsTheSectionOrRefusesItNamingTheFile(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		section       string
+		wantFunctions []string
+		wantErr       error
+	}{
+		{name: "no section is the zero config", section: ""},
+		{
+			name:          "a section is decoded",
+			section:       `{"functions":["Run"],"errcheck":true}`,
+			wantFunctions: []string{"Run"},
+		},
+		{
+			name:    "an unknown key is refused as a config error",
+			section: `{"functions":["Run"],"tails":true}`,
+			wantErr: ErrConfig,
+		},
+		{
+			name:    "an invalid section also matches the section's own error",
+			section: `{"functions":[""]}`,
+			wantErr: sliceconf.ErrInvalid,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := Config{ConfigPath: "redigit.json"}
+			cfg.Sections.Slice = json.RawMessage(testCase.section)
+
+			got, err := decodeSlice(cfg)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("decodeSlice() error = %v, want %v", err, testCase.wantErr)
+			}
+
+			if err != nil && !strings.Contains(err.Error(), "redigit.json") {
+				t.Fatalf("decodeSlice() error = %q, want the config path named", err)
+			}
+
+			if !slices.Equal(got.Functions, testCase.wantFunctions) {
+				t.Fatalf("decodeSlice() = %v, want %v", got.Functions, testCase.wantFunctions)
+			}
+		})
+	}
+}
+
+func TestSpecificLanguagesGivesOnlyTheGoPackTheSliceSection(t *testing.T) {
+	t.Parallel()
+
+	slice := sliceconf.Config{Functions: []string{"Run"}}
+	languages := specificLanguages(config.Syntax{}, finalTree{}, typed.NewSource(nil), slice)
+
+	for _, language := range languages {
+		selector, isSelector := language.Syntax.(indexing.Selector)
+		if isSelector != (language.Name == goLanguage) {
+			t.Fatalf("%q selector = %v, want only %q", language.Name, isSelector, goLanguage)
+		}
+
+		if isSelector && !slices.Equal(selector.Functions(), slice.Functions) {
+			t.Fatalf("Functions() = %v, want %v", selector.Functions(), slice.Functions)
+		}
+	}
+}
+
+func TestStartRefusesABadSliceSectionBeforeOpeningTheRepository(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		section string
+	}{
+		{name: "an unknown key", section: `{"functions":["Run"],"tails":true}`},
+		{name: "a null section", section: `null`},
+		{name: "a bad glob", section: `{"functions":[""]}`},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := Config{Repo: t.TempDir() + "/absent", ConfigPath: "redigit.json"}
+			cfg.Sections.Slice = json.RawMessage(testCase.section)
+
+			pipe, err := start(context.Background(), cfg, nil)
+			if !errors.Is(err, sliceconf.ErrInvalid) || !errors.Is(err, ErrConfig) {
+				t.Fatalf("start() error = %v, want the section's error and ErrConfig", err)
+			}
+
+			if pipe != nil {
+				t.Fatalf("start() = %v, want no pipeline", pipe)
 			}
 		})
 	}

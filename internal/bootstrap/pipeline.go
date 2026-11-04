@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -101,9 +100,9 @@ func Start(ctx context.Context, cfg Config) (*Pipeline, error) {
 }
 
 func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error) {
-	root, err := filepath.Abs(cfg.Repo)
+	root, slice, err := startInputs(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("resolve repository path: %w", err)
+		return nil, err
 	}
 
 	opened, err := openRevision(ctx, root, cfg)
@@ -124,7 +123,7 @@ func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error
 
 	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
 	tree := finalTree{snapshot.Files, reader, cfg.Virtual}
-	specific := specificLanguages(configSyntax, tree, goSource)
+	specific := specificLanguages(configSyntax, tree, goSource, slice)
 
 	env := stageEnv{root: root, opened: opened, specific: specific, goSource: goSource, tree: tree}
 

@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/shaping"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/shaping/passes"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 type (
@@ -109,6 +111,17 @@ func (observer slogObserver) Refused(pass string, added []entities.Edge) {
 		slog.Int("added", len(added)),
 		slog.Any("edges", edges),
 	)
+}
+
+func startInputs(cfg Config) (string, sliceconf.Config, error) {
+	root, err := filepath.Abs(cfg.Repo)
+	if err != nil {
+		return "", sliceconf.Config{}, fmt.Errorf("resolve repository path: %w", err)
+	}
+
+	slice, err := decodeSlice(cfg)
+
+	return root, slice, err
 }
 
 func stageHooks() []namedHook {

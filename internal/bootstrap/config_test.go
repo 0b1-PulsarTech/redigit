@@ -11,6 +11,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 // TestDefaults pins the values a run starts from before flags narrow it. The
@@ -101,7 +102,9 @@ func TestSettingsMatchThePacks(t *testing.T) {
 	packsWithoutSettings := []string{dartLanguage, configLanguage}
 
 	packs := make([]string, 0, 4)
-	for _, lang := range specificLanguages(config.Syntax{}, finalTree{}, typed.NewSource(nil)) {
+	goSource := typed.NewSource(nil)
+
+	for _, lang := range specificLanguages(config.Syntax{}, finalTree{}, goSource, sliceconf.Config{}) {
 		packs = append(packs, lang.Name)
 	}
 

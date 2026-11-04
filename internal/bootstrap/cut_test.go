@@ -9,6 +9,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/chunk"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
+	"github.com/wrapped-owls/redigit/internal/infra/sliceconf"
 )
 
 func TestChunkersPrependsTheMapApplierWhenGiven(t *testing.T) {
@@ -95,7 +96,10 @@ func TestValidateChunkMap(t *testing.T) {
 	t.Parallel()
 
 	specific := specificLanguages(
-		config.NewSyntax(configChunkers(nil)), finalTree{}, typed.NewSource(nil),
+		config.NewSyntax(configChunkers(nil)),
+		finalTree{},
+		typed.NewSource(nil),
+		sliceconf.Config{},
 	)
 	snap := entities.Snapshot{Files: []string{"main.go", "go.mod", "engines/wwebjs/src/main.tmpl"}}
 
