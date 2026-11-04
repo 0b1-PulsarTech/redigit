@@ -1,0 +1,1 @@
+{"rules":[{"type":"go-router","handle":["*.GET"],"mount":["example.com/atk/users.Mount"]},{"type":"go-router","handle":["*.GET"],"mount":["example.com/atk/orders.Mount"]},{"type":"go-router","handle":["*.GET"],"mount":["example.com/atk/billing.Mount"]}],"write":{"identity":{"name":"proof","email":"proof@localhost"},"dateRef":"HEAD"}}

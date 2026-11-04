@@ -1,0 +1,1 @@
+{"rules":[{"type":"go-router","handle":["*.GET","*.POST"],"mount":["Mount*","*.Mount","*.Route"],"groupMethods":true}],"write":{"identity":{"name":"proof","email":"proof@localhost"},"dateRef":"HEAD"}}
