@@ -510,6 +510,24 @@ A regra `pin` (config `{decl, after}`, cada alvo `arquivo:tipo:nome` com globs p
 
 Um pin que fecha um ciclo entre arquivos nao e desfeito nem recusado: `graph`, `plan`, `audit` e `emit` seguem adiante com um WARN ("the ordering settled with complaints ... ordering holds 1 cycle(s) across files, of 1"), `report` nao imprime aviso, e todos os comandos (`graph`, `plan`, `audit`, `report`, `emit`, `write`, `verify`) terminam com rc=0. A aresta com a razao `pin` aparece em `graph` e em `report`; o ciclo nomeado, com membros e razoes, so no `audit`.
 
+### 3.10 Go-e2e: o teste HTTP espera a rota que chama
+
+A regra `go-e2e` (config `{router, dirs, requests?}`, `router` com as mesmas chaves da `go-router`) acrescenta uma aresta `e2e` de um teste para a rota cuja URL ele chama. Ela le, em cada declaracao de teste (funcao, metodo ou instrucao) sob `dirs`, o literal de texto passado a uma chamada que pode ser uma requisicao: `/caminho` ou `METODO /caminho`, com `?` e `#` cortados. A rota vem da visao `Routes` da `go-router`, e a aresta aponta para a instrucao (ou funcao) que a registra e para cada instrucao ou funcao que a monta, subindo por todos os chamadores, em todos os niveis, com guarda de ciclo. O prefixo e o argumento constante `/...` da chamada de montagem (somado ao da chamada de montagem em cujo literal de funcao ela esta, se houver) em cada nivel. Uma rota de caminho literal vence uma de parametro (`/items/me` casa so a literal quando as duas existem), e uma chamada de rota sem palavra de metodo (`HandleFunc`) responde a qualquer metodo.
+
+A razao `e2e` e mole: `birth.IsSoft` a conta, entao um ciclo que passa por ela e desfeito em vez de tratado como duro, mas em um caso simples o teste continua nascendo depois da rota (a espera e a mesma). Ela tambem nao faz de uma rota lida so por testes HTTP codigo de apoio de teste: `testplace.TestSupport` a ignora, e a feature da rota nao se funde em outro commit.
+
+Sem `requests`, toda chamada conta, menos as de `testing`, `os`, `path`, `path/filepath`, `log`, `log/slog`, `fmt` e `strings`, e menos as que casam o `handle` ou o `mount` do proprio router (um servidor que o teste monta nao e requisicao). `requests` (lista de globs como os do router) estreita isso para so as chamadas listadas. `dirs` sao diretorios (`test/`); um glob e recusado ao carregar a regra.
+
+Um resumo de uma linha, na primeira passada do indexador e nao a cada passada, e registrado em INFO (`internal/infra/langpack/idiom/e2e/report.go`). `cmd/redigit/main.go` fixa o nivel em WARN e nao ha flag para mudar isso, entao a linha so aparece quando a execucao achou declaracoes de teste e zero arestas; com uma aresta ou mais ela nao e impressa. Os numeros da linha sao os da primeira passada: nos fixtures da revisao o total de arestas impresso fica uma abaixo do grafo final (16 contra 17, 24 contra 25). No amigonimo (`2502d84`) ela saiu assim: `go-e2e: 32 test declarations in dirs, 32 without call facts (nested module?), 15 routes, 0 edges, 0 urls with no known route path`. Um segundo aviso, tambem uma vez, lista as URLs sem caminho de rota conhecido; ele e WARN e sempre sai quando a lista nao esta vazia; ele nunca diz que uma URL nao e servida. Um literal que comeca com `/` mas tem espaco ou quebra de linha nao e URL e nao entra na lista.
+
+O que a regra nao ve: uma URL montada por um auxiliar, um campo de tabela, um `http://host/...` completo, um prefixo que nao e constante no ponto da chamada (o `GroupName()` do amigonimo), a variavel de um grupo aberto por atribuicao, e um teste em modulo aninhado sem fatos de chamada (a linha acima o conta como `without call facts`). Em modulo aninhado, hoje, quem funciona e a ancora de `tests/routepath.go`, que le o texto do teste e nao os fatos de chamada.
+
+Tres casos acrescentam aresta errada ou deixam a rota certa sem aresta, sem aviso proprio:
+
+- Um caminho nu `/x` num teste casa toda rota de grupo que termina em `/x`: no fixture da revisao `TestGroupBare` (`get("/x")`) ganha arestas para `Routes#6` e `Routes#8`, as duas rotas de grupo.
+- O primeiro literal de texto que comeca com `/` passado a uma chamada de montagem e tomado como prefixo, mesmo quando nao e: `reg.Mount(mux, "/etc/conf")` gera `/etc/conf/reg`, que ganha arestas, e a rota realmente servida, `/reg`, fica sem aresta e entra na lista do aviso.
+- Le-se so um nivel de `Route` aninhado: `Route("/n1", Route("/n2", GET("/deep")))` gera `/n2/deep`, que ganha aresta, e o caminho real `/n1/n2/deep` fica sem aresta e entra na lista.
+
 ## 4. As duas entradas
 
 `base` deixa de ser a espinha dorsal e passa a ser evidencia opcional.

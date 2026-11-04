@@ -10,6 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/gofacts"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/di"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/e2e"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/router"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/pinrule"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
@@ -68,6 +69,7 @@ func ruleConstructors() map[string]rules.Constructor {
 	// Each idiom pack registers its own constructor here.
 	return map[string]rules.Constructor{
 		"go-di":     di.Constructor("go-di", slog.Default()),
+		"go-e2e":    e2e.Constructor("go-e2e", slog.Default()),
 		"go-router": router.Constructor("go-router"),
 		"pin":       pinrule.Constructor("pin"),
 	}

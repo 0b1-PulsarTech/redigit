@@ -11,6 +11,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/di"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/e2e"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/router"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/pinrule"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
@@ -19,6 +20,7 @@ import (
 const (
 	goDIRule     = `{"type":"go-di","registerFuncs":["Register*"],"resolveFuncs":["Get"]}`
 	goRouterRule = `{"type":"go-router","handle":["*.GET"],"mount":["Mount*"],"groupMethods":true}`
+	goE2ERule    = `{"type":"go-e2e","router":{"handle":["*.GET"]},"dirs":["test/"]}`
 	pinRule      = `{"type":"pin","decl":"a.go:func:A","after":"b.go:func:B"}`
 )
 
@@ -75,6 +77,20 @@ func TestRuleHookWiresGoIdioms(t *testing.T) {
 		{
 			name:          "go-router adds one language and one gate",
 			specs:         []rules.Spec{{Type: "go-router", Raw: []byte(goRouterRule)}},
+			wantLanguages: []string{"kept", "go-idioms"},
+			wantGates:     1,
+		},
+		{
+			name:          "go-e2e adds one language and no gate",
+			specs:         []rules.Spec{{Type: "go-e2e", Raw: []byte(goE2ERule)}},
+			wantLanguages: []string{"kept", "go-idioms"},
+		},
+		{
+			name: "go-e2e beside go-router shares one language",
+			specs: []rules.Spec{
+				{Type: "go-router", Raw: []byte(goRouterRule)},
+				{Type: "go-e2e", Raw: []byte(goE2ERule)},
+			},
 			wantLanguages: []string{"kept", "go-idioms"},
 			wantGates:     1,
 		},
@@ -253,7 +269,7 @@ func TestRuleConstructors(t *testing.T) {
 			name:     "a rule type nobody registered is refused and the known ones listed",
 			specs:    []rules.Spec{{Type: "no-such-rule"}},
 			wantErr:  rules.ErrUnknownType,
-			wantText: "known: go-di, go-router, pin",
+			wantText: "known: go-di, go-e2e, go-router, pin",
 		},
 		{
 			name:    "go-di builds a rule",
@@ -292,8 +308,8 @@ func TestRuleConstructors(t *testing.T) {
 		},
 	}
 
-	if got := len(ruleConstructors()); got != 3 {
-		t.Fatalf("len(ruleConstructors()) = %d, want 3", got)
+	if got := len(ruleConstructors()); got != 4 {
+		t.Fatalf("len(ruleConstructors()) = %d, want 4", got)
 	}
 
 	for _, testCase := range testCases {
@@ -316,6 +332,62 @@ func TestRuleConstructors(t *testing.T) {
 
 			if err == nil && len(built) != testCase.wantLen {
 				t.Fatalf("Build() = %v, want %d rules", built, testCase.wantLen)
+			}
+		})
+	}
+}
+
+func TestRuleConstructorsGoE2E(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		raw      string
+		wantErr  error
+		wantText string
+	}{
+		{name: "go-e2e builds a rule", raw: goE2ERule},
+		{
+			name: "go-e2e takes a requests list",
+			raw:  `{"type":"go-e2e","router":{"handle":["*.GET"]},"dirs":["test/"],"requests":["Get"]}`,
+		},
+		{
+			name:     "go-e2e refuses a dir that is a pattern",
+			raw:      `{"type":"go-e2e","router":{"handle":["*.GET"]},"dirs":["t*/"]}`,
+			wantErr:  e2e.ErrBadDir,
+			wantText: "rules[0] (go-e2e)",
+		},
+		{
+			name:     "go-e2e names the rule it refuses",
+			raw:      `{"type":"go-e2e","router":{"handle":["*.GET"]}}`,
+			wantErr:  e2e.ErrNoDirs,
+			wantText: "rules[0] (go-e2e)",
+		},
+		{
+			name:     "go-e2e refuses a router that handles nothing",
+			raw:      `{"type":"go-e2e","router":{},"dirs":["test/"]}`,
+			wantErr:  router.ErrNoHandle,
+			wantText: "rules[0] (go-e2e)",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			built, err := compiledRegistry().Build([]rules.Spec{
+				{Type: "go-e2e", Raw: []byte(testCase.raw)},
+			})
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("Build() err = %v, want %v", err, testCase.wantErr)
+			}
+
+			if err != nil && !strings.Contains(err.Error(), testCase.wantText) {
+				t.Fatalf("Build() err = %q, want it to say %q", err, testCase.wantText)
+			}
+
+			if err == nil && len(built) != 1 {
+				t.Fatalf("Build() = %v, want 1 rule", built)
 			}
 		})
 	}
