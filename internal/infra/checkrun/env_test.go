@@ -183,7 +183,7 @@ func TestCheckPassesHashedAndUnhashedButNoDroppedVariables(t *testing.T) {
 	useFakeGo(t)
 
 	passed := map[string]string{
-		"REDIGIT_TEST_UNKNOWN": "u", "CPATH": "/inc", "TMPDIR": "/tmp/x",
+		"REDIGIT_TEST_UNKNOWN": "u", "CPATH": "/inc", "TMPDIR": t.TempDir(),
 		"HOME": "/home/x", "LC_TIME": "C", "HTTP_PROXY": "http://p",
 	}
 	dropped := map[string]string{
