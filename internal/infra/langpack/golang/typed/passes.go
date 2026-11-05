@@ -152,6 +152,15 @@ func (source *Source) Packages(
 	return loaded[0], nil
 }
 
+func (source *Source) Hidden(
+	ctx context.Context,
+	snap entities.Snapshot,
+) ([][]*packages.Package, error) {
+	loaded, err := source.load(ctx, snap)
+
+	return loaded[min(1, len(loaded)):], err
+}
+
 func (source *Source) load(
 	ctx context.Context,
 	snap entities.Snapshot,

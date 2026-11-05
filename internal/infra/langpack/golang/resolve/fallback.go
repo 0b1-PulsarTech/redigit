@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"sync/atomic"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -26,6 +27,8 @@ type (
 	}
 
 	adhocReporter interface{ AdhocErr() error }
+
+	hiddenReporter interface{ HiddenLost() int64 }
 
 	Fallback struct {
 		primary   indexing.Resolver
@@ -58,6 +61,17 @@ func (resolver *Typed) AdhocErr() error {
 	}
 
 	return nil
+}
+
+func (resolver *Typed) HiddenLost() int64 { return resolver.hiddenLost.Load() }
+
+func lostRows(groups []index) int64 {
+	lost := map[row]bool{}
+	for _, group := range groups {
+		maps.Copy(lost, group.lost)
+	}
+
+	return int64(len(lost))
 }
 
 func (fallback *Fallback) References(
@@ -128,6 +142,14 @@ func (fallback *Fallback) settlePrimary(ctx context.Context) error {
 				"typed resolver skipped ad hoc files", slog.String("error", failed.Error()),
 			)
 		}
+	}
+
+	if reporting, ok := fallback.primary.(hiddenReporter); ok && reporting.HiddenLost() > 0 {
+		fallback.logger.Warn(
+			"hidden files read packages their pass met only as export data, "+
+				"so any implements edge to those is missing",
+			slog.Int64("count", reporting.HiddenLost()),
+		)
 	}
 
 	return stopErr

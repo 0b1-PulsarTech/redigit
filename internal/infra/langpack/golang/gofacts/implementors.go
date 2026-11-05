@@ -98,7 +98,7 @@ func (impl *implementors) collect() []typeEntry {
 	var entries []typeEntry
 
 	// Only pass-0 packages are walked, by design: a type seen solely under hidden run tags is not
-	// an implementor here.
+	// an implementor here, though the typed resolver's own index does count it.
 	for _, pkg := range impl.pkgs {
 		if pkg.TypesInfo == nil {
 			continue

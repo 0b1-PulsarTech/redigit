@@ -31,8 +31,9 @@ type (
 		source *typed.Source
 		snap   entities.Snapshot
 
-		built    loadonce.Once[[]index]
-		adhocErr atomic.Pointer[error]
+		built      loadonce.Once[[]index]
+		adhocErr   atomic.Pointer[error]
+		hiddenLost atomic.Int64
 	}
 )
 
@@ -138,9 +139,9 @@ func (resolver *Typed) lookup(
 }
 
 func (resolver *Typed) build(ctx context.Context) ([]index, error) {
-	// Each group is indexed on its own: a type from one type-check never satisfies an interface
-	// of another, so an interface another group could meet is refused, not answered; a file
-	// belongs to exactly one of them.
+	// Each group is indexed on its own, a file belonging to one: an interface a main or ad hoc
+	// group could meet in another, or one a hidden file declares, is refused. A hidden pass
+	// reaches the interfaces of the packages it re-checks and no others.
 	main, err := resolver.source.Packages(ctx, resolver.snap)
 	if err != nil {
 		return nil, fmt.Errorf("typed packages: %w", err)
@@ -160,7 +161,18 @@ func (resolver *Typed) build(ctx context.Context) ([]index, error) {
 		resolver.adhocErr.Store(&adhocErr)
 	}
 
-	groups := append([][]*packages.Package{main}, apart...)
+	// The hidden passes load with the main one, so a load failure there already failed the index.
+	hidden, err := resolver.source.Hidden(ctx, resolver.snap)
+	if err != nil {
+		return nil, fmt.Errorf("typed hidden: %w", err)
+	}
 
-	return indexGroups(groups, newPlaces(resolver.snap)), nil
+	groups := append([][]*packages.Package{main}, apart...)
+	where := newPlaces(resolver.snap)
+	built := indexGroups(groups, where)
+	read := indexHidden(hidden, where, built)
+
+	resolver.hiddenLost.Store(lostRows(read))
+
+	return append(built, read...), nil
 }

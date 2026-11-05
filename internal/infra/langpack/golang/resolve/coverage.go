@@ -4,12 +4,67 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
 
 type covering struct {
 	textFile
 
 	incomplete bool
+}
+
+func indexHidden(passes [][]*packages.Package, where *places, built []index) []index {
+	owners, out := slices.Clone(built), []index{}
+
+	// A hidden pass re-checks whole packages, so it answers only for the files no earlier group
+	// parsed. Its complete files lend what they read of the owners' declarations in the packages
+	// it re-checked; an incomplete file lends nothing, and no loss is settled onto the owners.
+	for _, pass := range passes {
+		for _, group := range indexGroups([][]*packages.Package{pass}, where) {
+			for rel := range group.covered {
+				if slices.ContainsFunc(owners, func(owner index) bool {
+					_, parsed := owner.covered[rel]
+
+					return parsed
+				}) {
+					delete(group.covered, rel)
+				}
+			}
+
+			group.crossed = map[site]bool{}
+
+			for at := range group.implementors {
+				_, group.crossed[at] = group.covered[at.file]
+			}
+
+			for _, owner := range owners {
+				lendTo(owner.refs, group.refs, owner.covered, group.covered)
+				lendTo(owner.implementors, group.implementors, owner.covered, group.covered)
+			}
+
+			owners, out = append(owners, group), append(out, group)
+		}
+	}
+
+	return out
+}
+
+func lendTo(to, from map[site][]entities.Location, owns, hidden map[string]covering) {
+	for def, readers := range from {
+		if _, owned := owns[def.file]; !owned {
+			continue
+		}
+
+		for _, reader := range readers {
+			file, inHidden := hidden[reader.File]
+			if inHidden && !file.incomplete && !slices.Contains(to[def], reader) {
+				to[def] = append(to[def], reader)
+			}
+		}
+
+		slices.SortFunc(to[def], compareLocations)
+	}
 }
 
 func rewritten(pkg *packages.Package) bool {

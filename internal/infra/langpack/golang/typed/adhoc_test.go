@@ -298,3 +298,53 @@ func TestSourceAdhocSurvivesACancelledFirstCaller(t *testing.T) {
 		t.Fatalf("Adhoc() by the second caller = %d groups, %v; want the answer", len(groups), err)
 	}
 }
+
+func TestSourceHidden(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{
+		"a.go":     "package fixture\n",
+		"h_dev.go": "//go:build dev\n\npackage fixture\n\nfunc Dev() int { return 0 }\n",
+		"h_alt.go": "//go:build alt\n\npackage fixture\n\nfunc Alt() int { return 0 }\n",
+	}
+
+	testCases := []struct {
+		name       string
+		tags       []string
+		wantPasses int
+	}{
+		{name: "no tags hide two files, one pass each", wantPasses: 2},
+		{name: "one tag leaves one file hidden", tags: []string{"dev"}, wantPasses: 1},
+		{name: "tags that hide nothing", tags: []string{"dev", "alt"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap, _ := testkit.Fixture(t, files)
+			source := NewSource(testCase.tags)
+
+			hidden, err := source.Hidden(context.Background(), snap)
+			if err != nil || len(hidden) != testCase.wantPasses {
+				t.Fatalf("Hidden() = %d passes, %v; want %d", len(hidden), err, testCase.wantPasses)
+			}
+
+			main, err := source.Packages(context.Background(), snap)
+			if err != nil || len(main) == 0 {
+				t.Fatalf("Packages() = %d packages, %v; want pass zero", len(main), err)
+			}
+		})
+	}
+
+	snap, _ := testkit.Fixture(t, files)
+	source := NewSource(nil)
+
+	if err := source.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if hidden, err := source.Hidden(context.Background(), snap); err == nil || hidden != nil {
+		t.Fatalf("Hidden() after Close = %v, %v; want the error", hidden, err)
+	}
+}

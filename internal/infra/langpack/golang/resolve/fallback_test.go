@@ -238,6 +238,57 @@ func (primary adhocPrimary) AdhocErr() error {
 	return primary.adhocErr
 }
 
+type hiddenPrimary struct {
+	*MockSecondary
+
+	lost int64
+}
+
+func (primary hiddenPrimary) HiddenLost() int64 { return primary.lost }
+
+func TestFallbackCloseWarnsOfHiddenReadsItCouldNotPlace(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		lost int64
+		want string
+	}{
+		{name: "hidden files that read nothing unplaced", lost: 0, want: ""},
+		{name: "hidden files with three unplaced reads", lost: 3, want: "count=3"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			secondary := NewMockSecondary(ctrl)
+			secondary.EXPECT().Close(gomock.Any()).Return(nil)
+
+			var logged bytes.Buffer
+
+			primary := hiddenPrimary{MockSecondary: NewMockSecondary(ctrl), lost: testCase.lost}
+			primary.EXPECT().Close(gomock.Any()).Return(nil)
+			fallback := NewFallback(primary, secondary, slog.New(slog.NewTextHandler(&logged, nil)))
+
+			if err := fallback.Close(context.Background()); err != nil {
+				t.Fatalf("Close() error = %v", err)
+			}
+
+			const warning = "implements edge to those is missing"
+
+			if got := strings.Contains(logged.String(), warning); got != (testCase.want != "") {
+				t.Fatalf("logged = %s, want the warning %v", logged.String(), testCase.want != "")
+			}
+
+			if !strings.Contains(logged.String(), testCase.want) {
+				t.Fatalf("logged = %s, want %q", logged.String(), testCase.want)
+			}
+		})
+	}
+}
+
 func TestFallbackCloseLogsAnAdhocFailure(t *testing.T) {
 	t.Parallel()
 
