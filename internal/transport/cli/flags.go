@@ -7,8 +7,12 @@ import (
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
 	"github.com/wrapped-owls/redigit/internal/infra/inputs"
+	"github.com/wrapped-owls/redigit/internal/infra/lineageconf"
 )
+
+var ErrStopped = anchoring.ErrStopped
 
 func newFlagSet() *flag.FlagSet {
 	set := flag.NewFlagSet("redigit", flag.ContinueOnError)
@@ -17,60 +21,40 @@ func newFlagSet() *flag.FlagSet {
 	return set
 }
 
-func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
-	cfg := bootstrap.Defaults()
+type fileFlags struct {
+	layers, features, chunkMap, config, stateDir string
+}
 
-	var (
-		tags         string
-		layerFile    string
-		featureFile  string
-		chunkMapFile string
-		configFile   string
-		far          int
-		virtualErr   error
-	)
+func addFileFlags(set *flag.FlagSet) *fileFlags {
+	files := &fileFlags{}
 
-	set.StringVar(&cfg.Repo, "repo", "", "repository to read")
-	set.StringVar(&cfg.Rev, "rev", cfg.Rev, "revision to read")
-	set.StringVar(&tags, "tags", "", "comma-separated build tags")
-	set.IntVar(&far, "far", 0, "positions before a declaration counts as adrift")
+	set.StringVar(&files.layers, "layers", "", "layer file: which path prefixes come first")
 	set.StringVar(
-		&cfg.BlobDir,
-		"blob-dir",
-		"",
-		"write blobs to this directory instead of the object database",
-	)
-	addServerFlags(set, &cfg)
-	set.StringVar(&layerFile, "layers", "", "layer file: which path prefixes come first")
-	set.StringVar(
-		&featureFile,
-		"features",
-		"",
-		"feature file: the vertical slices layers act inside",
+		&files.features, "features", "", "feature file: the vertical slices layers act inside",
 	)
 	set.StringVar(
-		&chunkMapFile,
-		"chunk-map",
-		"",
+		&files.chunkMap, "chunk-map", "",
 		"chunk map file: JSON spans for a format redigit cannot parse on its own",
 	)
-
 	set.StringVar(
-		&configFile,
-		"config",
-		"",
-		"config file: tags, virtual modules and rules for a project",
+		&files.config, "config", "", "config file: tags, virtual modules and rules for a project",
 	)
+	set.StringVar(&files.stateDir, "state-dir", "", "where a run that stops keeps its state")
 
-	add := addVirtual(&cfg, &virtualErr)
-	set.Func("virtual", "ID=PATH: the file a virtual module compiles from", add)
+	return files
+}
+
+func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
+	cfg := bootstrap.Defaults()
+	flags := defineFlags(set, &cfg)
+	files := flags.files
 
 	if err := set.Parse(args); err != nil {
 		return bootstrap.Config{}, 0, fmt.Errorf("%w: %w", ErrUsage, err)
 	}
 
-	if virtualErr != nil {
-		return bootstrap.Config{}, 0, fmt.Errorf("%w: --virtual: %w", ErrUsage, virtualErr)
+	if flags.virtualErr != nil {
+		return bootstrap.Config{}, 0, fmt.Errorf("%w: --virtual: %w", ErrUsage, flags.virtualErr)
 	}
 
 	if cfg.Repo == "" {
@@ -81,23 +65,27 @@ func parse(set *flag.FlagSet, args []string) (bootstrap.Config, int, error) {
 		return bootstrap.Config{}, 0, err
 	}
 
-	if err := applyTags(&cfg, tags); err != nil {
+	if err := applyTags(&cfg, flags.tags); err != nil {
 		return bootstrap.Config{}, 0, err
 	}
 
-	if err := applyConfigFile(&cfg, set, configFile); err != nil {
+	if err := applyConfigFile(&cfg, set, files.config); err != nil {
 		return bootstrap.Config{}, 0, err
 	}
 
-	if err := loadSlicing(&cfg, layerFile, featureFile); err != nil {
+	if err := loadSlicing(&cfg, files.layers, files.features); err != nil {
 		return bootstrap.Config{}, 0, err
 	}
 
-	if err := loadChunkMap(&cfg, chunkMapFile); err != nil {
+	if err := checkStateDir(cfg, files.stateDir); err != nil {
 		return bootstrap.Config{}, 0, err
 	}
 
-	return cfg, far, nil
+	if err := loadChunkMap(&cfg, files.chunkMap); err != nil {
+		return bootstrap.Config{}, 0, err
+	}
+
+	return cfg, flags.far, nil
 }
 
 func addServerFlags(set *flag.FlagSet, cfg *bootstrap.Config) {
@@ -146,6 +134,23 @@ func applyTags(cfg *bootstrap.Config, tags string) error {
 	}
 
 	cfg.BuildTags = parsed
+
+	return nil
+}
+
+func checkStateDir(cfg bootstrap.Config, stateDir string) error {
+	if cfg.Mode != bootstrap.ModeLineage || stateDir != "" {
+		return nil
+	}
+
+	section, err := lineageconf.Decode(cfg.Sections.Lineage)
+	if err != nil {
+		return fmt.Errorf("%w: %w", bootstrap.ErrConfig, err)
+	}
+
+	if section.IsStopping() {
+		return fmt.Errorf("%w: policy stop needs --state-dir", ErrUsage)
+	}
 
 	return nil
 }

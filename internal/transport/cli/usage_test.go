@@ -18,6 +18,26 @@ func TestRunUsageFitsAnEightyColumnTerminal(t *testing.T) {
 	}
 }
 
+func TestUsageNamesTheStateDirOnTheCommandsThatStop(t *testing.T) {
+	t.Parallel()
+
+	for _, command := range []string{"emit", "plan"} {
+		t.Run(command, func(t *testing.T) {
+			t.Parallel()
+
+			start := strings.Index(usage, "  redigit "+command)
+			if start < 0 {
+				t.Fatalf("usage has no %s paragraph", command)
+			}
+
+			paragraph, _, _ := strings.Cut(usage[start:], "\n\n")
+			if !strings.Contains(paragraph, "[--state-dir DIR]") {
+				t.Fatalf("the %s paragraph does not name [--state-dir DIR]", command)
+			}
+		})
+	}
+}
+
 func TestUsageDocumentsTheModeFlag(t *testing.T) {
 	t.Parallel()
 

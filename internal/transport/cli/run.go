@@ -44,6 +44,46 @@ func registerRunFlags(set *flag.FlagSet) *runOptions {
 	return opts
 }
 
+type parsedFlags struct {
+	files      *fileFlags
+	tags       string
+	far        int
+	virtualErr error
+}
+
+func defineFlags(set *flag.FlagSet, cfg *bootstrap.Config) *parsedFlags {
+	flags := &parsedFlags{}
+
+	set.StringVar(&cfg.Repo, "repo", "", "repository to read")
+	set.StringVar(&cfg.Rev, "rev", cfg.Rev, "revision to read")
+	set.StringVar(&flags.tags, "tags", "", "comma-separated build tags")
+	set.IntVar(&flags.far, "far", 0, "positions before a declaration counts as adrift")
+	set.StringVar(
+		&cfg.BlobDir,
+		"blob-dir",
+		"",
+		"write blobs to this directory instead of the object database",
+	)
+	addServerFlags(set, cfg)
+
+	flags.files = addFileFlags(set)
+	set.Func(
+		"virtual", "ID=PATH: the file a virtual module compiles from",
+		addVirtual(cfg, &flags.virtualErr),
+	)
+
+	return flags
+}
+
+func scanFlags() *flag.FlagSet {
+	set, cfg := newFlagSet(), bootstrap.Defaults()
+
+	registerRunFlags(set)
+	defineFlags(set, &cfg)
+
+	return set
+}
+
 func startProfiling(opts *runOptions, stderr io.Writer) (*profiling.Session, error) {
 	// Before the pipeline starts, so the indexing that dominates a run is inside.
 	profile, err := profiling.Start(profiling.Options{

@@ -238,21 +238,34 @@ func TestDispatchVerifyRoutesWithoutAPipeline(t *testing.T) {
 	}
 }
 
-func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
+func TestDispatchContinueRunsItsOwnCommandWithoutAPipeline(t *testing.T) {
 	t.Parallel()
 
 	unreachable := func(context.Context, bootstrap.Config) (pipeline, error) {
-		t.Fatal("a reserved verb must never start a pipeline")
+		t.Fatal("a usage error in continue must never start a pipeline")
 
 		return nil, nil
 	}
 
 	testCases := []struct {
-		name    string
-		command string
-		slice   string
+		name        string
+		args        []string
+		wantMessage string
 	}{
-		{"continue", cmdContinue, "slice 24b"},
+		{
+			name: "no state", args: []string{cmdContinue, "--rest", "fold"},
+			wantMessage: "--state is required",
+		},
+		{
+			name:        "no decision",
+			args:        []string{cmdContinue, "--state", "/nonexistent"},
+			wantMessage: "give decisions or --abort",
+		},
+		{
+			name:        "a directory with no state",
+			args:        []string{cmdContinue, "--state", "/nonexistent", "--rest", "fold"},
+			wantMessage: "no stop state here",
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -262,14 +275,10 @@ func TestDispatchReservedVerbsAreUsageErrors(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 
 			err := dispatch(
-				context.Background(),
-				[]string{testCase.command, "--repo", "."},
-				&stdout,
-				&stderr,
-				runEnv{Start: unreachable},
+				context.Background(), testCase.args, &stdout, &stderr, runEnv{Start: unreachable},
 			)
-			if !errors.Is(err, ErrUsage) || !strings.Contains(err.Error(), testCase.slice) {
-				t.Fatalf("err = %v, want a usage error naming %q", err, testCase.slice)
+			if !errors.Is(err, ErrUsage) || !strings.Contains(err.Error(), testCase.wantMessage) {
+				t.Fatalf("err = %v, want a usage error naming %q", err, testCase.wantMessage)
 			}
 
 			if stderr.String() != fullUsage || stdout.Len() != 0 {
@@ -378,5 +387,43 @@ func TestDispatchFormatRunsItsOwnCommandWithoutAPipeline(t *testing.T) {
 				t.Fatalf("stderr = %q, want format usage = %v", stderr.String(), testCase.wantUsage)
 			}
 		})
+	}
+}
+
+func TestScanFlagsIsTheFlagSetOfARun(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		flag     string
+		wantBool bool
+	}{
+		{name: "the repository", flag: "repo"},
+		{name: "the revision", flag: "rev"},
+		{name: "the config", flag: "config"},
+		{name: "the state directory", flag: "state-dir"},
+		{name: "the timings", flag: "timings", wantBool: true},
+		{name: "the cache", flag: "from-cache", wantBool: true},
+		{name: "a virtual module", flag: "virtual"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			registered := scanFlags().Lookup(testCase.flag)
+			if registered == nil {
+				t.Fatalf("scanFlags() has no --%s", testCase.flag)
+			}
+
+			boolean, isBoolean := registered.Value.(interface{ IsBoolFlag() bool })
+			if got := isBoolean && boolean.IsBoolFlag(); got != testCase.wantBool {
+				t.Fatalf("--%s is bool = %v, want %v", testCase.flag, got, testCase.wantBool)
+			}
+		})
+	}
+
+	if got := scanFlags().Lookup("rev").Value.String(); got != "HEAD" {
+		t.Fatalf("--rev defaults to %q, want HEAD", got)
 	}
 }

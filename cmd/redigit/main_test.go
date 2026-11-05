@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
 	"github.com/wrapped-owls/redigit/internal/transport/cli"
 )
 
@@ -48,6 +49,27 @@ func TestRun(t *testing.T) {
 			name: "a config error returns exit 2",
 			execute: func(context.Context, []string, io.Writer, io.Writer) error {
 				return fmt.Errorf("start: %w", bootstrap.ErrConfig)
+			},
+			wantCode: exitUsage,
+		},
+		{
+			name: "a stop returns exit 3",
+			execute: func(context.Context, []string, io.Writer, io.Writer) error {
+				return &anchoring.StoppedError{}
+			},
+			wantCode: exitStopped,
+		},
+		{
+			name: "a wrapped stop returns exit 3",
+			execute: func(context.Context, []string, io.Writer, io.Writer) error {
+				return fmt.Errorf("plan: %w", cli.ErrStopped)
+			},
+			wantCode: exitStopped,
+		},
+		{
+			name: "an error that is both a stop and a usage error is exit 2, usage first",
+			execute: func(context.Context, []string, io.Writer, io.Writer) error {
+				return errors.Join(cli.ErrStopped, cli.ErrUsage)
 			},
 			wantCode: exitUsage,
 		},

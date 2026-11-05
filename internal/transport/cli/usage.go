@@ -8,6 +8,7 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
       a build constraint hid from the reference queries.
 
   redigit emit   --repo PATH [--rev REF] [--tags TAGS] [--blob-dir DIR]
+                 [--state-dir DIR]
       Materialise the plan: one JSON object per commit with the declarations
       born there, the full content of every file it changes, and the forward
       references it can see. Writes no commit and no ref - that is the calling
@@ -30,7 +31,7 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
       Emit the declaration graph: every declaration and every edge, with the
       reason each edge exists.
 
-  redigit plan   --repo PATH [--rev REF] [--tags TAGS]
+  redigit plan   --repo PATH [--rev REF] [--tags TAGS] [--state-dir DIR]
       Emit a commit plan, cut along features where a feature owns the work and
       along layers where none does. Subjects come out marked DRAFT: nothing
       writes a history from an unreviewed plan.

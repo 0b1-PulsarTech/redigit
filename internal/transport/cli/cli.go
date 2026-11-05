@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/infra/profiling"
@@ -43,6 +44,10 @@ const fullUsage = usage + runUsage + write.Usage + verify.Usage +
 	subjects.Usage + format.Usage + lint.Usage + resume.Usage
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	return resume.Keep(ctx, args, execute(ctx, args, stdout, stderr), scanFlags) //nolint:wrapcheck
+}
+
+func execute(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	return dispatch(ctx, args, stdout, stderr, realEnv())
 }
 
@@ -83,7 +88,7 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, env 
 
 	// Before any profile file is made or any cache key is built for nothing.
 	command := args[0]
-	if !isCommand(command) {
+	if !usesCache(command) && command != cmdChunks {
 		return unknownCommand(stderr, command)
 	}
 
@@ -125,15 +130,8 @@ func dispatch(ctx context.Context, args []string, stdout, stderr io.Writer, env 
 }
 
 func usesCache(command string) bool {
-	switch command {
-	case cmdAudit, cmdGraph, cmdPlan, cmdReport, cmdEmit:
-		return true
-	}
-
-	return false
+	return slices.Contains([]string{cmdAudit, cmdGraph, cmdPlan, cmdReport, cmdEmit}, command)
 }
-
-func isCommand(command string) bool { return usesCache(command) || command == cmdChunks }
 
 func unknownCommand(stderr io.Writer, command string) error {
 	_, _ = fmt.Fprint(stderr, fullUsage)
@@ -167,7 +165,7 @@ func verbs() map[string]verbRun {
 		cmdSubjects: subjects.Run,
 		cmdFormat:   format.Run,
 		cmdLint:     lint.Run,
-		cmdContinue: resume.Run,
+		cmdContinue: resume.With(execute, scanFlags),
 	}
 }
 

@@ -30,7 +30,14 @@ func Classify(name string) (class FlagClass, isKnown bool) {
 		return ClassKey, true
 	case "layers", "features", "chunk-map", "config":
 		return ClassFile, true
-	case "far", "blob-dir", "cpuprofile", "memprofile", "trace", "timings", "mem-limit",
+	case "far",
+		"blob-dir",
+		"state-dir",
+		"cpuprofile",
+		"memprofile",
+		"trace",
+		"timings",
+		"mem-limit",
 		"from-cache":
 		return ClassRunOnly, true
 	}

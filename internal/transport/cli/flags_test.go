@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
 )
 
 type parseTestCase struct {
@@ -329,5 +330,78 @@ func TestParseMode(t *testing.T) {
 				t.Fatalf("Mode = %q, %v, want %q", cfg.Mode, err, testCase.want)
 			}
 		})
+	}
+}
+
+func TestParseStateDir(t *testing.T) {
+	t.Parallel()
+
+	stopSection := `{"lineage": {"policy": "stop", "anchors": [{"rev": "3d2d883", "kind": "fix"}]}}`
+	anchorStop := `{"lineage": {"policy": "fold", "anchors": [
+		{"rev": "3d2d883", "kind": "fix", "policy": "stop"}]}}`
+	foldSection := `{"lineage": {"policy": "fold", "anchors": [{"rev": "3d2d883", "kind": "fix"}]}}`
+	badSection := `{"lineage": {"policy": "later"}}`
+
+	testCases := []struct {
+		name    string
+		config  string
+		extra   []string
+		wantErr error
+	}{
+		{name: "stop with no state dir is a usage error", config: stopSection, wantErr: ErrUsage},
+		{
+			name:    "an anchor stop with no state dir is a usage error",
+			config:  anchorStop,
+			wantErr: ErrUsage,
+		},
+		{
+			name:    "an empty state dir is a usage error",
+			config:  stopSection,
+			extra:   []string{"--state-dir", ""},
+			wantErr: ErrUsage,
+		},
+		{
+			name:   "stop with a state dir",
+			config: stopSection,
+			extra:  []string{"--state-dir", "/tmp/s"},
+		},
+		{name: "fold needs no state dir", config: foldSection},
+		{
+			name:   "a state dir without stop is harmless",
+			config: foldSection,
+			extra:  []string{"--state-dir=/tmp/s"},
+		},
+		{
+			name:   "history mode ignores the anchors",
+			config: stopSection,
+			extra:  []string{"--mode", "history"},
+		},
+		{name: "a bad section is a config error", config: badSection, wantErr: bootstrap.ErrConfig},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			file := filepath.Join(t.TempDir(), "cfg.json")
+			if err := os.WriteFile(file, []byte(testCase.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			args := []string{"--repo", ".", "--mode", "lineage", "--config", file}
+
+			_, _, err := parse(newFlagSet(), append(args, testCase.extra...))
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("parse() = %v, want %v", err, testCase.wantErr)
+			}
+		})
+	}
+}
+
+func TestErrStoppedIsTheSentinel(t *testing.T) {
+	t.Parallel()
+
+	if !errors.Is(&anchoring.StoppedError{}, ErrStopped) {
+		t.Fatal("a StoppedError does not match cli.ErrStopped")
 	}
 }

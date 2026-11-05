@@ -36,7 +36,7 @@ func testSet(t *testing.T, args ...string) (*flag.FlagSet, bootstrap.Config) {
 
 	for _, name := range []string{
 		"tags", "layers", "features", "chunk-map", "config", "blob-dir", "cpuprofile",
-		"memprofile", "trace", "mem-limit", "mode",
+		"memprofile", "trace", "mem-limit", "mode", "state-dir",
 	} {
 		set.String(name, "", "")
 	}
@@ -59,18 +59,19 @@ func TestClassifyFlag(t *testing.T) {
 		name string
 		want FlagClass
 	}{
-		{"tags", ClassKey},
-		{"virtual", ClassKey},
-		{"resolver", ClassKey},
-		{"mode", ClassKey},
-		{"layers", ClassFile},
-		{"features", ClassFile},
-		{"chunk-map", ClassFile},
-		{"config", ClassFile},
-		{"far", ClassRunOnly},
-		{"blob-dir", ClassRunOnly},
-		{"from-cache", ClassRunOnly},
-		{"timings", ClassRunOnly},
+		{name: "tags", want: ClassKey},
+		{name: "virtual", want: ClassKey},
+		{name: "resolver", want: ClassKey},
+		{name: "mode", want: ClassKey},
+		{name: "layers", want: ClassFile},
+		{name: "features", want: ClassFile},
+		{name: "chunk-map", want: ClassFile},
+		{name: "config", want: ClassFile},
+		{name: "far", want: ClassRunOnly},
+		{name: "blob-dir", want: ClassRunOnly},
+		{name: "state-dir", want: ClassRunOnly},
+		{name: "from-cache", want: ClassRunOnly},
+		{name: "timings", want: ClassRunOnly},
 	}
 
 	for _, testCase := range testCases {
@@ -105,7 +106,7 @@ func TestCacheFlagsLeaveOutRunOnlyFlags(t *testing.T) {
 
 	set, _ := testSet(t,
 		"--repo", "/src", "--tags", "a,b", "--far", "3", "--cpuprofile", "cpu", "--from-cache",
-		"--timings", "--blob-dir", "/tmp/blobs", "--layers", layers,
+		"--timings", "--blob-dir", "/tmp/blobs", "--layers", layers, "--state-dir", "/tmp/state",
 	)
 
 	want := []plancache.Flag{

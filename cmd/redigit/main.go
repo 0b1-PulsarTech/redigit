@@ -17,6 +17,8 @@ import (
 // failed, so a shell script can tell the two apart.
 const exitUsage = 2
 
+const exitStopped = 3
+
 // runner is what run needs to execute one command line. Production wires it
 // to cli.Run; a test wires it to a fake so the exit code each outcome
 // produces can be proven without a language server or a git worktree.
@@ -54,6 +56,11 @@ func run(parent context.Context, args []string, stdout, stderr io.Writer, execut
 
 	if errors.Is(err, cli.ErrUsage) || errors.Is(err, bootstrap.ErrConfig) {
 		return exitUsage
+	}
+
+	// Only a stop whose state is on disk gets here: redigit continue goes on from it.
+	if errors.Is(err, cli.ErrStopped) {
+		return exitStopped
 	}
 
 	return 1
