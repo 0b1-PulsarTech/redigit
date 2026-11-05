@@ -108,39 +108,6 @@ func funcEncloses(
 	return []entities.Edge{{Dependent: funcKey, Provider: typeKey, Reason: entities.ReasonEncloses}}
 }
 
-func singleResultType(
-	fn *ast.FuncDecl,
-	types map[string]entities.DeclKey,
-) (entities.DeclKey, bool) {
-	if fn.Type.Results == nil {
-		return entities.DeclKey{}, false
-	}
-
-	total := 0
-
-	for _, field := range fn.Type.Results.List {
-		total += max(len(field.Names), 1)
-	}
-
-	if total != 1 {
-		return entities.DeclKey{}, false
-	}
-
-	expr := fn.Type.Results.List[0].Type
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-
-	ident, ok := expr.(*ast.Ident)
-	if !ok {
-		return entities.DeclKey{}, false
-	}
-
-	key, found := types[ident.Name]
-
-	return key, found
-}
-
 func valueEncloses(
 	fileDecls []entities.Decl,
 	file string,
