@@ -3,13 +3,20 @@ package lint
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap"
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/linting"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/rewriting"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/write"
 )
 
@@ -170,7 +177,7 @@ func TestRunRefusesWhatItCannotRun(t *testing.T) {
 
 			var stdout bytes.Buffer
 
-			err := Run(context.Background(), testCase.args, &stdout)
+			err := Run(context.Background(), testCase.args, &stdout, session.Env{})
 			if err == nil || errors.Is(err, write.ErrUsage) != testCase.wantUsage ||
 				stdout.Len() != 0 {
 				t.Fatalf("Run() err = %v, stdout = %q", err, stdout.String())
@@ -213,7 +220,7 @@ func TestRunRefusesAMalformedManifestAnEmptyOneAndAMissingBlob(t *testing.T) {
 				},
 				testCase.extra...)
 
-			err := Run(context.Background(), args, &stdout)
+			err := Run(context.Background(), args, &stdout, session.Env{})
 			if err == nil || stdout.Len() != 0 ||
 				!strings.Contains(err.Error(), testCase.wantText) {
 				t.Fatalf("Run() err = %v, stdout = %q", err, stdout.String())
@@ -260,7 +267,7 @@ func TestRunReadsItsLimitsFromTheConfig(t *testing.T) {
 			err := Run(context.Background(), []string{
 				"--manifest", manifestFile(t, manifestLine("a.go", "h")),
 				"--blob-dir", dir, "--config", configPath,
-			}, &stdout)
+			}, &stdout, session.Env{})
 			if (err != nil) != testCase.wantErr {
 				t.Fatalf("Run() err = %v", err)
 			}
@@ -269,6 +276,181 @@ func TestRunReadsItsLimitsFromTheConfig(t *testing.T) {
 				t.Fatalf(
 					"findings = %d, want %d in %q", got, testCase.wantFindings, stdout.String(),
 				)
+			}
+		})
+	}
+}
+
+func TestRunFailOverCountsOnlyAStubOrAnUnreadDeclaration(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		readerRow      int
+		readsIt        bool
+		wantErr        error
+		wantNotCounted bool
+	}{
+		{
+			name:      "red: a first reader three rows later is not counted",
+			readerRow: 3, readsIt: true, wantNotCounted: true,
+		},
+		{
+			name:      "a first reader past the stub limit is counted",
+			readerRow: 25, readsIt: true, wantErr: ErrFailed,
+		},
+		{name: "a declaration nothing reads is counted", readerRow: 3, wantErr: ErrFailed},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			read := entities.DeclKey{File: "a.go", Kind: entities.KindFunc, Name: "loadRows"}
+			user := entities.DeclKey{File: "a.go", Kind: entities.KindFunc, Name: "Use"}
+
+			var edges []entities.Edge
+			if testCase.readsIt {
+				edges = append(edges, entities.Edge{
+					Dependent: user, Provider: read, Reason: entities.ReasonReference,
+				})
+			}
+
+			closed := 0
+			env := session.Env{
+				Start: func(context.Context, bootstrap.Config) (session.Pipeline, error) {
+					return fakePipeline{
+						result: indexing.Result{Graph: entities.NewGraph(
+							[]entities.Decl{{Key: read, Unit: "a"}, {Key: user, Unit: "a"}},
+							edges, nil,
+						)},
+						closed: &closed,
+					}, nil
+				},
+				Commit: func(context.Context, string, string) (string, error) { return "abc", nil },
+			}
+
+			text := `{"position":0,"subject":"s","chunks":[{"key":"a.go:func:loadRows"}]}` + "\n" +
+				`{"position":` + strconv.Itoa(testCase.readerRow) +
+				`,"subject":"s","chunks":[{"key":"a.go:func:Use"}]}` + "\n"
+
+			var stdout bytes.Buffer
+
+			err := Run(context.Background(), []string{
+				"--manifest", manifestFile(t, text), "--repo", "/r", "--fail-over",
+			}, &stdout, env)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("Run() err = %v, want %v", err, testCase.wantErr)
+			}
+
+			var finding struct {
+				Measure    string
+				NotCounted bool
+			}
+
+			first, _, _ := strings.Cut(stdout.String(), "\n")
+			if jsonErr := json.Unmarshal([]byte(first), &finding); jsonErr != nil {
+				t.Fatalf("finding line %q: %v", first, jsonErr)
+			}
+
+			isUnused := finding.Measure == linting.MeasureUnusedAtBirth
+			if !isUnused || finding.NotCounted != testCase.wantNotCounted {
+				t.Fatalf("finding = %+v, want unused_at_birth with notCounted %v",
+					finding, testCase.wantNotCounted)
+			}
+		})
+	}
+}
+
+func libraryEnv() session.Env {
+	closed := 0
+	screen := entities.DeclKey{File: "lib/a.dart", Kind: entities.KindFunc, Name: "build"}
+
+	return session.Env{
+		Start: func(context.Context, bootstrap.Config) (session.Pipeline, error) {
+			return fakePipeline{
+				result: indexing.Result{Graph: entities.NewGraph(
+					[]entities.Decl{{Key: screen, Unit: "lib"}}, nil, nil,
+				)},
+				closed: &closed,
+			}, nil
+		},
+		Commit: func(context.Context, string, string) (string, error) { return "abc", nil },
+	}
+}
+
+func TestRunRefusesAManifestTheGraphDoesNotHold(t *testing.T) {
+	t.Parallel()
+
+	ghost := `{"position":0,"subject":"s","chunks":[{"key":"lib/a.dart:func:ghost"}]}` + "\n"
+
+	var stdout bytes.Buffer
+
+	err := Run(context.Background(), []string{
+		"--manifest", manifestFile(t, ghost), "--repo", "/r",
+	}, &stdout, libraryEnv())
+	if !errors.Is(err, write.ErrUsage) || stdout.Len() != 0 {
+		t.Fatalf("Run() err = %v, stdout = %q, want a usage error and nothing printed",
+			err, stdout.String())
+	}
+}
+
+func TestRunWithARepoSaysWhichTierRan(t *testing.T) {
+	t.Parallel()
+
+	known := `{"position":0,"subject":"s","chunks":[{"key":"lib/a.dart:func:build"}]}` + "\n"
+
+	testCases := []struct {
+		name         string
+		extra        []string
+		wantGraph    bool
+		wantDeferred int
+	}{
+		{name: "the manifest alone runs one tier", wantDeferred: 5},
+		{
+			name:      "a repo runs both and defers nothing",
+			extra:     []string{"--repo", "/r"},
+			wantGraph: true,
+		},
+		{
+			name:      "fail-over accepts a graph run that read no blob",
+			extra:     []string{"--repo", "/r", "--fail-over"},
+			wantGraph: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout bytes.Buffer
+
+			args := append([]string{"--manifest", manifestFile(t, known)}, testCase.extra...)
+
+			if err := Run(context.Background(), args, &stdout, libraryEnv()); err != nil {
+				t.Fatalf("Run() err = %v", err)
+			}
+
+			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+
+			var summary struct {
+				Graph    *struct{ Ran bool }
+				Measures []struct{ Name string }
+				Deferred []string
+			}
+
+			if jsonErr := json.Unmarshal([]byte(lines[len(lines)-1]), &summary); jsonErr != nil {
+				t.Fatalf("summary %q: %v", lines[len(lines)-1], jsonErr)
+			}
+
+			if (summary.Graph != nil && summary.Graph.Ran) != testCase.wantGraph ||
+				len(summary.Deferred) != testCase.wantDeferred {
+				t.Fatalf("summary = %+v, want graph %v deferred %d",
+					summary, testCase.wantGraph, testCase.wantDeferred)
+			}
+
+			if testCase.wantGraph && len(summary.Measures) != 5 {
+				t.Fatalf("measures = %+v, want the five graph measures", summary.Measures)
 			}
 		})
 	}

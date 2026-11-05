@@ -17,6 +17,7 @@ import (
 
 type measuredRows struct {
 	rows     []linting.Row
+	decoded  []manifest.Row
 	measured bool
 }
 
@@ -47,7 +48,7 @@ func readRows(manifestPath, blobDir string) (measuredRows, error) {
 			rows[index] = linting.Row{Position: row.Position, Subject: row.Subject}
 		}
 
-		return measuredRows{rows: rows}, nil
+		return measuredRows{rows: rows, decoded: decoded}, nil
 	}
 
 	return addedLines(decoded, blobDir)
@@ -56,7 +57,7 @@ func readRows(manifestPath, blobDir string) (measuredRows, error) {
 func addedLines(decoded []manifest.Row, blobDir string) (measuredRows, error) {
 	// measured is set only when a blob is read: rows that hold none measured nothing.
 	last := map[string]int{}
-	result := measuredRows{rows: make([]linting.Row, 0, len(decoded))}
+	result := measuredRows{rows: make([]linting.Row, 0, len(decoded)), decoded: decoded}
 
 	for _, row := range decoded {
 		out := linting.Row{Position: row.Position, Subject: row.Subject}

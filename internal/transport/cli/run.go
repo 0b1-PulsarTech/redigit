@@ -12,6 +12,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 	"github.com/wrapped-owls/redigit/internal/infra/plancache"
 	"github.com/wrapped-owls/redigit/internal/infra/profiling"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/lint"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
 
@@ -115,6 +116,10 @@ func realEnv() runEnv {
 		Digest:    plancache.CommandDigest,
 		Toolchain: plancache.GoToolchain,
 	}
+}
+
+func lintVerb(ctx context.Context, args []string, stdout io.Writer) error {
+	return lint.Run(ctx, args, stdout, realEnv()) //nolint:wrapcheck // names its own failures
 }
 
 func stopProfiling(profile *profiling.Session, runErr error) error {

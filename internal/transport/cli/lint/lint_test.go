@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
 
 type (
@@ -72,7 +74,7 @@ func runLint(
 
 	var stdout bytes.Buffer
 
-	runErr := Run(context.Background(), args, &stdout)
+	runErr := Run(context.Background(), args, &stdout, session.Env{})
 
 	text := strings.TrimSpace(stdout.String())
 	if text == "" {

@@ -22,16 +22,25 @@ func TestLoadLimits(t *testing.T) {
 		{name: "no section keeps the defaults", content: `{}`, want: linting.DefaultLimits()},
 		{
 			name:    "every limit can be set",
-			content: `{"lint":{"sourceAdded":10,"generatedMixed":20,"rowAdded":30}}`,
-			want:    linting.Limits{SourceAdded: 10, GeneratedMixed: 20, RowAdded: 30},
+			content: `{"lint":{"sourceAdded":10,"generatedMixed":20,"rowAdded":30,"stubGap":7}}`,
+			want:    linting.Limits{SourceAdded: 10, GeneratedMixed: 20, RowAdded: 30, StubGap: 7},
 		},
 		{
 			name:    "one limit leaves the others",
 			content: `{"lint":{"rowAdded":5}}`,
-			want:    linting.Limits{SourceAdded: 900, GeneratedMixed: 900, RowAdded: 5},
+			want: linting.Limits{
+				SourceAdded:    900,
+				GeneratedMixed: 900,
+				RowAdded:       5,
+				StubGap:        20,
+			},
 		},
 		{
 			name: "an unknown setting is refused", content: `{"lint":{"rowsAdded":5}}`,
+			wantErr: bootstrap.ErrConfig,
+		},
+		{
+			name: "a zero stub gap is refused", content: `{"lint":{"stubGap":0}}`,
 			wantErr: bootstrap.ErrConfig,
 		},
 		{
@@ -61,10 +70,10 @@ func TestLoadLimits(t *testing.T) {
 				t.Fatalf("WriteFile() err = %v", err)
 			}
 
-			got, err := loadLimits(path)
+			_, got, err := loadConfig(path)
 			if !errors.Is(err, testCase.wantErr) || got != testCase.want {
 				t.Fatalf(
-					"loadLimits() = %+v, %v, want %+v, %v",
+					"loadConfig() = %+v, %v, want %+v, %v",
 					got,
 					err,
 					testCase.want,
@@ -95,9 +104,9 @@ func TestLoadLimitsWithoutAFileOrWithAMissingOne(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := loadLimits(testCase.path)
+			_, got, err := loadConfig(testCase.path)
 			if !errors.Is(err, testCase.wantErr) || got != testCase.want {
-				t.Fatalf("loadLimits() = %+v, %v", got, err)
+				t.Fatalf("loadConfig() = %+v, %v", got, err)
 			}
 		})
 	}

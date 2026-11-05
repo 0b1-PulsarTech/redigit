@@ -164,7 +164,7 @@ func verbs() map[string]verbRun {
 		cmdVerify:   verify.Run,
 		cmdSubjects: subjects.Run,
 		cmdFormat:   format.Run,
-		cmdLint:     lint.Run,
+		cmdLint:     lintVerb,
 		cmdContinue: resume.With(execute, scanFlags),
 	}
 }

@@ -11,31 +11,31 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
-func loadLimits(path string) (linting.Limits, error) {
+func loadConfig(path string) (*bootstrap.ConfigFile, linting.Limits, error) {
 	limits := linting.DefaultLimits()
 	if path == "" {
-		return limits, nil
+		return nil, limits, nil
 	}
 
 	file, err := bootstrap.LoadConfigFile(path)
 	if err != nil {
-		return linting.Limits{}, err //nolint:wrapcheck // a config error names its file once
+		return nil, linting.Limits{}, err //nolint:wrapcheck // a config error names its file once
 	}
 
 	if len(file.File.Lint) == 0 {
-		return limits, nil
+		return &file, limits, nil
 	}
 
 	fields := map[string]*int{
 		"sourceAdded": &limits.SourceAdded, "generatedMixed": &limits.GeneratedMixed,
-		"rowAdded": &limits.RowAdded,
+		"rowAdded": &limits.RowAdded, "stubGap": &limits.StubGap,
 	}
 
 	if err = decodeFields(file.File.Lint, fields); err != nil {
-		return linting.Limits{}, fmt.Errorf("%w: %s: lint: %w", bootstrap.ErrConfig, path, err)
+		return nil, linting.Limits{}, fmt.Errorf("%w: %s: lint: %w", bootstrap.ErrConfig, path, err)
 	}
 
-	return limits, nil
+	return &file, limits, nil
 }
 
 func decodeFields(raw json.RawMessage, fields map[string]*int) error {

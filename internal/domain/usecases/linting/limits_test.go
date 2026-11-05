@@ -11,7 +11,7 @@ func TestDefaultLimits(t *testing.T) {
 	}{
 		{
 			name: "the finish-cap numbers of the original scanner",
-			want: Limits{SourceAdded: 900, GeneratedMixed: 900, RowAdded: 850},
+			want: Limits{SourceAdded: 900, GeneratedMixed: 900, RowAdded: 850, StubGap: 20},
 		},
 	}
 
