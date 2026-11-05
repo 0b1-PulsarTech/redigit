@@ -12,6 +12,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
 
 func fn(file, name string, unit entities.UnitID) entities.Decl {
@@ -244,7 +245,7 @@ func TestInInterfaceMarksTheWholeMethodSet(t *testing.T) {
 func reportStart(
 	ctrl *gomock.Controller,
 	graphErr, birthsErr error,
-) starter {
+) session.Starter {
 	pl := NewMockPipeline(ctrl)
 	pl.EXPECT().Unseen().Return(nil).AnyTimes()
 	pl.EXPECT().Unclaimed().Return(nil).AnyTimes()
@@ -253,7 +254,7 @@ func reportStart(
 	if graphErr != nil {
 		pl.EXPECT().Graph(gomock.Any()).Return(indexing.Result{}, graphErr)
 
-		return func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+		return func(context.Context, bootstrap.Config) (session.Pipeline, error) { return pl, nil }
 	}
 
 	subject := fn("lead/create.go", "Create", "lead")
@@ -268,7 +269,7 @@ func reportStart(
 		}, nil)
 	}
 
-	return func(context.Context, bootstrap.Config) (pipeline, error) { return pl, nil }
+	return func(context.Context, bootstrap.Config) (session.Pipeline, error) { return pl, nil }
 }
 
 func TestRunReport(t *testing.T) {
