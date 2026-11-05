@@ -275,7 +275,9 @@ func TestBlobStoreNeverTouchesRefIndexOrWorkingTree(t *testing.T) {
 
 	for i := range 50 {
 		content := fmt.Appendf(nil, "content %d\n", i)
-		if _, err = s.Put(t.Context(), fmt.Sprintf("f%d.go", i), gitstore.ModeFile, content); err != nil {
+		name := fmt.Sprintf("f%d.go", i)
+
+		if _, err = s.Put(t.Context(), name, gitstore.ModeFile, content); err != nil {
 			t.Fatalf("Put() err = %v", err)
 		}
 	}
