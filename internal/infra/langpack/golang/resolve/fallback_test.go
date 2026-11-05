@@ -336,3 +336,83 @@ func TestFallbackCloseLogsAnAdhocFailure(t *testing.T) {
 		})
 	}
 }
+
+func importedFrom(dir string) map[string]string {
+	return map[string]string{
+		"a.go":        "package fixture\n",
+		dir + "/h.go": "package helper\n\nfunc H() {}\n\ntype Namer interface{ Name() string }\n",
+		"user.go": "package fixture\n\nimport \"example.test/fixture/" + dir + "\"\n\n" +
+			"type Impl struct{}\n\nfunc (Impl) Name() string { return \"\" }\n\n" +
+			"var _ helper.Namer = Impl{}\n\nfunc Use() { helper.H() }\n",
+	}
+}
+
+func TestTypedPackageTheLoadPatternSkips(t *testing.T) {
+	t.Parallel()
+
+	lone := map[string]string{
+		"a.go":                    "package fixture\n",
+		"testdata/lone/l.go":      "package lone\n\nfunc H() {}\n\nfunc G() { H() }\n",
+		"testdata/lone/l_test.go": "package lone\n\nfunc use() { H() }\n",
+	}
+
+	testCases := []struct {
+		name    string
+		files   map[string]string
+		kind    int
+		query   spot
+		want    []spot
+		wantErr error
+	}{
+		{
+			"references of a testdata function a package of the module imports",
+			importedFrom("testdata/helper"),
+			askReferences,
+			spot{"testdata/helper/h.go", "H()", 0},
+			nil,
+			ErrNotCovered,
+		},
+		{
+			"references of a function in an underscore directory a package imports",
+			importedFrom("_helper"),
+			askReferences,
+			spot{"_helper/h.go", "H()", 0},
+			nil,
+			ErrNotCovered,
+		},
+		{
+			"implementations of a testdata interface a package of the module implements",
+			importedFrom("testdata/helper"),
+			askImplementations,
+			spot{"testdata/helper/h.go", "Namer interface", 0},
+			nil,
+			ErrNotCovered,
+		},
+		{
+			"references of a testdata function nothing outside it imports, read by its test file",
+			lone,
+			askReferences,
+			spot{"testdata/lone/l.go", "H()", 0},
+			[]spot{{"testdata/lone/l.go", "H() }", 0}, {"testdata/lone/l_test.go", "H()", 0}},
+			nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			fix := newFixture(t, testCase.files)
+
+			got, err := answerOf(fix.resolver, testCase.kind, fix.locate(t, testCase.query))
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("answer error = %v, want %v", err, testCase.wantErr)
+			}
+
+			want := fix.locations(t, testCase.want)
+			if !slices.Equal(got, want) && (len(got) != 0 || len(want) != 0) {
+				t.Fatalf("answer = %v, want %v", got, want)
+			}
+		})
+	}
+}

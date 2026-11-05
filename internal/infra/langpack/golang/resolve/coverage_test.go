@@ -1,14 +1,22 @@
 package resolve
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"go/types"
 	"maps"
+	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
+	"go.uber.org/mock/gomock"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
 )
 
@@ -212,4 +220,240 @@ func absolute(root string, names []string) []string {
 	}
 
 	return out
+}
+
+func TestTypedNotCovered(t *testing.T) {
+	t.Parallel()
+
+	fix := newFixture(t, usesFiles())
+
+	testCases := []struct {
+		name string
+		at   entities.Location
+	}{
+		{"a file no pass loaded", entities.Location{File: "elsewhere.go"}},
+		{
+			"a file in a package with errors",
+			entities.Location{File: "bad/bad.go", Line: 2, Char: 5},
+		},
+		{"a line past the end of the file", entities.Location{File: "a.go", Line: 999}},
+		{"a column inside a surrogate pair", fix.locate(t, spot{"a.go", "\U0001F600", 0})},
+	}
+	testCases[3].at.Char++
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := fix.resolver.References(
+				context.Background(),
+				testCase.at,
+			); !errors.Is(
+				err,
+				ErrNotCovered,
+			) {
+				t.Fatalf("References() error = %v, want ErrNotCovered", err)
+			}
+
+			if _, err := fix.resolver.Implementations(
+				context.Background(),
+				testCase.at,
+			); !errors.Is(
+				err,
+				ErrNotCovered,
+			) {
+				t.Fatalf("Implementations() error = %v, want ErrNotCovered", err)
+			}
+
+			if _, err := fix.resolver.Definition(
+				context.Background(),
+				testCase.at,
+			); !errors.Is(
+				err,
+				ErrNotCovered,
+			) {
+				t.Fatalf("Definition() error = %v, want ErrNotCovered", err)
+			}
+		})
+	}
+}
+
+func adhocFiles() map[string]string {
+	return map[string]string{
+		"a.go": "package fixture\n\nfunc One() int { return 1 }\n",
+		"testdata/fix/a.go": `package fix
+
+type Reader interface{ Read() int }
+
+type ReaderA struct{}
+
+func (ReaderA) Read() int { return 0 }
+
+var _ Reader = (*ReaderA)(nil)
+
+type Stack struct{}
+
+func (stack *Stack) Push() { _ = stack }
+`,
+		"testdata/fix/a_x_test.go": `package fix_test
+
+import "example.test/fixture/testdata/fix"
+
+func TestX() { _ = fix.ReaderA{} }
+`,
+		"testdata/sib/b.go": "package sib\n\ntype Far struct{}\n\nfunc (Far) Read() int { return 0 }\n",
+	}
+}
+
+const (
+	askReferences = iota
+	askImplementations
+	askDefinition
+)
+
+func answerOf(
+	resolver indexing.Resolver,
+	kind int,
+	at entities.Location,
+) ([]entities.Location, error) {
+	ctx := context.Background()
+
+	switch kind {
+	case askReferences:
+		found, err := resolver.References(ctx, at)
+		if err != nil {
+			return nil, fmt.Errorf("references: %w", err)
+		}
+
+		return found, nil
+	case askImplementations:
+		found, err := resolver.Implementations(ctx, at)
+		if err != nil {
+			return nil, fmt.Errorf("implementations: %w", err)
+		}
+
+		return found, nil
+	}
+
+	found, err := resolver.Definition(ctx, at)
+	if err != nil {
+		return nil, fmt.Errorf("definition: %w", err)
+	}
+
+	return []entities.Location{found}, nil
+}
+
+func TestTypedAnswersTheAdhocPackagesWithoutTheFallback(t *testing.T) {
+	t.Parallel()
+
+	fix := newFixture(t, adhocFiles())
+
+	testCases := []struct {
+		name  string
+		kind  int
+		query spot
+		want  []spot
+	}{
+		{
+			"a type read by its method receiver",
+			askReferences,
+			spot{"testdata/fix/a.go", "Stack struct", 0},
+			[]spot{{"testdata/fix/a.go", "Stack)", 0}},
+		},
+		{
+			"an interface read by its blank assertion",
+			askReferences,
+			spot{"testdata/fix/a.go", "Reader interface", 0},
+			[]spot{{"testdata/fix/a.go", "Reader =", 0}},
+		},
+		{
+			"an implementor in the same directory and one in a sibling, as gopls once both are loaded",
+			askImplementations,
+			spot{"testdata/fix/a.go", "Reader interface", 0},
+			[]spot{
+				{"testdata/fix/a.go", "ReaderA struct", 0},
+				{"testdata/sib/b.go", "Far struct", 0},
+			},
+		},
+		{
+			"a use in the external test package",
+			askDefinition,
+			spot{"testdata/fix/a_x_test.go", "ReaderA{}", 0},
+			[]spot{{"testdata/fix/a.go", "ReaderA struct", 0}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			secondary := NewMockSecondary(gomock.NewController(t))
+			fallback := NewFallback(fix.resolver, secondary, quietLogger())
+
+			got, err := answerOf(fallback, testCase.kind, fix.locate(t, testCase.query))
+			if err != nil {
+				t.Fatalf("query error = %v", err)
+			}
+
+			want := fix.locations(t, testCase.want)
+			if !slices.Equal(got, want) {
+				t.Fatalf("answer = %v, want %v", got, want)
+			}
+
+			if fallback.Fallbacks() != 0 {
+				t.Fatalf("Fallbacks() = %d, want 0", fallback.Fallbacks())
+			}
+		})
+	}
+
+	fix.requireNoFactsUnder(t, "testdata/")
+}
+
+func (fix fixture) requireNoFactsUnder(t *testing.T, prefix string) {
+	t.Helper()
+
+	facts, err := fix.source.Facts(context.Background(), fix.resolver.snap, fix.decls)
+	if err != nil {
+		t.Fatalf("Facts() error = %v", err)
+	}
+
+	for _, use := range facts.Uses {
+		if strings.HasPrefix(use.Dependent.File, prefix) {
+			t.Fatalf("Facts() holds %+v from the ad hoc pass", use)
+		}
+	}
+}
+
+func TestTypedAdhocFailureLeavesThoseFilesUncovered(t *testing.T) {
+	t.Parallel()
+
+	fix := newFixture(t, adhocFiles())
+
+	if _, err := fix.source.Packages(context.Background(), fix.resolver.snap); err != nil {
+		t.Fatalf("Packages() error = %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(fix.resolver.snap.Root, "go.mod")); err != nil {
+		t.Fatalf("remove go.mod: %v", err)
+	}
+
+	testCases := []struct {
+		name    string
+		query   spot
+		wantErr error
+	}{
+		{"a file of the main load is still answered", spot{"a.go", "One() int", 0}, nil},
+		{
+			"a file of the failed ad hoc pass is left to the fallback",
+			spot{"testdata/fix/a.go", "Stack struct", 0},
+			ErrNotCovered,
+		},
+	}
+
+	for _, testCase := range testCases {
+		_, err := fix.resolver.References(context.Background(), fix.locate(t, testCase.query))
+		if !errors.Is(err, testCase.wantErr) {
+			t.Fatalf("%s: References() error = %v, want %v", testCase.name, err, testCase.wantErr)
+		}
+	}
 }

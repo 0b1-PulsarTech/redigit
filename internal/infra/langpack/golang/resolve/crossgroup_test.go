@@ -1,10 +1,17 @@
 package resolve
 
 import (
+	"context"
 	"errors"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/testkit"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 )
 
 func TestTypedImplementationsAcrossGroups(t *testing.T) {
@@ -83,6 +90,94 @@ func TestTypedImplementationsAcrossGroups(t *testing.T) {
 			want := fix.locations(t, testCase.want)
 			if !slices.Equal(got, want) && (len(got) != 0 || len(want) != 0) {
 				t.Fatalf("Implementations() = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestTypedImplementationsAcrossACgoGroup(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		cgo     bool
+		wantErr error
+	}{
+		{"a group holding a cgo package", true, ErrNotCovered},
+		{"a group without one", false, nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			resolver := &Typed{}
+			_, _ = resolver.built.Do(
+				context.Background(),
+				func(context.Context) ([]index, error) {
+					return []index{{
+						covered: map[string]covering{
+							"a.go": {textFile: newTextFile([]byte("package a\n"))},
+						},
+						cgo: testCase.cgo,
+					}}, nil
+				},
+			)
+
+			_, err := resolver.Implementations(
+				context.Background(), entities.Location{File: "a.go", Char: 8},
+			)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("Implementations() error = %v, want %v", err, testCase.wantErr)
+			}
+		})
+	}
+}
+
+func TestTypedKeepsTheAdhocFailure(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		removed   bool
+		cancelled bool
+		wantErr   bool
+	}{
+		{"an ad hoc pass that fails", true, false, true},
+		{"an ad hoc pass that succeeds", false, false, false},
+		{"an ad hoc pass cut short by a cancelled build", false, true, false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			snap, _ := testkit.Fixture(t, map[string]string{"a.go": "package fixture\n"})
+			source := typed.NewSource(nil)
+
+			if _, err := source.Packages(context.Background(), snap); err != nil {
+				t.Fatalf("Packages() error = %v", err)
+			}
+
+			if testCase.removed {
+				if err := os.Remove(filepath.Join(snap.Root, "go.mod")); err != nil {
+					t.Fatalf("remove go.mod: %v", err)
+				}
+			}
+
+			resolver := NewTyped(source, snap)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if testCase.cancelled {
+				cancel()
+			}
+
+			_, _ = resolver.build(ctx)
+
+			if got := resolver.AdhocErr() != nil; got != testCase.wantErr {
+				t.Fatalf("AdhocErr() = %v, want an error %v", resolver.AdhocErr(), testCase.wantErr)
 			}
 		})
 	}
