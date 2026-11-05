@@ -16,12 +16,16 @@ tasks:
 
   test:
     desc: Race tests
+    env:
+      CGO_ENABLED: '1'
     cmds:
       - go vet ./...
       - go test -race ./...
 
   test:integration:
     desc: Tests behind the integration tag
+    env:
+      CGO_ENABLED: '1'
     cmds:
       - go test -race -tags=integration ./...
 
@@ -39,8 +43,10 @@ tasks:
 
   gate:
     desc: Everything that must be green before a commit
+    env:
+      CGO_ENABLED: '1'
     cmds:
-      - go build ./...
+      - CGO_ENABLED=0 go build ./...
       - go vet ./...
       - go test -race ./...
       - test -z "$(gofmt -l . | tee /dev/stderr)"
