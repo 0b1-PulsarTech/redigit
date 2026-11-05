@@ -1,4 +1,4 @@
-package indexing
+package lineindex
 
 import (
 	"unicode/utf16"
