@@ -2,10 +2,14 @@ package sql
 
 import (
 	"context"
+	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/declsource"
+	"github.com/wrapped-owls/redigit/internal/infra/sqlstmt"
 )
 
 type Migration struct{}
@@ -113,4 +117,46 @@ func migrationFiles(files []string) []string {
 	}
 
 	return out
+}
+
+func (model *sqlModel) readMigrations(snap entities.Snapshot) error {
+	for _, file := range migrationFiles(snap.Files) {
+		source, err := declsource.ReadSource(snap, file)
+		if err != nil {
+			return fmt.Errorf("sql model source: %w", err)
+		}
+
+		for _, stmt := range sqlstmt.Split(source) {
+			key := entities.DeclKey{File: file, Kind: entities.KindOther, Name: stmt.Name}
+
+			if name, isExtension := strings.CutPrefix(stmt.Name, "extension:"); isExtension {
+				model.extensions[name] = key
+			}
+
+			if stmt.Kind == sqlstmt.CreateTable {
+				model.tables[stmt.Table] = &sqlTable{name: stmt.Table}
+				model.order = append(model.order, stmt.Table)
+			}
+
+			table, known := model.tables[stmt.Table]
+			if !known {
+				continue
+			}
+
+			table.stmts = append(
+				table.stmts, sqlStmt{
+					key: key, kind: stmt.Kind, refs: stmt.Refs,
+					words: sqlstmt.Idents(source[stmt.Start:stmt.End]),
+				},
+			)
+
+			for _, ref := range stmt.Refs {
+				if ref != stmt.Table && !slices.Contains(table.refs, ref) {
+					table.refs = append(table.refs, ref)
+				}
+			}
+		}
+	}
+
+	return nil
 }
