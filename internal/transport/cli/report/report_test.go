@@ -240,7 +240,7 @@ func TestInInterfaceMarksTheWholeMethodSet(t *testing.T) {
 	}
 }
 
-// reportGraph and reportStart give runReport a fake pipeline whose Graph and
+// reportGraph and reportStart give RunReport a fake pipeline whose Graph and
 // Births return controllable, deterministic data.
 func reportStart(
 	ctrl *gomock.Controller,
@@ -328,7 +328,7 @@ func TestRunReport(t *testing.T) {
 		var out bytes.Buffer
 
 		if err := RunReport(context.Background(), bootstrap.Config{}, &out, start); err != nil {
-			t.Fatalf("runReport() = %v", err)
+			t.Fatalf("RunReport() = %v", err)
 		}
 
 		var got reportLine

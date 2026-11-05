@@ -10,7 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 )
 
-// TestWithPipeline covers the three things withPipeline can do: fail to
+// TestWithPipeline covers the three things WithPipeline can do: fail to
 // start, run the caller's function and hand back its error, or succeed and
 // still close the pipeline it started.
 func TestWithPipeline(t *testing.T) {
