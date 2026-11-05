@@ -207,6 +207,84 @@ func TestApplyConfigFileRefusesWhatLoadWouldHave(t *testing.T) {
 	}
 }
 
+func TestApplyConfigFileKeepsRulesAndPath(t *testing.T) {
+	t.Parallel()
+
+	rule := globRule{globs: []string{"*.go"}}
+	file := ConfigFile{Path: "/etc/redigit.json", Rules: []rules.Rule{rule}}
+
+	cfg, err := ApplyConfigFile(Config{}, file, func(string) bool { return false })
+	if err != nil {
+		t.Fatalf("ApplyConfigFile() = %v", err)
+	}
+
+	if cfg.ConfigPath != file.Path {
+		t.Fatalf("ConfigPath = %q, want %q", cfg.ConfigPath, file.Path)
+	}
+
+	if len(cfg.Rules) != 1 {
+		t.Fatalf("Rules = %v, want one rule", cfg.Rules)
+	}
+
+	if got, ok := cfg.Rules[0].(globRule); !ok || got.Type() != rule.Type() {
+		t.Fatalf("Rules[0] = %#v, want %#v", cfg.Rules[0], rule)
+	}
+}
+
+func TestApplyConfigFileKeepsTheRawSections(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		content string
+		want    map[string]string
+	}{
+		{
+			name: "every raw section is kept",
+			content: `{"slice":{"a":1},"passes":{"b":2},"format":{"c":3},` +
+				`"write":{"d":4},"verify":{"e":5},"lineage":{"f":6},"lint":{"g":7}}`,
+			want: map[string]string{
+				"slice": `{"a":1}`, "passes": `{"b":2}`, "format": `{"c":3}`,
+				"write": `{"d":4}`, "verify": `{"e":5}`, "lineage": `{"f":6}`, "lint": `{"g":7}`,
+			},
+		},
+		{
+			name:    "a missing section is empty",
+			content: `{"verify":{"e":5}}`,
+			want: map[string]string{
+				"slice": "", "passes": "", "format": "",
+				"write": "", "verify": `{"e":5}`, "lineage": "", "lint": "",
+			},
+		},
+		{
+			name:    "a file with no section keeps none",
+			content: `{}`,
+			want: map[string]string{
+				"slice": "", "passes": "", "format": "",
+				"write": "", "verify": "", "lineage": "", "lint": "",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := loadAndApply(t, testCase.content, Config{}, nil)
+			got := map[string]string{
+				"slice": string(cfg.Sections.Slice), "passes": string(cfg.Sections.Passes),
+				"format": string(cfg.Sections.Format), "write": string(cfg.Sections.Write),
+				"verify": string(cfg.Sections.Verify), "lineage": string(cfg.Sections.Lineage),
+				"lint": string(cfg.Sections.Lint),
+			}
+
+			if !maps.Equal(got, testCase.want) {
+				t.Fatalf("Sections = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
 func loadAndApply(t testing.TB, content string, prior Config, explicit map[string]bool) Config {
 	t.Helper()
 
