@@ -154,34 +154,3 @@ func (flow bodyFlow) needs(index int) []int {
 }
 
 func byPos(left, right types.Object) int { return cmp.Compare(left.Pos(), right.Pos()) }
-
-func (flow bodyFlow) joinDeclarations(groups groups) {
-	for index := range flow.declares {
-		for _, obj := range slices.SortedFunc(maps.Keys(flow.declares[index]), byPos) {
-			flow.joinReader(groups, index, obj)
-		}
-	}
-}
-
-func (flow bodyFlow) joinReader(groups groups, declaration int, obj types.Object) {
-	// A declaration is born with the first statement that reads it: Go refuses an unused local.
-	first := -1
-
-	for index := declaration + 1; index < len(flow.reads); index++ {
-		if !flow.reads[index][obj] {
-			continue
-		}
-
-		if groups.find(index) == groups.find(declaration) {
-			return
-		}
-
-		if first < 0 {
-			first = index
-		}
-	}
-
-	if first >= 0 {
-		groups.join(declaration, first)
-	}
-}
