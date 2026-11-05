@@ -306,3 +306,64 @@ func TestLazySessionFailedStart(t *testing.T) {
 		})
 	}
 }
+
+func TestServerConfig_mergedInitOptions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		cfg            ServerConfig
+		wantBuildFlags []string
+		wantExtraKey   string
+	}{
+		{
+			name:           "build flags only",
+			cfg:            ServerConfig{BuildFlags: []string{"-tags=integration"}},
+			wantBuildFlags: []string{"-tags=integration"},
+		},
+		{
+			name:           "nil build flags is explicit, not omitted",
+			cfg:            ServerConfig{},
+			wantBuildFlags: nil,
+		},
+		{
+			name: "extra options merged alongside build flags",
+			cfg: ServerConfig{
+				BuildFlags: []string{"-tags=integration"},
+				InitializationOptions: map[string]any{
+					"env": map[string]string{"GOFLAGS": "-mod=mod"},
+				},
+			},
+			wantBuildFlags: []string{"-tags=integration"},
+			wantExtraKey:   "env",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := testCase.cfg.mergedInitOptions()
+
+			flags, ok := got["buildFlags"]
+			if !ok {
+				t.Fatalf("mergedInitOptions: missing buildFlags key entirely: %v", got)
+			}
+
+			gotFlags, _ := flags.([]string)
+			if len(gotFlags) != len(testCase.wantBuildFlags) {
+				t.Fatalf("buildFlags = %v, want %v", gotFlags, testCase.wantBuildFlags)
+			}
+
+			if testCase.wantExtraKey != "" {
+				if _, ok := got[testCase.wantExtraKey]; !ok {
+					t.Fatalf(
+						"mergedInitOptions: missing extra key %q: %v",
+						testCase.wantExtraKey,
+						got,
+					)
+				}
+			}
+		})
+	}
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"maps"
 	"sync"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -109,4 +111,41 @@ func (lazy *LazySession) ensure(ctx context.Context) error {
 	}
 
 	return lazy.err
+}
+
+// ServerConfig configures which language server Session starts and how, so
+// this package never hardcodes what "Go" means.
+type ServerConfig struct {
+	// Command and Args launch the server, e.g. "gopls", []string{"-mode=stdio"}.
+	Command string
+	Args    []string
+	// RootPath is the workspace root directory. It is a plain path, not a
+	// URI: encoding one is this package's job, not a caller's, and a caller
+	// that has to build "file://..." by hand will eventually get a space or a
+	// drive letter wrong.
+	RootPath string
+	// BuildFlags is REQUIRED and explicit on purpose: gopls answers
+	// references/implementation/workspace-symbol only for files visible
+	// under these flags, silently and without error otherwise. Passing
+	// []string{"-tags=integration"} is what makes a file behind
+	// //go:build integration visible to those queries; passing nil is a
+	// conscious choice to exclude them, not an oversight this type lets
+	// happen by accident.
+	BuildFlags []string
+	// InitializationOptions are extra flat gopls settings merged with
+	// BuildFlags under the "buildFlags" key. gopls flattens nested JSON on
+	// the last "."-separated segment, so this map must already be flat
+	// (e.g. "buildFlags", not "build.buildFlags").
+	InitializationOptions map[string]any
+	// Logger receives debug-level transport diagnostics. Defaults to
+	// slog.Default() when nil.
+	Logger *slog.Logger
+}
+
+func (c ServerConfig) mergedInitOptions() map[string]any {
+	merged := make(map[string]any, len(c.InitializationOptions)+1)
+	maps.Copy(merged, c.InitializationOptions)
+	merged["buildFlags"] = c.BuildFlags
+
+	return merged
 }

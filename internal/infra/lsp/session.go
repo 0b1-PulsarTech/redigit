@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,43 +44,6 @@ var ErrEmptyCommand = errors.New("lsp: server command is empty")
 // Session.Definition returns instead of a zero-value entities.Location a
 // caller could mistake for a real one.
 var ErrNoDefinition = errors.New("lsp: no definition found")
-
-// ServerConfig configures which language server Session starts and how, so
-// this package never hardcodes what "Go" means.
-type ServerConfig struct {
-	// Command and Args launch the server, e.g. "gopls", []string{"-mode=stdio"}.
-	Command string
-	Args    []string
-	// RootPath is the workspace root directory. It is a plain path, not a
-	// URI: encoding one is this package's job, not a caller's, and a caller
-	// that has to build "file://..." by hand will eventually get a space or a
-	// drive letter wrong.
-	RootPath string
-	// BuildFlags is REQUIRED and explicit on purpose: gopls answers
-	// references/implementation/workspace-symbol only for files visible
-	// under these flags, silently and without error otherwise. Passing
-	// []string{"-tags=integration"} is what makes a file behind
-	// //go:build integration visible to those queries; passing nil is a
-	// conscious choice to exclude them, not an oversight this type lets
-	// happen by accident.
-	BuildFlags []string
-	// InitializationOptions are extra flat gopls settings merged with
-	// BuildFlags under the "buildFlags" key. gopls flattens nested JSON on
-	// the last "."-separated segment, so this map must already be flat
-	// (e.g. "buildFlags", not "build.buildFlags").
-	InitializationOptions map[string]any
-	// Logger receives debug-level transport diagnostics. Defaults to
-	// slog.Default() when nil.
-	Logger *slog.Logger
-}
-
-func (c ServerConfig) mergedInitOptions() map[string]any {
-	merged := make(map[string]any, len(c.InitializationOptions)+1)
-	maps.Copy(merged, c.InitializationOptions)
-	merged["buildFlags"] = c.BuildFlags
-
-	return merged
-}
 
 // Session starts one language server process and answers indexing.Resolver
 // against it. It owns the process and the single reader goroutine that
