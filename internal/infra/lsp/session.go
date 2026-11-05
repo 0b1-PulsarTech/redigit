@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -23,6 +24,19 @@ import (
 // LSP spec requires reading as UTF-16 and which gopls always does regardless
 // of what general.positionEncodings this client advertised.
 const defaultPositionEncoding = "utf-16"
+
+// closeTimeout bounds how long Session.Close may take even when the caller
+// passes a ctx with no deadline of its own (context.Background() is a legal
+// value; nothing in this package's exported API forbids it). Close exists
+// specifically to guarantee the session's resources stop, so it cannot
+// simply inherit an undeadlined ctx and risk blocking forever behind a
+// wedged shutdown call (see sendRacingCtx). This value is generous enough
+// for a real language server's graceful shutdown/exit round trip - which
+// normally completes in a small fraction of a second, even for a large
+// workspace, since it is just two small frames over an already-open pipe -
+// while still keeping Close's worst case bounded to a small, human-scale
+// ceiling instead of an indefinite hang.
+const closeTimeout = 5 * time.Second
 
 // ErrEmptyCommand reports a ServerConfig with no server command to launch.
 var ErrEmptyCommand = errors.New("lsp: server command is empty")
