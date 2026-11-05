@@ -285,7 +285,7 @@ func TestRunReport(t *testing.T) {
 
 		var out bytes.Buffer
 
-		err := runReport(context.Background(), bootstrap.Config{}, &out, start)
+		err := RunReport(context.Background(), bootstrap.Config{}, &out, start)
 		if !errors.Is(err, errBoom) {
 			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
 		}
@@ -299,7 +299,7 @@ func TestRunReport(t *testing.T) {
 
 		var out bytes.Buffer
 
-		err := runReport(context.Background(), bootstrap.Config{}, &out, start)
+		err := RunReport(context.Background(), bootstrap.Config{}, &out, start)
 		if !errors.Is(err, errBoom) {
 			t.Fatalf("err = %v, want it to wrap %v", err, errBoom)
 		}
@@ -313,7 +313,7 @@ func TestRunReport(t *testing.T) {
 
 		errWrite := errors.New("disk full")
 
-		err := runReport(context.Background(), bootstrap.Config{}, failWriter{err: errWrite}, start)
+		err := RunReport(context.Background(), bootstrap.Config{}, failWriter{err: errWrite}, start)
 		if !errors.Is(err, errWrite) {
 			t.Fatalf("err = %v, want it to wrap %v", err, errWrite)
 		}
@@ -327,7 +327,7 @@ func TestRunReport(t *testing.T) {
 
 		var out bytes.Buffer
 
-		if err := runReport(context.Background(), bootstrap.Config{}, &out, start); err != nil {
+		if err := RunReport(context.Background(), bootstrap.Config{}, &out, start); err != nil {
 			t.Fatalf("runReport() = %v", err)
 		}
 

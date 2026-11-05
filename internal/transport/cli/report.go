@@ -71,7 +71,7 @@ type reportLine struct {
 	Readers    []readerDTO `json:"readers"`
 }
 
-// runReport writes one JSON object per declaration, ordered by how far it sits
+// RunReport writes one JSON object per declaration, ordered by how far it sits
 // ahead of its first outside reader.
 //
 // Positions are the SOURCE history's, not a rebuilt ordering's, because the
@@ -79,7 +79,7 @@ type reportLine struct {
 // each file as it stood at each commit that touched it: a file's own first
 // touch dates every declaration it ever gains to the moment it was created
 // nearly empty, which is precisely the measurement that breaks a move.
-func runReport(
+func RunReport(
 	ctx context.Context,
 	cfg bootstrap.Config,
 	out io.Writer,

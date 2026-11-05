@@ -148,7 +148,7 @@ func route(ctx context.Context, call invocation) error {
 	case cmdPlan:
 		return runPlan(ctx, call.cfg, call.stdout, call.start)
 	case cmdReport:
-		return runReport(ctx, call.cfg, call.stdout, call.start)
+		return RunReport(ctx, call.cfg, call.stdout, call.start)
 	case cmdEmit:
 		return runEmit(ctx, call.cfg, call.start, call.stdout)
 	case cmdChunks:
