@@ -392,3 +392,56 @@ func TestRuleConstructorsGoE2E(t *testing.T) {
 		})
 	}
 }
+
+func TestRunHooksReleasesWhatEarlierHooksOpenedWhenOneFails(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("hook failed")
+
+	testCases := []struct {
+		name       string
+		failing    error
+		wantClosed []string
+	}{
+		{
+			name:       "a failing hook closes the earlier hooks' closers once",
+			failing:    boom,
+			wantClosed: []string{"b", "a"},
+		},
+		{name: "no failure leaves them open for the pipeline", wantClosed: nil},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var order []string
+
+			opening := func(name string, err error) namedHook {
+				return namedHook{name: name, run: func(
+					_ context.Context, _ *Config, _ stageEnv, built *stages,
+				) error {
+					built.closers = append(built.closers, orderedCloser{name, &order})
+
+					return err
+				}}
+			}
+
+			cfg := Defaults()
+			hooks := []namedHook{opening("a", nil), opening("b", nil), {name: "last", run: func(
+				context.Context, *Config, stageEnv, *stages,
+			) error {
+				return testCase.failing
+			}}}
+
+			err := runHooks(t.Context(), &cfg, stageEnv{}, identityStages(nil), hooks)
+			if !errors.Is(err, testCase.failing) {
+				t.Fatalf("runHooks() = %v, want %v", err, testCase.failing)
+			}
+
+			if !slices.Equal(order, testCase.wantClosed) {
+				t.Fatalf("closed %v, want %v", order, testCase.wantClosed)
+			}
+		})
+	}
+}

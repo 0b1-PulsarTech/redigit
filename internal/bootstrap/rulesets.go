@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/gofacts"
+	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/di"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/idiom/e2e"
@@ -73,4 +78,71 @@ func ruleConstructors() map[string]rules.Constructor {
 		"go-router": router.Constructor("go-router"),
 		"pin":       pinrule.Constructor("pin"),
 	}
+}
+
+type (
+	stageHook func(context.Context, *Config, stageEnv, *stages) error
+
+	namedHook struct {
+		name string
+		run  stageHook
+	}
+
+	stageEnv struct {
+		root     string
+		opened   revision
+		specific []indexing.Language
+		goSource *typed.Source
+		tree     finalTree
+	}
+
+	stages struct {
+		languages []indexing.Language
+		orderer   orderer
+		planner   planner
+		closers   closers
+	}
+)
+
+func shapeStages(
+	ctx context.Context,
+	cfg *Config,
+	env stageEnv,
+	configSyntax config.Syntax,
+	hooks []namedHook,
+) (indexing.Config, *stages, error) {
+	if err := validateChunkMap(cfg.ChunkMap, env.opened.snapshot, env.specific); err != nil {
+		return indexing.Config{}, nil, fmt.Errorf("validate chunk map: %w", err)
+	}
+
+	built := &stages{orderer: ordering.New(cfg.Ordering), planner: planning.New(cfg.Planning)}
+
+	if err := runHooks(ctx, cfg, env, built, hooks); err != nil {
+		return indexing.Config{}, nil, err
+	}
+
+	indexCfg := cfg.Indexing
+	indexCfg.Languages = slices.Concat(
+		env.specific, built.languages, []indexing.Language{opaqueLanguage(configSyntax)},
+	)
+
+	return indexCfg, built, nil
+}
+
+func runHooks(
+	ctx context.Context,
+	cfg *Config,
+	env stageEnv,
+	built *stages,
+	hooks []namedHook,
+) error {
+	for _, hook := range hooks {
+		if err := hook.run(ctx, cfg, env, built); err != nil {
+			release(ctx, built.closers)
+
+			return fmt.Errorf("%s: %w", hook.name, err)
+		}
+	}
+
+	return nil
 }
