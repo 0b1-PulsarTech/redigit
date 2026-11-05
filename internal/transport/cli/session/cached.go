@@ -25,6 +25,7 @@ type cachedPipeline struct {
 	hasGraph bool
 	hasOrder bool
 	hasPlan  bool
+	planErr  error
 }
 
 var _ Pipeline = (*cachedPipeline)(nil)
@@ -119,6 +120,8 @@ func (cached *cachedPipeline) Plan(
 	plan, err := cached.live.Plan(graph, order)
 	if err == nil {
 		cached.entry.Plan, cached.hasPlan = plan, true
+	} else {
+		cached.planErr = err
 	}
 
 	return plan, err

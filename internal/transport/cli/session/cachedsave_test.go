@@ -9,6 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/mock/gomock"
+
+	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/plancache"
 )
 
@@ -113,5 +116,25 @@ func TestPlanFailingDuringTheRunSavesNothing(t *testing.T) {
 
 	if !strings.Contains(logged.String(), "planning failed") {
 		t.Fatalf("logged %q, want the planning failure named", logged.String())
+	}
+}
+
+func TestPlanFailingDuringTheRunIsNotPlannedAgainOnClose(t *testing.T) {
+	live := NewMockPipeline(gomock.NewController(t))
+	live.EXPECT().Graph(gomock.Any()).Return(indexing.Result{Graph: declGraph()}, nil)
+	live.EXPECT().Order(gomock.Any()).Return(cannedOrder(), nil)
+	live.EXPECT().Plan(gomock.Any(), gomock.Any()).Return(cannedPlan(), errors.New("plan")).Times(1)
+	live.EXPECT().Close(gomock.Any()).Return(nil)
+
+	pl := begin(t, &startCounter{live: live}, plancache.Open(t.TempDir()))
+	result, _ := pl.Graph(t.Context())
+	order, _ := pl.Order(result.Graph)
+
+	if _, err := pl.Plan(result.Graph, order); err == nil {
+		t.Fatal("Plan() err = nil, want the stage failure")
+	}
+
+	if err := pl.Close(t.Context()); err != nil {
+		t.Fatalf("Close() err = %v", err)
 	}
 }

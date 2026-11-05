@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/infra/plancache"
 )
 
@@ -14,7 +15,15 @@ func (cached *cachedPipeline) save() {
 	}
 
 	if !cached.hasPlan {
-		plan, err := cached.live.Plan(cached.result.Graph, cached.entry.Ordering)
+		err := cached.planErr
+
+		var plan entities.Plan
+
+		// A plan the command already failed is not paid for a second time.
+		if err == nil {
+			plan, err = cached.live.Plan(cached.result.Graph, cached.entry.Ordering)
+		}
+
 		if err != nil {
 			slog.Warn(
 				"the plan cache was not saved: planning failed",
