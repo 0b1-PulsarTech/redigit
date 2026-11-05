@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -131,4 +132,41 @@ func readFrame(r *bufio.Reader) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+// jsonNull is the wire form of a JSON null value.
+const jsonNull = "null"
+
+// locations decodes a `Location | Location[] | null` result - the shape
+// definition and implementation return when linkSupport is not advertised -
+// into a plain slice.
+type locations []Location
+
+func (l *locations) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+
+	switch {
+	case len(trimmed) == 0 || string(trimmed) == jsonNull:
+		*l = nil
+
+		return nil
+	case trimmed[0] == '[':
+		var arr []Location
+		if err := json.Unmarshal(trimmed, &arr); err != nil {
+			return fmt.Errorf("unmarshal locations array: %w", err)
+		}
+
+		*l = arr
+
+		return nil
+	default:
+		var single Location
+		if err := json.Unmarshal(trimmed, &single); err != nil {
+			return fmt.Errorf("unmarshal single location: %w", err)
+		}
+
+		*l = locations{single}
+
+		return nil
+	}
 }

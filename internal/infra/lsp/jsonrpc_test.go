@@ -220,3 +220,76 @@ func TestReadFrame(t *testing.T) {
 		})
 	}
 }
+
+func TestLocationsUnmarshal(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		body    string
+		want    locations
+		wantErr bool
+	}{
+		{name: "null", body: `null`, want: nil},
+		{
+			name: "single object",
+			body: `{"uri":"file:///a.go","range":{"start":{"line":1,"character":2},"end":{"line":1,"character":5}}}`,
+			want: locations{
+				{
+					URI: "file:///a.go",
+					Range: Range{
+						Start: Position{Line: 1, Character: 2},
+						End:   Position{Line: 1, Character: 5},
+					},
+				},
+			},
+		},
+		{
+			name: "array of one",
+			body: `[{"uri":"file:///a.go","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":1}}}]`,
+			want: locations{
+				{
+					URI: "file:///a.go",
+					Range: Range{
+						Start: Position{Line: 0, Character: 0},
+						End:   Position{Line: 0, Character: 1},
+					},
+				},
+			},
+		},
+		{name: "empty array", body: `[]`, want: locations{}},
+		{name: "malformed object", body: `{"uri":`, wantErr: true},
+		{name: "malformed array", body: `[{"uri":`, wantErr: true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got locations
+			err := json.Unmarshal([]byte(testCase.body), &got)
+
+			if testCase.wantErr {
+				if err == nil {
+					t.Fatalf("unmarshal: want error, got nil")
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+
+			if len(got) != len(testCase.want) {
+				t.Fatalf("got = %+v, want %+v", got, testCase.want)
+			}
+
+			for i := range got {
+				if got[i] != testCase.want[i] {
+					t.Fatalf("got[%d] = %+v, want %+v", i, got[i], testCase.want[i])
+				}
+			}
+		})
+	}
+}
