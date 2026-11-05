@@ -17,6 +17,7 @@ import (
 )
 
 //go:generate go tool -modfile=../../../tools/go.mod mockgen -source=session/pipeline.go -destination=pipeline_mock_test.go -package=cli
+//go:generate go tool -modfile=../../../tools/go.mod mockgen -source=session/pipeline.go -destination=report/pipeline_mock_test.go -package=report
 
 type runOptions struct {
 	cpuProfile  string
