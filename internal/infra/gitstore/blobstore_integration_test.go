@@ -3,8 +3,13 @@
 package gitstore
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +22,7 @@ const emptyBlobOID = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 func catFile(t *testing.T, dir, oid string) []byte {
 	t.Helper()
 
-	out, err := runGit(t.Context(), dir, "cat-file", "-p", oid)
+	out, err := blobGit(t.Context(), dir, "cat-file", "-p", oid)
 	if err != nil {
 		t.Fatalf("cat-file -p %s: %v", oid, err)
 	}
@@ -28,15 +33,73 @@ func catFile(t *testing.T, dir, oid string) []byte {
 func objectExists(t *testing.T, dir, oid string) bool {
 	t.Helper()
 
-	_, err := runGit(t.Context(), dir, "cat-file", "-e", oid)
+	_, err := blobGit(t.Context(), dir, "cat-file", "-e", oid)
 
 	return err == nil
+}
+
+func blobGit(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	out, err := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("git %v: %w", args, err)
+	}
+
+	return out, nil
+}
+
+func blobHead(ctx context.Context, dir string) (string, error) {
+	out, err := blobGit(ctx, dir, "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes.TrimSpace(out)), nil
+}
+
+func blobTestRepo(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"config", "user.email", "tester@example.com"},
+		{"config", "user.name", "Tester"},
+	} {
+		if _, err := blobGit(t.Context(), dir, args...); err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+	}
+
+	return dir
+}
+
+func blobCommitFiles(t *testing.T, dir, message string, files map[string][]byte) {
+	t.Helper()
+
+	for path, content := range files {
+		full := filepath.Join(dir, filepath.FromSlash(path))
+
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(full), err)
+		}
+
+		if err := os.WriteFile(full, content, 0o600); err != nil {
+			t.Fatalf("write %s: %v", full, err)
+		}
+	}
+
+	for _, args := range [][]string{{"add", "-A"}, {"commit", "-q", "-m", message}} {
+		if _, err := blobGit(t.Context(), dir, args...); err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+	}
 }
 
 func TestBlobStorePutSameContentWritesOnce(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
 	t.Cleanup(func() {
@@ -76,7 +139,7 @@ func TestBlobStorePutSameContentWritesOnce(t *testing.T) {
 func TestBlobStorePutEmptyContentIsTheWellKnownID(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
 	t.Cleanup(func() { _ = s.Close() })
@@ -94,7 +157,7 @@ func TestBlobStorePutEmptyContentIsTheWellKnownID(t *testing.T) {
 func TestBlobStorePutSurvivesNULAndNonUTF8Content(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
 	t.Cleanup(func() { _ = s.Close() })
@@ -127,7 +190,7 @@ func TestBlobStorePutSurvivesNULAndNonUTF8Content(t *testing.T) {
 func TestBlobStorePutAcceptsPathsWithSpaceAndQuote(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
 	t.Cleanup(func() { _ = s.Close() })
@@ -161,7 +224,7 @@ func TestBlobStorePutAcceptsPathsWithSpaceAndQuote(t *testing.T) {
 func TestBlobStoreDryRunMatchesWriteAndWritesNothing(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	content := []byte("package a\n")
 
 	dry := NewDryRunBlobStore(dir)
@@ -198,10 +261,10 @@ func TestBlobStoreDryRunMatchesWriteAndWritesNothing(t *testing.T) {
 func TestBlobStoreNeverTouchesRefIndexOrWorkingTree(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
-	commitTestFiles(t, dir, "seed", map[string][]byte{"a.go": []byte("package a\n")})
+	dir := blobTestRepo(t)
+	blobCommitFiles(t, dir, "seed", map[string][]byte{"a.go": []byte("package a\n")})
 
-	headBefore, err := revParse(t.Context(), dir, "HEAD")
+	headBefore, err := blobHead(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("resolve HEAD before: %v", err)
 	}
@@ -219,7 +282,7 @@ func TestBlobStoreNeverTouchesRefIndexOrWorkingTree(t *testing.T) {
 		t.Fatalf("Close() err = %v", err)
 	}
 
-	headAfter, err := revParse(t.Context(), dir, "HEAD")
+	headAfter, err := blobHead(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("resolve HEAD after: %v", err)
 	}
@@ -232,7 +295,7 @@ func TestBlobStoreNeverTouchesRefIndexOrWorkingTree(t *testing.T) {
 		)
 	}
 
-	status, err := runGit(t.Context(), dir, "status", "--porcelain")
+	status, err := blobGit(t.Context(), dir, "status", "--porcelain")
 	if err != nil {
 		t.Fatalf("git status: %v", err)
 	}
@@ -248,7 +311,7 @@ func TestBlobStoreNeverTouchesRefIndexOrWorkingTree(t *testing.T) {
 func TestBlobStoreOnUnbornBranchTouchesNoRef(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
 	if _, err := s.Put(t.Context(), "a.go", ModeFile, []byte("package a\n")); err != nil {
@@ -259,7 +322,7 @@ func TestBlobStoreOnUnbornBranchTouchesNoRef(t *testing.T) {
 		t.Fatalf("Close() err = %v", err)
 	}
 
-	if _, err := revParse(t.Context(), dir, "HEAD"); err == nil {
+	if _, err := blobHead(t.Context(), dir); err == nil {
 		t.Fatalf("HEAD resolved on a repo with no commits: a blob write must never create one")
 	}
 }
@@ -274,7 +337,7 @@ func TestBlobStoreOnUnbornBranchTouchesNoRef(t *testing.T) {
 func TestBlobStoreThroughputAgainstRealData(t *testing.T) {
 	t.Parallel()
 
-	dir := newTestRepo(t)
+	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
 	t.Cleanup(func() {
@@ -329,7 +392,7 @@ func TestBlobStoreThroughputAgainstRealData(t *testing.T) {
 		}
 	}
 
-	status, err := runGit(t.Context(), dir, "status", "--porcelain")
+	status, err := blobGit(t.Context(), dir, "status", "--porcelain")
 	if err != nil {
 		t.Fatalf("git status: %v", err)
 	}
@@ -338,7 +401,7 @@ func TestBlobStoreThroughputAgainstRealData(t *testing.T) {
 		t.Fatalf("git status --porcelain = %q, want empty after %d blob writes", status, blobCount)
 	}
 
-	if _, err = revParse(t.Context(), dir, "HEAD"); err == nil {
+	if _, err = blobHead(t.Context(), dir); err == nil {
 		t.Fatalf("HEAD resolved after %d blob writes on a repo with no commits", blobCount)
 	}
 }
