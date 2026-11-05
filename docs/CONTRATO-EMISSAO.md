@@ -197,7 +197,7 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
 - A pre-imagem so se aplica se ela compila. Uma sonda monta a arvore final com as
   pre-imagens costuradas e decide: `fold` descarta a ancora e `wip` a mantem e
   marca com `[wip]` todo commit entre o nascimento da pre-imagem e a ancora. O
-  padrao e `fold`; `stop` chega na 24b e hoje so diz isso. A sonda so ve a arvore
+  padrao e `fold`; `stop` para e espera uma pessoa (abaixo). A sonda so ve a arvore
   final, entao uma pre-imagem que le algo colocado depois dela nao e pega por
   ela. Depois de colocar e adotar as ancoras, cada entrada viva de uma ancora
   que compilou (`kept`; uma `wip` ja esta marcada e uma sem veredito continua sem
@@ -391,6 +391,90 @@ pre-imagem) e vira o texto FINAL no commit da ancora.
 
 A invariante da arvore continua valendo: o ultimo commit tem a arvore do HEAD.
 `[wip]` e tolerado pelo `verify`; um commit vermelho sem a marca nao.
+
+### A politica `stop` e o `continue`
+
+`policy: stop` (global ou por ancora) faz uma ancora cuja pre-imagem nao compila
+parar a execucao em vez de dobrar ou marcar. So `plan` e `emit` param (codigo 3);
+`audit` planeja e registra a ancora no resumo (`outcome=stopped`) mas termina com
+0, e `report` nao planeja. A parada lista TODOS os conflitos, nao o primeiro, e
+nao escreve nada na saida padrao nem no cache do plano (uma parada e um plano que
+falhou, e o plano que falhou nao e guardado nem refeito). O resumo registra a
+ancora como `outcome=stopped`, tambem com `--from-cache`, nunca como `folded`.
+`stop` exige `--state-dir DIR`: sem ele e erro de uso (codigo 2) antes de
+qualquer indexacao, tambem para um `stop` so numa ancora, e nada e escrito num
+lugar escondido. A chave do cache nao inclui `--state-dir`.
+
+Codigos de saida: `0` terminou; `1` falhou; `2` uso ou configuracao invalida;
+`3` parou numa ancora e o estado ficou guardado em `--state-dir`. Se o estado nao
+pode ser guardado (`DIR` e um arquivo, o `conflicts/` ou um nome reservado de
+`DIR` tem algo que nao e do redigit, o disco falhou), a execucao termina com `2`
+(uso) ou `1`, nunca com `3`, e a mensagem diz que o estado nao foi guardado e que
+repetir com `policy` `fold` ou `wip`, ou com outro `--state-dir`, segue. `DIR` pode
+ter arquivos do usuario: a parada os deixa onde estao (um `notes.txt` ao lado
+segue la, codigo 3); a recusa e sobre o `conflicts/` e os nomes reservados.
+
+Em `DIR` ficam `state.json` (com a marca `redigit-stop-state`: a linha de comando
+original, o commit resolvido, o digest da configuracao original, as decisoes ate
+ali, se a parada criou `DIR`, e os conflitos; e a ultima coisa gravada, entao uma
+parada interrompida, ou que falha, deixa o estado anterior valido, e sem ele nao
+ha estado),
+`conflicts/<rev>/NN-<nome>.preimage` e `.final` (os dois textos de cada
+declaracao; um nome com mais de 120 bytes vira um prefixo e um hash) com o
+arquivo `.redigit-conflicts` em `conflicts/`, e, depois de um `continue`,
+`.redigit-continue.json`, a configuracao derivada. O `.redigit-conflicts` lista,
+um por linha, cada texto que o redigit gravou, e e gravado antes deles; o redigit
+so grava e so remove o que esta nessa lista e os nomes reservados e exatos
+`.redigit-stage`, `.redigit-old`, `.redigit-continue.json` e
+`.redigit-tmp-<digitos>`. Um texto listado que voce editou vai junto com o resto.
+Um arquivo comum num desses nomes reservados exatos conta como do redigit e sai.
+Uma pasta nesses nomes so sai vazia ou com o que a marca lista; com outra coisa
+dentro ela fica, com a marca ao lado: o `emit` recusa com codigo 2 e a nomeia, e o
+`--abort` termina com 0 e a deixa, sem nomea-la. Um `state.json` ou um `conflicts/` sem marca
+em `DIR` e recusado (codigo 2, o arquivo e nomeado) e nada e tocado. Um
+`continue` com um `conflicts/` marcado que tem uma entrada fora da lista (um
+arquivo ou uma pasta do usuario) roda; se ele para de novo, o `Save` recusa em
+vez de apagar (codigo 2, a entrada e nomeada, o estado fica), e se ele termina
+devolve 0 e deixa a entrada. A unica excecao a recusa de um `conflicts/` sem marca
+e um `conflicts/` vazio e sem marca ao lado de um `state.json` do redigit, que uma
+parada interrompida deixa e que e reaproveitado. Um `conflicts/` que e link
+simbolico nunca e tocado. `--config` nao pode nomear `.redigit-continue.json`.
+Duas execucoes ao mesmo tempo sobre o mesmo `DIR` nao sao suportadas.
+
+`redigit continue --state DIR [--fold REV] [--wip REV] [--rest fold|wip] [--abort]`
+segue dali. Cada decisao nomeia um conflito por um prefixo nao ambiguo do rev;
+uma ancora sem decisao para de novo (codigo 3), e o `continue` guarda o estado de
+novo, sobre o original, com todas as decisoes ate ali. `--rest fold|wip` decide
+todas as que ainda param, e o resultado de um `continue` que termina e identico,
+byte a byte, ao de uma execucao nova com as mesmas decisoes (`policy: fold` ou
+`wip` para todas, ou a decisao de cada ancora). O `continue` le a linha de
+comando guardada com a gramatica de flags do Go e a reexecuta com a
+configuracao original mais as decisoes, so na chave `lineage`, em
+`.redigit-continue.json`. Ele recusa, sem executar nada, quando: o commit ou a
+configuracao original mudaram desde a parada (codigo 1); a configuracao derivada
+passaria de 1 MiB (codigo 1); `DIR` tem um `state.json` ou um `conflicts/` sem a
+marca do redigit, ou nao tem estado (codigo 2); ou o estado guarda uma linha de
+comando que e um `continue` (codigo 1). Uma execucao que falha (codigo 1) deixa
+o estado como estava, e o mesmo comando segue; ela pode deixar parte de
+`conflicts/` ja trocada e um `.redigit-old`, o estado fica intacto, e corrigir a
+causa e repetir o mesmo comando, ou `--abort`, segue. Essa lista e a das recusas
+conhecidas, nao uma garantia de que nenhum outro caso existe. `--abort` remove
+so os textos da lista da marca (e as pastas `<rev>` que ficam vazias),
+`.redigit-continue.json` e as sobras reservadas do redigit, e por ultimo o
+`state.json` com a marca, de modo que uma remocao interrompida pode ser repetida;
+um primeiro save interrompido e depois uma remocao interrompida podem deixar um
+`conflicts/` vazio e sem marca, sem `state.json`: `emit` o recusa nomeando-o e
+`continue` e `--abort` dizem que nao ha estado (codigo 2), e remover o
+`conflicts/` vazio, ou usar outro `--state-dir`, segue; o `DIR` so sai se a parada
+o criou e ele ficou vazio, e o que o usuario guardou la dentro fica e faz o `rmdir` falhar, de proposito. Se uma troca de `conflicts/`
+foi interrompida, o `state.json` e as decisoes ficam e o `conflicts/` pode ja ser
+o novo. Um `conflicts/` marcado sem `state.json` e uma parada interrompida:
+`continue` diz que nao ha estado (codigo 2) e `--abort` o limpa (codigo 0), assim
+como um `state.json` com a marca mas sem linha de comando. Um
+`--edited REV` (uma pre-imagem editada a mao) nao existe nesta fatia: o formato
+de entrada dele ainda nao esta definido, e `continue` o recusa como flag
+desconhecida (codigo 2). `write` e `verify` leem um manifesto e nao planejam,
+entao nao param.
 
 ## 9. O que a regra `go-router` promete e o que nao promete
 
