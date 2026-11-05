@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"os/exec"
+
+	"github.com/wrapped-owls/redigit/pkg/jsonrpc"
 )
 
 // methodNotFoundCode is the JSON-RPC error code for a server-to-client
@@ -44,7 +46,7 @@ func (c *client) run(ctx context.Context) error {
 	reader := bufio.NewReader(c.r)
 
 	for {
-		raw, err := readFrame(reader)
+		raw, err := jsonrpc.ReadFrame(reader)
 		if err != nil {
 			c.failPending(err)
 

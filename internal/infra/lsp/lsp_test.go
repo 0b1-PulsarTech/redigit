@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/wrapped-owls/redigit/pkg/jsonrpc"
 )
 
 // testLogger discards diagnostics so tests stay quiet; failures are asserted
@@ -46,7 +48,7 @@ func (s *fakeServer) hangup() {
 func (s *fakeServer) next() incomingMessage {
 	s.t.Helper()
 
-	raw, err := readFrame(s.reader)
+	raw, err := jsonrpc.ReadFrame(s.reader)
 	if err != nil {
 		s.t.Fatalf("fakeServer: read frame: %v", err)
 	}
@@ -97,7 +99,7 @@ func (s *fakeServer) send(v any) {
 		s.t.Fatalf("fakeServer: encode: %v", err)
 	}
 
-	if err := writeFrame(s.writer, body); err != nil {
+	if err := jsonrpc.WriteFrame(s.writer, body); err != nil {
 		s.t.Fatalf("fakeServer: write frame: %v", err)
 	}
 }

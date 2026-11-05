@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/wrapped-owls/redigit/pkg/jsonrpc"
 )
 
 // cancelNotifyTimeout bounds how long a single $/cancelRequest send may
@@ -72,7 +74,7 @@ func (c *client) writeFrame(body []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	if err := writeFrame(c.w, body); err != nil {
+	if err := jsonrpc.WriteFrame(c.w, body); err != nil {
 		return fmt.Errorf("write frame: %w", err)
 	}
 
