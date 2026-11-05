@@ -282,3 +282,48 @@ func TestGuardedIndexRefusesAFailedStart(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildFlags(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		tags []string
+		want []string
+	}{
+		{"no tags yields nil, not -tags=", nil, nil},
+		{"empty slice also yields nil", []string{}, nil},
+		{"one tag", []string{"integration"}, []string{"-tags=integration"}},
+		{
+			"multiple tags share one flag, as go keeps only the last",
+			[]string{"integration", "e2e"},
+			[]string{"-tags=integration,e2e"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := buildFlags(testCase.tags)
+
+			if testCase.want == nil {
+				if got != nil {
+					t.Fatalf("buildFlags(%v) = %v, want nil", testCase.tags, got)
+				}
+
+				return
+			}
+
+			if len(got) != len(testCase.want) {
+				t.Fatalf("buildFlags(%v) = %v, want %v", testCase.tags, got, testCase.want)
+			}
+
+			for i, flag := range testCase.want {
+				if got[i] != flag {
+					t.Fatalf("buildFlags(%v)[%d] = %q, want %q", testCase.tags, i, got[i], flag)
+				}
+			}
+		})
+	}
+}
