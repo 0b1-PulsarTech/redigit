@@ -83,13 +83,21 @@ ambiente.
 
 ### 1.4 Mecanismo de plugin
 
-Registro em tempo de compilacao, como `go/analysis` e o golangci-lint. Nao
-`plugin`, nao subprocesso, nao WASM. Um binario estatico, CGO desligado.
+Go, Dart, Python e config sao registrados em tempo de compilacao, como
+`go/analysis` e o golangci-lint. Uma linguagem cujo parser real nao e Go
+importavel roda como pack em subprocesso: JSON-RPC sobre stdio, com o mesmo
+enquadramento do cliente LSP (`pkg/jsonrpc`) e o contrato publico em
+`pkg/langpack`. O primeiro e o pack de TypeScript, JavaScript e Svelte, sobre o
+parser do typescript-go. O binario redigit segue estatico, CGO desligado; so os
+testes com `-race` ligam CGO.
 
-Tree-sitter foi avaliado e **recusado por ora**: o binding oficial exige CGO, e
-o unico runtime "puro Go" disponivel (`gotreesitter`) tem 523 arquivos num
-pacote plano, 330 deles de teste, funcoes `...ForTest` exportadas na API publica
-e um `func Add(a, b int) int` no topo. Para Go usamos `go/ast` mais
+Decisao do dono em 2026-11-05, depois de duas rodadas medidas. Recusados:
+tree-sitter pelo binding oficial (exige CGO); `gotreesitter` (11 a 26 vezes mais
+lento, 917 MB num corpus Dart, erros falsos em 8 de 140 arquivos Dart); o pacote
+`plugin` do Go (quebra com `-trimpath` e com qualquer mudanca na API comum);
+bibliotecas c-shared (so trazem a gramatica); WASM pelo wazero (cerca de 100
+vezes mais lento que o nativo; oxc, swc e ruff pedem cola JS). Para Go usamos
+`go/ast` mais
 `github.com/dave/dst`, que existe precisamente para resolver o problema de
 comentarios que se soltam do no.
 
