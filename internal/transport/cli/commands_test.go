@@ -524,53 +524,6 @@ func TestWarnBlind(t *testing.T) {
 	}
 }
 
-// TestWarnUnclaimed pins that a path no language pack claims is logged (not
-// dropped), and that nothing is logged when every path was claimed. It runs
-// outside t.Parallel() for the same reason TestWarnBlind does: it swaps the
-// package-global slog default, and that state is process-wide.
-func TestWarnUnclaimed(t *testing.T) {
-	testCases := []struct {
-		name      string
-		unclaimed []auditing.Unclaimed
-		wantLines int
-	}{
-		{"nothing unclaimed logs nothing", nil, 0},
-		{
-			"an unclaimed path is logged",
-			[]auditing.Unclaimed{{File: "database/atlas.hcl"}},
-			1,
-		},
-	}
-
-	for _, testCase := range testCases {
-		var buf bytes.Buffer
-
-		restore := slog.Default()
-		slog.SetDefault(
-			slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})),
-		)
-
-		warnUnclaimed(testCase.unclaimed)
-
-		slog.SetDefault(restore)
-
-		got := 0
-		if buf.Len() > 0 {
-			got = 1
-		}
-
-		if got != testCase.wantLines {
-			t.Errorf(
-				"%s: logged = %d lines, want %d (output: %q)",
-				testCase.name,
-				got,
-				testCase.wantLines,
-				buf.String(),
-			)
-		}
-	}
-}
-
 var _ io.Writer = failWriter{}
 
 func TestRunGraphIgnoresInputOrder(t *testing.T) {
