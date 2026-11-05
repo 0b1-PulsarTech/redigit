@@ -1,83 +1,11 @@
 package indexing
 
 import (
-	"cmp"
 	"context"
-	"fmt"
 	"slices"
-	"sync"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
-
-// resolve asks the resolver, per declaration, who reads it and what satisfies
-// it. This is the step that replaces identifier matching: searching for the
-// first consumer of 59 declarations by name put 24 of 53 destinations in the
-// wrong place, on collisions, mentions inside comments, and a standard-library
-// symbol matching a same-named one nothing ever calls.
-func (i Indexer) resolve(
-	ctx context.Context,
-	decls []entities.Decl,
-	where locator,
-) ([]entities.Edge, []Blind, error) {
-	var (
-		guard sync.Mutex
-		edges []entities.Edge
-		blind []Blind
-	)
-
-	interfaces := make(map[entities.DeclKey]bool, len(decls))
-
-	for _, decl := range decls {
-		if decl.IsInterface {
-			interfaces[decl.Key] = true
-		}
-	}
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(i.limit)
-
-	for _, decl := range decls {
-		group.Go(func() error {
-			found, missed := i.edgesOf(groupCtx, decl, where, interfaces)
-
-			guard.Lock()
-			defer guard.Unlock()
-
-			edges = append(edges, found...)
-			blind = append(blind, missed...)
-
-			return nil
-		})
-	}
-
-	if err := cmp.Or(group.Wait(), ctx.Err()); err != nil {
-		return nil, nil, fmt.Errorf("resolve edges: %w", err)
-	}
-
-	slices.SortFunc(edges, compareEdges)
-	slices.SortFunc(blind, compareBlind)
-
-	return slices.Compact(edges), blind, nil
-}
-
-func compareBlind(left, right Blind) int {
-	return cmp.Or(
-		entities.CompareKeys(left.Decl, right.Decl),
-		cmp.Compare(left.Query, right.Query),
-		cmp.Compare(left.Reason, right.Reason),
-	)
-}
-
-func compareEdges(a, b entities.Edge) int {
-	return cmp.Or(
-		entities.CompareKeys(a.Dependent, b.Dependent),
-		entities.CompareKeys(a.Provider, b.Provider),
-		cmp.Compare(a.Reason, b.Reason),
-	)
-}
 
 // edgesOf asks the resolver about one declaration. A query the server cannot
 // answer is recorded as a blind spot rather than ending the run: a language
