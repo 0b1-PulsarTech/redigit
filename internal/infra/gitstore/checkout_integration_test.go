@@ -3,8 +3,12 @@
 package gitstore
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -132,5 +136,174 @@ func TestOpenStageReadsTheTarget(t *testing.T) {
 				t.Fatalf("openStage() base = %q, want a base: %v", staged.Base, testCase.wantBase)
 			}
 		})
+	}
+}
+
+func TestHistoryPublishAnswersForWhereTheRefEnded(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		phase      string
+		action     string
+		wantMoved  bool
+		wantFailed bool
+	}{
+		{"git killed after it committed the move", "committed", "kill -KILL $PPID", true, false},
+		{"hook refusing before the move", "prepared", "exit 1", false, true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			const target = "refs/heads/out"
+
+			dir := newTestRepo(t)
+			history := NewHistory(dir, "", Identity{Name: "Proof", Email: "proof@localhost"})
+
+			staged, err := history.Replay(t.Context(), target, replayInputs())
+			if err != nil {
+				t.Fatalf("Replay() err = %v", err)
+			}
+
+			hooks, marker := t.TempDir(), filepath.Join(t.TempDir(), "ran")
+			script := fmt.Sprintf(
+				"#!/bin/sh\nif [ \"$1\" = %s ] && grep -q ' %s$'; then\n: > %q\n%s\nfi\n",
+				testCase.phase, target, marker, testCase.action,
+			)
+
+			if err = os.WriteFile(
+				filepath.Join(hooks, "reference-transaction"), []byte(script), 0o700,
+			); err != nil {
+				t.Fatalf("write hook: %v", err)
+			}
+
+			runTestGit(t, dir, "config", "--local", "core.hooksPath", hooks)
+
+			err = history.Publish(t.Context(), target, staged)
+			if (err != nil) != testCase.wantFailed {
+				t.Fatalf("Publish() err = %v, want a failure: %v", err, testCase.wantFailed)
+			}
+
+			if _, statErr := os.Stat(marker); statErr != nil {
+				t.Fatalf("hook marker: %v, want the hook to have run", statErr)
+			}
+
+			if isMoved := refValue(t, dir, target) == staged.Tip; isMoved != testCase.wantMoved {
+				t.Fatalf("target moved = %v, want %v", isMoved, testCase.wantMoved)
+			}
+		})
+	}
+}
+
+func TestHistoryPublishReadsBackPastACancelledContext(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		isAtTip    bool
+		wantFailed bool
+	}{
+		{"ref already on the tip", true, false},
+		{"ref elsewhere", false, true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			const target = "refs/heads/out"
+
+			dir := newTestRepo(t)
+			history := NewHistory(dir, "", Identity{Name: "Proof", Email: "proof@localhost"})
+
+			staged, err := history.Replay(t.Context(), target, replayInputs())
+			if err != nil {
+				t.Fatalf("Replay() err = %v", err)
+			}
+
+			if testCase.isAtTip {
+				runTestGit(t, dir, "update-ref", target, staged.Tip)
+			}
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			err = history.Publish(ctx, target, staged)
+			if (err != nil) != testCase.wantFailed {
+				t.Fatalf("Publish() err = %v, want a failure: %v", err, testCase.wantFailed)
+			}
+		})
+	}
+}
+
+func TestHistoryPublishRefusesAMovedRef(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		isSeed bool
+	}{
+		{"absent at start, created meanwhile", false},
+		{"present at start, moved meanwhile", true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			const target = "refs/heads/out"
+
+			dir := newTestRepo(t)
+			ctx := t.Context()
+			history := NewHistory(dir, "", Identity{Name: "Proof", Email: "proof@localhost"})
+			commitTestFiles(t, dir, "seed", map[string][]byte{"a.go": []byte("One\n")})
+
+			if testCase.isSeed {
+				runTestGit(t, dir, "update-ref", target, "HEAD")
+			}
+
+			staged, err := history.Replay(ctx, target, replayInputs())
+			if err != nil {
+				t.Fatalf("Replay() err = %v", err)
+			}
+
+			commitTestFiles(t, dir, "moved", map[string][]byte{"a.go": []byte("Two\n")})
+			runTestGit(t, dir, "update-ref", target, "HEAD")
+
+			moved := refValue(t, dir, target)
+
+			err = history.Publish(ctx, target, staged)
+			if !errors.Is(err, ErrRefMoved) || !strings.Contains(err.Error(), "cannot lock ref") {
+				t.Fatalf("Publish() err = %v, want ErrRefMoved carrying git's reason", err)
+			}
+
+			if got := refValue(t, dir, target); got != moved {
+				t.Fatalf("target = %q, want it left at %q", got, moved)
+			}
+		})
+	}
+}
+
+func TestHistoryDiscardCarriesGitsReason(t *testing.T) {
+	t.Parallel()
+
+	dir := newTestRepo(t)
+	history := NewHistory(dir, "", Identity{Name: "Proof", Email: "proof@localhost"})
+
+	staged, err := history.Replay(t.Context(), "refs/heads/out", replayInputs())
+	if err != nil {
+		t.Fatalf("Replay() err = %v", err)
+	}
+
+	lock := filepath.Join(dir, ".git", filepath.FromSlash(staged.Scratch)+".lock")
+	if err = os.WriteFile(lock, nil, 0o600); err != nil {
+		t.Fatalf("write lock: %v", err)
+	}
+
+	err = history.Discard(t.Context(), staged)
+	if err == nil || !strings.Contains(err.Error(), "File exists") || errors.Is(err, ErrRefMoved) {
+		t.Fatalf("Discard() err = %v, want git's lock complaint and no ErrRefMoved", err)
 	}
 }
