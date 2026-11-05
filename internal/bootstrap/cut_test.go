@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap/languages"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/infra/chunk"
@@ -96,9 +97,9 @@ func TestConfigChunkersPrependsTheMapApplierWhenGiven(t *testing.T) {
 func TestValidateChunkMap(t *testing.T) {
 	t.Parallel()
 
-	specific := SpecificLanguages(
+	specific := languages.SpecificLanguages(
 		config.NewSyntax(configChunkers(nil)),
-		FinalTree{},
+		languages.FinalTree{},
 		typed.NewSource(nil),
 		sliceconf.Config{},
 	)

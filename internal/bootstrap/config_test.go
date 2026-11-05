@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap/languages"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/config"
 	"github.com/wrapped-owls/redigit/internal/infra/langpack/golang/typed"
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
@@ -99,12 +100,14 @@ func TestSettingsMatchThePacks(t *testing.T) {
 		withSettings[entry.language] = true
 	}
 
-	packsWithoutSettings := []string{DartLanguage, ConfigLanguage}
+	packsWithoutSettings := []string{languages.DartLanguage, languages.ConfigLanguage}
 
 	packs := make([]string, 0, 4)
 	goSource := typed.NewSource(nil)
 
-	for _, lang := range SpecificLanguages(config.Syntax{}, FinalTree{}, goSource, sliceconf.Config{}) {
+	for _, lang := range languages.SpecificLanguages(
+		config.Syntax{}, languages.FinalTree{}, goSource, sliceconf.Config{},
+	) {
 		packs = append(packs, lang.Name)
 	}
 
@@ -120,8 +123,8 @@ func TestSettingsMatchThePacks(t *testing.T) {
 		}
 	}
 
-	if withSettings[OpaqueName] || slices.Contains(packs, OpaqueName) {
-		t.Fatalf("the catch-all %q must not take settings", OpaqueName)
+	if withSettings[languages.OpaqueName] || slices.Contains(packs, languages.OpaqueName) {
+		t.Fatalf("the catch-all %q must not take settings", languages.OpaqueName)
 	}
 }
 
@@ -315,42 +318,42 @@ type settingCase struct {
 func settingCases() []settingCase {
 	return []settingCase{
 		{
-			name: "go tags reach BuildTags", language: GoLanguage, key: "tags",
+			name: "go tags reach BuildTags", language: languages.GoLanguage, key: "tags",
 			content:  `{"languages":{"go":{"tags":["integration"]}}}`,
 			wantTags: []string{"integration"},
 		},
 		{
-			name: "a padded tag is trimmed", language: GoLanguage, key: "tags",
+			name: "a padded tag is trimmed", language: languages.GoLanguage, key: "tags",
 			content:  `{"languages":{"go":{"tags":[" integration "]}}}`,
 			wantTags: []string{"integration"},
 		},
 		{
-			name: "an empty tag is dropped", language: GoLanguage, key: "tags",
+			name: "an empty tag is dropped", language: languages.GoLanguage, key: "tags",
 			content:  `{"languages":{"go":{"tags":["a","","  ","b"]}}}`,
 			wantTags: []string{"a", "b"},
 		},
 		{
-			name: "a comma splits as it does on the command line", language: GoLanguage,
+			name: "a comma splits as it does on the command line", language: languages.GoLanguage,
 			key: "tags", content: `{"languages":{"go":{"tags":["a,b"]}}}`,
 			wantTags: []string{"a", "b"},
 		},
 		{
-			name: "only blanks leave no tags", language: GoLanguage, key: "tags",
+			name: "only blanks leave no tags", language: languages.GoLanguage, key: "tags",
 			content: `{"languages":{"go":{"tags":["", " "]}}}`,
 		},
 		{
-			name: "an explicit tags flag wins, even when empty", language: GoLanguage,
+			name: "an explicit tags flag wins, even when empty", language: languages.GoLanguage,
 			key: "tags", content: `{"languages":{"go":{"tags":["integration"]}}}`,
 			explicit: map[string]bool{"tags": true},
 		},
 		{
-			name: "web virtual reaches Virtual", language: WebLanguage, key: "virtual",
+			name: "web virtual reaches Virtual", language: languages.WebLanguage, key: "virtual",
 			content:      `{"languages":{"web":{"virtual":{"virtual:a":"a.dart"}}}}`,
 			wantVirtuals: map[string]string{"virtual:a": "a.dart"},
 		},
 		{
-			name: "an explicit virtual flag replaces the whole file map", language: WebLanguage,
-			key:          "virtual",
+			name:     "an explicit virtual flag replaces the whole file map",
+			language: languages.WebLanguage, key: "virtual",
 			content:      `{"languages":{"web":{"virtual":{"virtual:a":"from-file"}}}}`,
 			explicit:     map[string]bool{"virtual": true},
 			prior:        Config{Virtual: map[string]string{"virtual:a": "from-flag"}},

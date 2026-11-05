@@ -12,14 +12,6 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/rules"
 )
 
-const (
-	GoLanguage     = "go"
-	DartLanguage   = "dart"
-	WebLanguage    = "web"
-	ConfigLanguage = "config"
-	OpaqueName     = "opaque"
-)
-
 var (
 	ErrUnknownLanguage = errors.New("unknown language")
 	ErrUnknownSetting  = errors.New("unknown setting")

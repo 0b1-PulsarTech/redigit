@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap/languages"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/ordering"
@@ -93,7 +94,7 @@ type (
 		opened   revision
 		specific []indexing.Language
 		goSource *typed.Source
-		tree     FinalTree
+		tree     languages.FinalTree
 	}
 
 	stages struct {
@@ -123,7 +124,7 @@ func shapeStages(
 
 	indexCfg := cfg.Indexing
 	indexCfg.Languages = slices.Concat(
-		env.specific, built.languages, []indexing.Language{OpaqueLanguage(configSyntax)},
+		env.specific, built.languages, []indexing.Language{languages.OpaqueLanguage(configSyntax)},
 	)
 
 	return indexCfg, built, nil

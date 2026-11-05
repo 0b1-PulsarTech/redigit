@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/wrapped-owls/redigit/internal/bootstrap/languages"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/auditing"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
@@ -120,8 +121,8 @@ func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error
 	}
 
 	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
-	tree := FinalTree{snapshot.Files, reader, cfg.Virtual}
-	specific := SpecificLanguages(configSyntax, tree, goSource, slice)
+	tree := languages.FinalTree{Files: snapshot.Files, Reader: reader, Virtual: cfg.Virtual}
+	specific := languages.SpecificLanguages(configSyntax, tree, goSource, slice)
 
 	env := stageEnv{root: root, opened: opened, specific: specific, goSource: goSource, tree: tree}
 
