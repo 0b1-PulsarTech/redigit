@@ -195,3 +195,203 @@ func TestOwnTestsHoldsAnAtomForAMateNotYetBuilt(t *testing.T) {
 		})
 	}
 }
+
+func TestOwnTestsStaysWithWhatItReads(t *testing.T) {
+	t.Parallel()
+
+	code := decl("a/code.go", "Code", "a")
+	later := decl("a/code.go", "Later", "a")
+	probe := testDecl("a/code_test.go", "TestCode", "a")
+	owner := map[entities.DeclKey]reach.FeatureID{
+		code.Key: "a", later.Key: "b", probe.Key: reach.SharedFeature,
+	}
+
+	testCases := []struct {
+		name     string
+		anchors  []entities.Anchor
+		deferred reach.Wiring
+		want     []entities.DeclKey
+	}{
+		{
+			name: "a test stays with what it reads and does not wait for a twin it does not read",
+			anchors: []entities.Anchor{
+				{Decl: probe.Key, To: later.Key, Reason: entities.ReasonTestOf},
+			},
+			deferred: reach.Wiring{probe.Key: true},
+			want:     []entities.DeclKey{probe.Key},
+		},
+		{
+			name: "a test waits for a twin a feature still defers",
+			anchors: []entities.Anchor{
+				{Decl: probe.Key, To: later.Key, Reason: entities.ReasonTestOf},
+			},
+			deferred: reach.Wiring{probe.Key: true, later.Key: true},
+			want:     nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := OwnTests(
+				entities.NewGraph(
+					[]entities.Decl{code, later, probe},
+					[]entities.Edge{needs(probe, code)},
+					testCase.anchors,
+				),
+				owners.Ownership{Owner: owner, Deferred: testCase.deferred, Roots: reach.Wiring{}},
+				map[entities.DeclKey]bool{code.Key: true},
+				map[entities.DeclKey]bool{code.Key: true},
+			)
+
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("ownTests() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestOwnTestsHoldsAChainBehindItsHead(t *testing.T) {
+	t.Parallel()
+
+	code := decl("a/code.go", "Code", "a")
+	unborn := decl("b/unborn.go", "Unborn", "b")
+	linkA := testDecl("a/chain_test.go", "LinkA", "a")
+	linkB := testDecl("a/chain_test.go", "LinkB", "a")
+	linkC := testDecl("a/chain_test.go", "LinkC", "a")
+	linkD := testDecl("a/chain_test.go", "LinkD", "a")
+	linkE := testDecl("a/chain_test.go", "LinkE", "a")
+	linkF := testDecl("a/chain_test.go", "LinkF", "a")
+	shared := reach.SharedFeature
+	owner := map[entities.DeclKey]reach.FeatureID{
+		code.Key: "a", unborn.Key: shared, linkA.Key: shared, linkB.Key: shared,
+		linkC.Key: shared, linkD.Key: shared, linkE.Key: shared, linkF.Key: shared,
+	}
+	deferred := reach.Wiring{
+		linkA.Key: true, linkB.Key: true, linkC.Key: true,
+		linkD.Key: true, linkE.Key: true, linkF.Key: true,
+	}
+	edges := []entities.Edge{
+		needs(linkF, code), needs(linkF, unborn), needs(linkE, code), needs(linkE, linkF),
+		needs(linkD, code), needs(linkD, linkE), needs(linkC, code), needs(linkC, linkD),
+		needs(linkB, code), needs(linkB, linkC), needs(linkA, code), needs(linkA, linkB),
+	}
+
+	testCases := []struct {
+		name string
+		born map[entities.DeclKey]bool
+		want []entities.DeclKey
+	}{
+		{
+			name: "every link waits on what the head waits on",
+			born: map[entities.DeclKey]bool{code.Key: true},
+			want: nil,
+		},
+		{
+			name: "the whole chain lands once the head can",
+			born: map[entities.DeclKey]bool{code.Key: true, unborn.Key: true},
+			want: []entities.DeclKey{
+				linkA.Key, linkB.Key, linkC.Key, linkD.Key, linkE.Key, linkF.Key,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := OwnTests(
+				entities.NewGraph(
+					[]entities.Decl{code, unborn, linkA, linkB, linkC, linkD, linkE, linkF},
+					edges,
+					nil,
+				),
+				owners.Ownership{Owner: owner, Deferred: deferred, Roots: reach.Wiring{}},
+				testCase.born,
+				map[entities.DeclKey]bool{code.Key: true},
+			)
+
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("ownTests() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestOwnTestsWaitsForAnUnbornProvider(t *testing.T) {
+	t.Parallel()
+
+	code := decl("a/code.go", "Code", "a")
+	unborn := decl("b/unborn.go", "Unborn", "b")
+	aid := testDecl("a/helper_test.go", "Helper", "a")
+	probe := testDecl("a/code_test.go", "TestCode", "a")
+	shared := reach.SharedFeature
+
+	testCases := []struct {
+		name  string
+		decls []entities.Decl
+		edges []entities.Edge
+		owner map[entities.DeclKey]reach.FeatureID
+		born  map[entities.DeclKey]bool
+		want  []entities.DeclKey
+	}{
+		{
+			name:  "a test reading a reach 0 declaration nobody has built waits for it",
+			decls: []entities.Decl{code, unborn, probe},
+			edges: []entities.Edge{needs(probe, code), needs(probe, unborn)},
+			owner: map[entities.DeclKey]reach.FeatureID{
+				code.Key: "a", unborn.Key: shared, probe.Key: shared,
+			},
+			born: map[entities.DeclKey]bool{code.Key: true},
+			want: nil,
+		},
+		{
+			name:  "the same test lands at once when that declaration is built",
+			decls: []entities.Decl{code, unborn, probe},
+			edges: []entities.Edge{needs(probe, code), needs(probe, unborn)},
+			owner: map[entities.DeclKey]reach.FeatureID{
+				code.Key: "a", unborn.Key: shared, probe.Key: shared,
+			},
+			born: map[entities.DeclKey]bool{code.Key: true, unborn.Key: true},
+			want: []entities.DeclKey{probe.Key},
+		},
+		{
+			name:  "a test reading a test helper that lands with it stays",
+			decls: []entities.Decl{code, aid, probe},
+			edges: []entities.Edge{needs(probe, code), needs(probe, aid), needs(aid, code)},
+			owner: map[entities.DeclKey]reach.FeatureID{
+				code.Key: "a", aid.Key: shared, probe.Key: shared,
+			},
+			born: map[entities.DeclKey]bool{code.Key: true},
+			want: []entities.DeclKey{probe.Key, aid.Key},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			deferred := reach.Wiring{}
+
+			for _, member := range testCase.decls {
+				if member.IsTest {
+					deferred[member.Key] = true
+				}
+			}
+
+			got := OwnTests(
+				entities.NewGraph(testCase.decls, testCase.edges, nil),
+				owners.Ownership{
+					Owner: testCase.owner, Deferred: deferred, Roots: reach.Wiring{},
+				},
+				testCase.born,
+				map[entities.DeclKey]bool{code.Key: true},
+			)
+
+			if !slices.Equal(got, testCase.want) {
+				t.Fatalf("ownTests() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

@@ -120,36 +120,66 @@ func TestPlannerBornWithTheFirstFeatureThatNeedsIt(t *testing.T) {
 func TestPlannerBornBeforeUse(t *testing.T) {
 	t.Parallel()
 
-	graph, order, _ := twoFeatures()
+	two, twoOrder, named := twoFeatures()
+	late, lateOrder := sharedKernelWithLateProvider()
+	isEven := decl("lead/api/parity.go", "isEven", "lead/api")
+	isOdd := decl("lead/api/parity.go", "isOdd", "lead/api")
+	probe := testDecl("lead/api/create_test.go", "TestCreate", "lead/api")
+	pair := entities.NewGraph(
+		append(two.Decls(), isEven, isOdd, probe),
+		append(two.Edges(), needs(isEven, isOdd), needs(isOdd, isEven),
+			needs(probe, named["leadUse"]), needs(probe, isEven)),
+		nil,
+	)
 
-	plan, err := New(Config{}).Plan(graph, order)
-	if err != nil {
-		t.Fatalf("Plan() = %v", err)
+	testCases := []struct {
+		name  string
+		graph entities.Graph
+		order entities.Ordering
+	}{
+		{name: "two vertical slices and a kernel", graph: two, order: twoOrder},
+		{name: "a shared declaration whose own provider is late", graph: late, order: lateOrder},
+		{
+			name:  "a test reading a function and a recursion pair no production reads",
+			graph: pair,
+			order: twoOrder,
+		},
 	}
 
-	bornAt := map[entities.DeclKey]int{}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-	for index, commit := range plan.Commits {
-		for _, key := range commit.Decls {
-			if _, already := bornAt[key]; already {
-				t.Fatalf("%s is born twice", key)
+			plan, err := New(Config{}).Plan(testCase.graph, testCase.order)
+			if err != nil {
+				t.Fatalf("Plan() = %v", err)
 			}
 
-			bornAt[key] = index
-		}
-	}
+			bornAt := map[entities.DeclKey]int{}
 
-	// The invariant the whole tool serves: no commit carries a declaration
-	// whose provider is written later. Inside one commit is fine, which is
-	// exactly what makes a vertical slice legal.
-	for _, edge := range graph.Edges() {
-		dependent, provider := bornAt[edge.Dependent], bornAt[edge.Provider]
-		if provider > dependent {
-			t.Fatalf(
-				"%s (commit %d) is born before %s (commit %d), which it needs",
-				edge.Dependent, dependent, edge.Provider, provider,
-			)
-		}
+			for index, commit := range plan.Commits {
+				for _, key := range commit.Decls {
+					if _, already := bornAt[key]; already {
+						t.Fatalf("%s is born twice", key)
+					}
+
+					bornAt[key] = index
+				}
+			}
+
+			// The invariant the whole tool serves: no commit carries a declaration
+			// whose provider is written later. Inside one commit is fine, which is
+			// exactly what makes a vertical slice legal.
+			for _, edge := range testCase.graph.Edges() {
+				dependent, provider := bornAt[edge.Dependent], bornAt[edge.Provider]
+				if provider > dependent {
+					t.Fatalf(
+						"%s (commit %d) is born before %s (commit %d), which it needs",
+						edge.Dependent, dependent, edge.Provider, provider,
+					)
+				}
+			}
+		})
 	}
 }
 
@@ -179,35 +209,6 @@ func sharedKernelWithLateProvider() (entities.Graph, entities.Ordering) {
 	}
 
 	return entities.NewGraph(decls, edges, nil), entities.Ordering{At: at}
-}
-
-func TestPlannerSharedDeclarationWaitsForItsOwnProvider(t *testing.T) {
-	t.Parallel()
-
-	graph, order := sharedKernelWithLateProvider()
-
-	plan, err := New(Config{}).Plan(graph, order)
-	if err != nil {
-		t.Fatalf("Plan() = %v", err)
-	}
-
-	bornAt := map[entities.DeclKey]int{}
-
-	for index, commit := range plan.Commits {
-		for _, key := range commit.Decls {
-			bornAt[key] = index
-		}
-	}
-
-	for _, edge := range graph.Edges() {
-		dependent, provider := bornAt[edge.Dependent], bornAt[edge.Provider]
-		if provider > dependent {
-			t.Fatalf(
-				"%s (commit %d) is born before %s (commit %d), which it needs",
-				edge.Dependent, dependent, edge.Provider, provider,
-			)
-		}
-	}
 }
 
 // A test waits for the member of its atom that needs the last feature. The

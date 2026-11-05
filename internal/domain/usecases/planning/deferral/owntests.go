@@ -1,6 +1,8 @@
 package deferral
 
 import (
+	"slices"
+
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/owners"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/planning/reach"
@@ -26,14 +28,20 @@ func OwnTests(
 		return !born[mate] && !taken[mate]
 	}
 
+	read := func(provider entities.DeclKey) bool { return !born[provider] && !taken[provider] }
+	// Subjects keep the Deferred clause: a twin owned by a later feature that the test
+	// does not read must not pull it off its subject's row.
+	exercised := func(provider entities.DeclKey) bool {
+		return read(provider) && own.Deferred[provider]
+	}
+
 	for changed := true; changed; {
 		changed = false
 		memo := map[string]bool{}
 
 		for key := range taken {
-			if !waitsOn(graph, subjects, key, func(provider entities.DeclKey) bool {
-				return !born[provider] && !taken[provider] && own.Deferred[provider]
-			}) && !atomBlocked(graph, atoms, key, memo, held) {
+			if !waitsOn(graph, nil, key, read) && !slices.ContainsFunc(subjects[key], exercised) &&
+				!atomBlocked(graph, atoms, key, memo, held) {
 				continue
 			}
 
