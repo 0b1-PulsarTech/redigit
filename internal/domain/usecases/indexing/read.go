@@ -2,8 +2,10 @@ package indexing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -78,6 +80,73 @@ func (i Indexer) languageFor(file string) (Language, bool) {
 	for _, lang := range i.langs {
 		if lang.Owns(file) {
 			return lang, true
+		}
+	}
+
+	return Language{}, false
+}
+
+func (scanner Scanner) parseAll(
+	ctx context.Context,
+	units []blobAt,
+	langs []Language,
+) ([]parsedUnit, error) {
+	parsed := make([]parsedUnit, len(units))
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(scanner.limit)
+
+	for idx, unit := range units {
+		group.Go(func() error {
+			source, err := scanner.log.ReadBlob(groupCtx, unit.blob)
+			if err != nil {
+				if ctxErr := interrupted(
+					groupCtx,
+				); ctxErr != nil ||
+					errors.Is(err, ErrBlobMissing) {
+					return ctxErr
+				}
+
+				return fmt.Errorf("read blob: %w", err)
+			}
+
+			found, err := langs[idx].Syntax.Declarations(groupCtx, unit.path, source)
+			if err != nil {
+				return interrupted(groupCtx)
+			}
+
+			keys := make([]entities.DeclKey, 0, len(found))
+			for _, decl := range found {
+				keys = append(keys, decl.Key)
+			}
+
+			parsed[idx] = parsedUnit{keys: keys, isParsed: true}
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("scan births: %w", err)
+	}
+
+	return parsed, nil
+}
+
+func interrupted(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("interrupted: %w", err)
+	}
+
+	return nil
+}
+
+func (scanner Scanner) languageFor(file string) (Language, bool) {
+	for _, lang := range scanner.langs {
+		for _, ext := range lang.Extensions {
+			if strings.HasSuffix(file, ext) {
+				return lang, true
+			}
 		}
 	}
 
