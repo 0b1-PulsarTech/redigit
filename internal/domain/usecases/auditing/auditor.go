@@ -15,8 +15,8 @@ const defaultFarApart = 25
 // Config tunes what counts as far.
 type Config struct {
 	FarApart int
-	// Unseen names the files a build constraint hid from the reference
-	// queries. It is supplied by the composition root because deciding which
+	// Unseen names the files a build constraint left out of the main build.
+	// It is supplied by the composition root because deciding which
 	// constraints a run satisfies is a per-language question, and this package
 	// knows no language.
 	Unseen []Unseen

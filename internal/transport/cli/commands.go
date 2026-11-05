@@ -182,19 +182,19 @@ func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer, start sta
 	})
 }
 
-// warnUnseen names the files a build constraint hid from the reference
-// queries. It is a DIFFERENT failure from warnBlind and needs its own line:
-// a blind query errored and is counted, while a hidden file answers the
-// syntactic query normally and contributes declarations with no edges at all.
-// That is indistinguishable from code nothing references, so without this the
-// run reports a clean graph and means nothing by it.
+// warnUnseen names the files a build constraint left out of the main build.
+// It is a DIFFERENT failure from warnBlind and needs its own line: a blind
+// query errored and is counted, while a hidden file answers the syntactic
+// query normally. Under the typed resolver its reference queries are answered
+// too; under lsp it may contribute declarations with no edges at all, which
+// is indistinguishable from code nothing references.
 func warnUnseen(unseen []auditing.Unseen) {
 	if len(unseen) == 0 {
 		return
 	}
 
 	slog.Warn(
-		"a build constraint hid some files from the reference queries",
+		"a build constraint left some files out of the main build",
 		slog.Int("files", len(unseen)),
 		slog.String("first", unseen[0].File),
 		slog.String("constraint", unseen[0].Constraint),

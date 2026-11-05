@@ -103,19 +103,22 @@ verdade, e a que a maquina le vence em silencio.
 
 ## 6. O ponto cego de build tag agora tem voz
 
-Um arquivo atras de `//go:build integration` sem a tag passada responde a
-consulta sintatica normalmente e fica invisivel a `references`. As declaracoes
-chegam ao grafo SEM ARESTA NENHUMA, o que e indistinguivel de codigo que
-ninguem le.
+Um arquivo atras de `//go:build integration` sem a tag passada fica fora do
+build principal e responde a consulta sintatica normalmente. Com o resolvedor
+`typed` (o padrao) passes extras o checam e, se ele compila, responde a
+`references`; com `--resolver lsp` o servidor pode nao o enxergar, e suas
+declaracoes chegam ao grafo SEM ARESTA NENHUMA, o que e indistinguivel de
+codigo que ninguem le.
 
-Isso nao e um `Blind`: aquele conta consulta que ERROU. Esta responde, e mente.
+Isso nao e um `Blind`: aquele conta consulta que ERROU. Esta responde, e pode
+mentir.
 
 Hoje `Auditing.Unseen` nomeia esses arquivos, todo comando avisa em stderr, e
 `redigit audit` os lista sob `unseen` com a restricao de cada um. A chave esta
 sempre presente, inclusive vazia, para separar "nada foi escondido" de "a
 ferramenta nem olhou".
 
-Passe `--tags` deliberadamente. Sem isso o numero e sobre menos codigo do que
+Passe `--tags` deliberadamente. Sem isso o grafo pode ter menos arestas do que
 voce pensa.
 
 ## 7. A invariante da arvore e necessaria, nao suficiente

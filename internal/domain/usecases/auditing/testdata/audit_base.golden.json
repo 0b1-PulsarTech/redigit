@@ -19,7 +19,7 @@
         ]
       },
       {
-        "Name": "declarations in a file the reference queries could read",
+        "Name": "declarations in a file no build constraint left out of the main build",
         "Value": 5,
         "Total": 5,
         "Excluded": [

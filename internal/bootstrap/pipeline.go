@@ -43,9 +43,9 @@ type Pipeline struct {
 	unclaimed []auditing.Unclaimed
 }
 
-// Unseen names the files a build constraint hid from this run's reference
-// queries. A caller reports it so a graph built without the tags is not read
-// as a graph built with them.
+// Unseen names the files a build constraint left out of this run's main build.
+// A caller reports it so a graph built without the tags is not read as a graph
+// built with them.
 func (p *Pipeline) Unseen() []auditing.Unseen { return p.unseen }
 
 // Unclaimed names the final-tree paths no configured language pack claims. A

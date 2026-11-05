@@ -33,8 +33,8 @@ type cycleDTO struct {
 // auditDTO is what `redigit audit` prints. Integrity and shape stay apart:
 // a rebuild can replay almost perfectly while grouping badly, and one merged
 // number would hide exactly that.
-// unseenDTO is one file this run could not read, and the constraint that hid
-// it. It is not omitempty: an empty list is the claim that nothing was hidden,
+// unseenDTO is one file this run left out of the main build, and the constraint
+// that hid it. It is not omitempty: an empty list is the claim that nothing was hidden,
 // and a reader must be able to tell that from a tool too old to report it.
 type unseenDTO struct {
 	File       string   `json:"file"`

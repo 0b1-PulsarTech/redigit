@@ -2,19 +2,19 @@ package auditing
 
 import "github.com/wrapped-owls/redigit/internal/domain/entities"
 
-// Unseen is one file a build constraint hid from the reference queries. It is
-// not a Blind query: that one ERRORED, while a hidden file answers the
-// syntactic query and contributes declarations carrying no edges, which is
-// indistinguishable from code nothing references.
+// Unseen is one file a build constraint left out of the main build. It is not
+// a Blind query, which ERRORED: a hidden file answers the syntactic query. Typed
+// answers its reference queries if it type-checks; lsp may leave its declarations
+// with no edges, indistinguishable from code nothing references.
 type Unseen struct {
 	File       string
 	Constraint string
 	Tags       []string
 }
 
-// resolverCouldSee counts declarations whose file the queries could read. It
-// is integrity, not shape: a hidden declaration is missing its edges, so a
-// shape number over it measures absence and reports it as tidiness.
+// resolverCouldSee counts declarations whose file the main build holds. It is
+// integrity, not shape: under lsp a hidden declaration may be missing its
+// edges, so a shape number over it measures absence and reports it as tidiness.
 func (a Auditor) resolverCouldSee(graph entities.Graph) entities.Measure {
 	hidden := make(map[string]bool, len(a.cfg.Unseen))
 	for _, unseen := range a.cfg.Unseen {
@@ -30,7 +30,7 @@ func (a Auditor) resolverCouldSee(graph entities.Graph) entities.Measure {
 	}
 
 	return entities.Measure{
-		Name:  "declarations in a file the reference queries could read",
+		Name:  "declarations in a file no build constraint left out of the main build",
 		Value: visible,
 		Total: graph.Len(),
 		Excluded: []string{

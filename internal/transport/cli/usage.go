@@ -5,7 +5,7 @@ const usage = `redigit rebuilds a repository's history so every commit creates e
   redigit audit  --repo PATH [--rev REF] [--tags TAGS] [--far N]
       Index, order, and report. Says which declarations are born far from
       whatever reads them, what each number does not look at, and which files
-      a build constraint hid from the reference queries.
+      a build constraint left out of the main build.
 
   redigit emit   --repo PATH [--rev REF] [--tags TAGS] [--blob-dir DIR]
                  [--state-dir DIR]
@@ -40,11 +40,13 @@ Flags:
   --repo PATH   repository to read (required)
   --rev  REF    revision holding the tree to read (default HEAD)
   --tags TAGS   comma-separated build tags. Passing none is a real choice: a
-                file behind a build constraint answers a syntactic query but is
-                invisible to reference queries, so its declarations reach the
-                graph with no edges and look exactly like code nothing reads.
-                Every command now names those files on stderr, and audit lists
-                them under "unseen", so the choice is at least reported.
+                file behind a build constraint is left out of the main build.
+                The typed resolver checks it in an extra pass and, if it
+                type-checks, answers its reference queries; under --resolver
+                lsp it may not, and its declarations reach the graph with no
+                edges, like code nothing reads. Every command names those
+                files on stderr, and audit lists them under "unseen", so the
+                choice is at least reported.
   --config FILE a redigit.json: per-language tags and virtual modules, plus
                 rules and a slice section. A flag replaces the file's whole
                 setting for it (a --virtual drops every virtual module the
