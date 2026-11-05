@@ -5,16 +5,16 @@ import (
 	"unicode/utf16"
 )
 
-// lineIndex converts between the byte offsets a syntax reader works in and the
+// LineIndex converts between the byte offsets a syntax reader works in and the
 // line/character coordinates a language server speaks. Neither side can be
 // used as the other: a language server reports UTF-16 code units, so a line
 // holding an accented letter or an emoji offsets differently in each.
-type lineIndex struct {
+type LineIndex struct {
 	source []byte
 	starts []int
 }
 
-func newLineIndex(source []byte) lineIndex {
+func NewLineIndex(source []byte) LineIndex {
 	starts := []int{0}
 
 	for offset, char := range source {
@@ -23,11 +23,11 @@ func newLineIndex(source []byte) lineIndex {
 		}
 	}
 
-	return lineIndex{source: source, starts: starts}
+	return LineIndex{source: source, starts: starts}
 }
 
 // LineOf reports the zero-based line holding a byte offset.
-func (l lineIndex) LineOf(offset int) int {
+func (l LineIndex) LineOf(offset int) int {
 	found, exact := slices.BinarySearch(l.starts, offset)
 	if exact {
 		return found
@@ -39,7 +39,7 @@ func (l lineIndex) LineOf(offset int) int {
 // UTF16Column reports the character offset a language server expects for a byte
 // offset, counting UTF-16 code units from the start of the line. An emoji is a
 // surrogate pair there and therefore counts as two.
-func (l lineIndex) UTF16Column(offset int) int {
+func (l LineIndex) UTF16Column(offset int) int {
 	line := l.LineOf(offset)
 	if line < 0 || line >= len(l.starts) {
 		return 0
@@ -51,7 +51,7 @@ func (l lineIndex) UTF16Column(offset int) int {
 // ByteOffset converts a language server's line and UTF-16 character back into a
 // byte offset. A character past the end of the line clamps to the line's end
 // rather than reading into the next one.
-func (l lineIndex) ByteOffset(line, char int) int {
+func (l LineIndex) ByteOffset(line, char int) int {
 	if line < 0 || line >= len(l.starts) {
 		return -1
 	}

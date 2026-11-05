@@ -15,7 +15,7 @@ import (
 // location reported by a resolver can be read back as the declaration that
 // encloses it.
 type fileSpans struct {
-	lines lineIndex
+	lines LineIndex
 	spans []spanOf
 }
 
@@ -74,7 +74,7 @@ func (l locator) Enclosing(at entities.Location) (entities.DeclKey, bool) {
 }
 
 func (l locator) add(path string, source []byte, decls []entities.Decl) {
-	entry := &fileSpans{lines: newLineIndex(source), spans: make([]spanOf, 0, len(decls))}
+	entry := &fileSpans{lines: NewLineIndex(source), spans: make([]spanOf, 0, len(decls))}
 
 	for _, decl := range decls {
 		entry.spans = append(entry.spans, spanOf{span: decl.Span, key: decl.Key})

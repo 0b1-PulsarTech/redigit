@@ -5,7 +5,7 @@ import "testing"
 func TestLineIndexLineOf(t *testing.T) {
 	t.Parallel()
 
-	index := newLineIndex([]byte("package a\n\nfunc B() {}\n"))
+	index := NewLineIndex([]byte("package a\n\nfunc B() {}\n"))
 
 	testCases := []struct {
 		name   string
@@ -63,7 +63,7 @@ func TestLineIndexUTF16RoundTrip(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			index := newLineIndex([]byte(testCase.source))
+			index := NewLineIndex([]byte(testCase.source))
 
 			line := index.LineOf(testCase.offset)
 			if line != testCase.wantLine {
@@ -85,7 +85,7 @@ func TestLineIndexUTF16RoundTrip(t *testing.T) {
 func TestLineIndexByteOffsetOutOfRange(t *testing.T) {
 	t.Parallel()
 
-	index := newLineIndex([]byte("var a = 1\nvar b = 2\n"))
+	index := NewLineIndex([]byte("var a = 1\nvar b = 2\n"))
 
 	testCases := []struct {
 		name string
