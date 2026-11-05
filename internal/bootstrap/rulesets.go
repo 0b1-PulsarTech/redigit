@@ -93,7 +93,7 @@ type (
 		opened   revision
 		specific []indexing.Language
 		goSource *typed.Source
-		tree     finalTree
+		tree     FinalTree
 	}
 
 	stages struct {
@@ -123,7 +123,7 @@ func shapeStages(
 
 	indexCfg := cfg.Indexing
 	indexCfg.Languages = slices.Concat(
-		env.specific, built.languages, []indexing.Language{opaqueLanguage(configSyntax)},
+		env.specific, built.languages, []indexing.Language{OpaqueLanguage(configSyntax)},
 	)
 
 	return indexCfg, built, nil

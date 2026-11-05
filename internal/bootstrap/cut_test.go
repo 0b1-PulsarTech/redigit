@@ -96,9 +96,9 @@ func TestConfigChunkersPrependsTheMapApplierWhenGiven(t *testing.T) {
 func TestValidateChunkMap(t *testing.T) {
 	t.Parallel()
 
-	specific := specificLanguages(
+	specific := SpecificLanguages(
 		config.NewSyntax(configChunkers(nil)),
-		finalTree{},
+		FinalTree{},
 		typed.NewSource(nil),
 		sliceconf.Config{},
 	)

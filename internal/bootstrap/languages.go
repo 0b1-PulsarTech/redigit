@@ -63,11 +63,11 @@ func (r byExtension) Render(
 	return out, nil
 }
 
-// configExtensions are the files the config pack reads. The first four carry
+// ConfigExtensions are the files the config pack reads. The first four carry
 // a chunker that splits them; the rest reach the tree as one whole-file piece.
 // The empty string claims a file with NO extension - a Dockerfile, a LICENSE -
 // which extension-keyed ownership would leave out with nothing reporting it.
-func configExtensions() []string {
+func ConfigExtensions() []string {
 	return slices.Clone([]string{
 		".mod", ".work", ".sum", ".sql",
 		".md", ".yml", ".yaml", ".xml", ".json", ".toml", ".nix", ".lock",
@@ -92,20 +92,20 @@ func renderersByExtension(languages []indexing.Language) map[string]renderer {
 	return out
 }
 
-// finalTree is what the Dart and web packs resolve an import against: which
+// FinalTree is what the Dart and web packs resolve an import against: which
 // files the tree holds, how to read one, and where each virtual module a
 // bundler plugin makes up is compiled from.
-type finalTree struct {
-	files   []string
-	reader  treeReader
-	virtual map[string]string
+type FinalTree struct {
+	Files   []string
+	Reader  TreeReader
+	Virtual map[string]string
 }
 
-type treeReader interface {
+type TreeReader interface {
 	Read(ctx context.Context, path string) ([]byte, error)
 }
 
-// specificLanguages is what the indexer reads a known format with. The config
+// SpecificLanguages is what the indexer reads a known format with. The config
 // entry covers the files a build needs and no language server reads: without
 // them a plan holds no go.mod, so every tree it describes has source and
 // nothing to compile it.
@@ -116,50 +116,50 @@ type treeReader interface {
 //
 // Dart and the web files are not Resolved: the one language server a run
 // starts is gopls, so their rule packs carry the reference edges themselves.
-func specificLanguages(
+func SpecificLanguages(
 	configSyntax config.Syntax,
-	tree finalTree,
+	tree FinalTree,
 	source *typed.Source,
 	slice sliceconf.Config,
 ) []indexing.Language {
 	return []indexing.Language{
 		{
-			Name:       goLanguage,
+			Name:       GoLanguage,
 			Extensions: []string{".go"},
 			Syntax:     golang.NewSyntaxWith(slice),
 			Rules:      golang.NewRulePackWith(source),
 			Resolved:   true,
 		},
 		{
-			Name:       dartLanguage,
+			Name:       DartLanguage,
 			Extensions: []string{".dart"},
-			Syntax:     dart.NewSyntax(tree.files, tree.reader),
+			Syntax:     dart.NewSyntax(tree.Files, tree.Reader),
 			Rules:      dart.NewRulePack(),
 		},
 		{
-			Name:       webLanguage,
+			Name:       WebLanguage,
 			Extensions: web.Extensions(),
-			Syntax:     web.NewSyntax(tree.files, tree.reader),
-			Rules:      web.NewRulePack(tree.virtual),
+			Syntax:     web.NewSyntax(tree.Files, tree.Reader),
+			Rules:      web.NewRulePack(tree.Virtual),
 		},
 		{
-			Name:       configLanguage,
-			Extensions: configExtensions(),
+			Name:       ConfigLanguage,
+			Extensions: ConfigExtensions(),
 			Syntax:     configSyntax,
 			Rules:      config.NewRulePack(),
 		},
 	}
 }
 
-// opaqueLanguage claims every final-tree path neither "go" nor "config" owns.
+// OpaqueLanguage claims every final-tree path neither "go" nor "config" owns.
 // It shares configSyntax's own chunker list, so it reads such a path
 // whole-file by default (chunk.WholeFile) unless a chunk map entry refines
 // the cut - see docs/PLANO-EMISSAO.md:113-133. Without it, a format this tool
 // has no reader for - .tmpl, a golden fixture - vanishes from the graph
 // in silence and a plan built from this run can never reproduce it.
-func opaqueLanguage(configSyntax config.Syntax) indexing.Language {
+func OpaqueLanguage(configSyntax config.Syntax) indexing.Language {
 	return indexing.Language{
-		Name:       opaqueName,
+		Name:       OpaqueName,
 		Extensions: []string{indexing.AnyExtension},
 		Syntax:     configSyntax,
 	}

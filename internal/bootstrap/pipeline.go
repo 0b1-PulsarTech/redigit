@@ -120,8 +120,8 @@ func start(ctx context.Context, cfg Config, hooks []namedHook) (*Pipeline, error
 	}
 
 	configSyntax := config.NewSyntax(configChunkers(cfg.ChunkMap))
-	tree := finalTree{snapshot.Files, reader, cfg.Virtual}
-	specific := specificLanguages(configSyntax, tree, goSource, slice)
+	tree := FinalTree{snapshot.Files, reader, cfg.Virtual}
+	specific := SpecificLanguages(configSyntax, tree, goSource, slice)
 
 	env := stageEnv{root: root, opened: opened, specific: specific, goSource: goSource, tree: tree}
 

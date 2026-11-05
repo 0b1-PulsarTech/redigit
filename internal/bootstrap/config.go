@@ -119,7 +119,7 @@ type setting struct {
 func settings() []setting {
 	// One table decodes, applies and validates, so no second key list can drift.
 	return []setting{
-		{goLanguage, "tags", "tags", func(raw json.RawMessage, cfg *Config) error {
+		{GoLanguage, "tags", "tags", func(raw json.RawMessage, cfg *Config) error {
 			var tags []*string
 			if err := rules.DecodeStrict(raw, &tags, "an array of strings"); err != nil {
 				return err //nolint:wrapcheck // rules.Expected words the setting error
@@ -141,7 +141,7 @@ func settings() []setting {
 
 			return err //nolint:wrapcheck // settingError names the setting once
 		}},
-		{webLanguage, "virtual", "virtual", func(raw json.RawMessage, cfg *Config) error {
+		{WebLanguage, "virtual", "virtual", func(raw json.RawMessage, cfg *Config) error {
 			var virtual map[string]*string
 			if err := rules.DecodeStrict(raw, &virtual, "an object of strings"); err != nil {
 				return err //nolint:wrapcheck // rules.Expected words the setting error

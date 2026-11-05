@@ -93,7 +93,7 @@ func lineageStage(
 
 	anchored.Inner, anchored.Policy, anchored.Anchors = built.planner, section.Policy, anchors
 	anchored.Floor, anchored.Renames, anchored.Bound = floored.Floor, result.Renames(), ctx
-	anchored.Languages, anchored.Finals = lineageLanguages(env.specific), env.tree.reader
+	anchored.Languages, anchored.Finals = lineageLanguages(env.specific), env.tree.Reader
 
 	built.closers = append(built.closers, held...)
 	built.planner = anchoring.New(anchored)

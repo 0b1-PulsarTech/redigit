@@ -96,7 +96,7 @@ func TestRenderersByExtensionFallsBackToConfig(t *testing.T) {
 		{Name: "go", Extensions: []string{".go"}, Syntax: stubRenderer{tag: "go"}},
 		{Name: "dart", Extensions: []string{".dart"}, Syntax: stubRenderer{tag: "dart"}},
 		{Name: "web", Extensions: web.Extensions(), Syntax: stubRenderer{tag: "web"}},
-		{Name: "config", Extensions: configExtensions(), Syntax: configSyntax},
+		{Name: "config", Extensions: ConfigExtensions(), Syntax: configSyntax},
 	})
 	dispatch := newRenderer(configSyntax, byExt)
 
@@ -188,12 +188,12 @@ func TestSpecificLanguagesGivesOnlyTheGoPackTheSliceSection(t *testing.T) {
 	t.Parallel()
 
 	slice := sliceconf.Config{Functions: []string{"Run"}}
-	languages := specificLanguages(config.Syntax{}, finalTree{}, typed.NewSource(nil), slice)
+	languages := SpecificLanguages(config.Syntax{}, FinalTree{}, typed.NewSource(nil), slice)
 
 	for _, language := range languages {
 		selector, isSelector := language.Syntax.(indexing.Selector)
-		if isSelector != (language.Name == goLanguage) {
-			t.Fatalf("%q selector = %v, want only %q", language.Name, isSelector, goLanguage)
+		if isSelector != (language.Name == GoLanguage) {
+			t.Fatalf("%q selector = %v, want only %q", language.Name, isSelector, GoLanguage)
 		}
 
 		if isSelector && !slices.Equal(selector.Functions(), slice.Functions) {

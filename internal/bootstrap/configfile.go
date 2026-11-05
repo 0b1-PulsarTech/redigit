@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	goLanguage     = "go"
-	dartLanguage   = "dart"
-	webLanguage    = "web"
-	configLanguage = "config"
-	opaqueName     = "opaque"
+	GoLanguage     = "go"
+	DartLanguage   = "dart"
+	WebLanguage    = "web"
+	ConfigLanguage = "config"
+	OpaqueName     = "opaque"
 )
 
 var (
