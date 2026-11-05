@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 )
@@ -26,6 +25,8 @@ func (planner Planner) decide(
 	judge judgement,
 ) ([]kept, error) {
 	var out []kept
+
+	clear(judge.stops)
 
 	keep := keysByFile(graph)
 	active := map[entities.DeclKey]entry{}
@@ -75,9 +76,11 @@ func (planner Planner) decide(
 			// Only a pre-image that builds may stand under an older anchor's trial.
 			active = trial
 
-			built := kept{found: one, outcome: outcomeKept, trial: trial}
-			built.reason = "its pre-image builds"
-			out = append(out, built)
+			out = append(out, kept{
+				found: one, outcome: outcomeKept, trial: trial, reason: "its pre-image builds",
+			})
+		case policy == PolicyStop:
+			planner.stop(one, verdict.Detail, judge)
 		case policy == PolicyFold:
 			planner.fold(one, verdict.Detail)
 		default:
@@ -89,41 +92,6 @@ func (planner Planner) decide(
 	slices.Reverse(out)
 
 	return out, nil
-}
-
-func keysByFile(graph entities.Graph) map[string][]entities.DeclKey {
-	out := map[string][]entities.DeclKey{}
-
-	for _, decl := range graph.Decls() {
-		out[decl.Key.File] = append(out[decl.Key.File], decl.Key)
-	}
-
-	return out
-}
-
-func editsOf(active map[entities.DeclKey]entry, keep map[string][]entities.DeclKey) []Edit {
-	edits := make([]Edit, 0, len(active))
-
-	for _, placed := range active {
-		edits = append(edits, Edit{
-			File:    placed.key.File,
-			Span:    placed.span,
-			Text:    placed.preimage,
-			Imports: placed.imports,
-			Keep:    keep[placed.key.File],
-		})
-	}
-
-	slices.SortFunc(edits, func(left, right Edit) int {
-		return cmp.Or(
-			strings.Compare(left.File, right.File), cmp.Compare(left.Span.Start, right.Span.Start),
-			cmp.Compare(left.Span.End, right.Span.End), strings.Compare(left.Text, right.Text),
-		)
-	})
-
-	return slices.CompactFunc(edits, func(left, right Edit) bool {
-		return left.File == right.File && left.Span == right.Span && left.Text == right.Text
-	})
 }
 
 func (planner Planner) verdictOf(

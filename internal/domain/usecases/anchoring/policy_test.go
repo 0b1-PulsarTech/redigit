@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -147,7 +148,7 @@ func TestPolicyRefusals(t *testing.T) {
 		},
 		{
 			name:    "a policy the planner does not know is refused",
-			anchors: []Anchor{{Rev: "fix", Position: 5, Policy: "stop"}}, verdicts: built,
+			anchors: []Anchor{{Rev: "fix", Position: 5, Policy: "later"}}, verdicts: built,
 			wantErr: ErrAnchor,
 		},
 		{
@@ -262,80 +263,6 @@ func TestWIPSubjectsAreMarkedButTheAnchorKeepsItsOwn(t *testing.T) {
 	}
 }
 
-func TestEditsOf(t *testing.T) {
-	t.Parallel()
-
-	span := entities.Span{Start: 2, End: 9}
-	testCases := []struct {
-		name   string
-		active map[entities.DeclKey]entry
-		want   []Edit
-	}{
-		{name: "nothing held", want: []Edit{}},
-		{
-			name: "declarations sharing one span give one edit",
-			active: map[entities.DeclKey]entry{
-				fkey("A"): {key: fkey("A"), span: span, preimage: "const ( A; B )"},
-				fkey("B"): {key: fkey("B"), span: span, preimage: "const ( A; B )"},
-			},
-			want: []Edit{{File: "a.go", Span: span, Text: "const ( A; B )"}},
-		},
-		{
-			name: "declarations sharing one span with differing text keep both edits",
-			active: map[entities.DeclKey]entry{
-				fkey("A"): {key: fkey("A"), span: span, preimage: "var a = 1"},
-				fkey("B"): {key: fkey("B"), span: span, preimage: "var b = 2"},
-			},
-			want: []Edit{
-				{File: "a.go", Span: span, Text: "var a = 1"},
-				{File: "a.go", Span: span, Text: "var b = 2"},
-			},
-		},
-		{
-			name: "distinct spans stay in file order",
-			active: map[entities.DeclKey]entry{
-				fkey("B"): {key: fkey("B"), span: entities.Span{Start: 20, End: 25}, preimage: "b"},
-				fkey("A"): {key: fkey("A"), span: entities.Span{Start: 1, End: 5}, preimage: "a"},
-			},
-			want: []Edit{
-				{File: "a.go", Span: entities.Span{Start: 1, End: 5}, Text: "a"},
-				{File: "a.go", Span: entities.Span{Start: 20, End: 25}, Text: "b"},
-			},
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := editsOf(testCase.active, nil)
-			if !reflect.DeepEqual(got, testCase.want) {
-				t.Fatalf("editsOf() = %+v, want %+v", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestEditsOfCarryTheImports(t *testing.T) {
-	t.Parallel()
-
-	active := map[entities.DeclKey]entry{
-		fkey("A"): {
-			key: fkey("A"), span: entities.Span{End: 6}, preimage: "A one",
-			imports: []string{"bytes"},
-		},
-	}
-	want := []Edit{{
-		File: "a.go", Span: entities.Span{End: 6}, Text: "A one", Imports: []string{"bytes"},
-		Keep: []entities.DeclKey{fkey("A")},
-	}}
-
-	got := editsOf(active, map[string][]entities.DeclKey{"a.go": {fkey("A")}})
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("editsOf() = %+v, want %+v", got, want)
-	}
-}
-
 func TestOverlapped(t *testing.T) {
 	t.Parallel()
 
@@ -392,5 +319,140 @@ func TestOverlapped(t *testing.T) {
 				t.Fatalf("overlapped() = %q, want %q", got, testCase.want)
 			}
 		})
+	}
+}
+
+type stopCase struct {
+	name      string
+	anchors   []Anchor
+	policy    Policy
+	verdicts  []Verdict
+	wantStops []string
+	wantSize  int
+	wantFold  bool
+}
+
+func runStop(t *testing.T, testCase stopCase) {
+	t.Helper()
+
+	var record probeLog
+
+	ctrl := gomock.NewController(t)
+	probe := scripted(ctrl, &record, testCase.verdicts, nil)
+	planner := fixture(ctrl, probe, testCase.policy, testCase.anchors...)
+
+	got, err := planOf(planner, finalFiles())
+	if testCase.wantStops != nil {
+		checkStopped(t, err, testCase.wantStops)
+
+		return
+	}
+
+	if err != nil || got.Len() != testCase.wantSize {
+		t.Fatalf("Plan() = %d commits, %v, want %d", got.Len(), err, testCase.wantSize)
+	}
+
+	if !testCase.wantFold {
+		return
+	}
+
+	folded := slices.Clone(testCase.anchors)
+	for idx := range folded {
+		folded[idx].Policy = PolicyFold
+	}
+
+	want, _ := planOf(fixture(ctrl, probe, PolicyFold, folded...), finalFiles())
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("stop plan = %+v, want the fold plan %+v", got, want)
+	}
+}
+
+func TestPolicyStop(t *testing.T) {
+	t.Parallel()
+
+	built := Verdict{IsBuilt: true}
+	broken := Verdict{Detail: "undefined: Z"}
+	older := Anchor{Rev: "fix", Position: 5, Policy: PolicyStop}
+	newer := Anchor{Rev: "fixb", Position: 7, Policy: PolicyStop}
+
+	testCases := []stopCase{
+		{
+			name:    "a conflict stops and lists the anchor with its declarations",
+			anchors: []Anchor{older}, verdicts: []Verdict{broken},
+			wantStops: []string{"fix|undefined: Z|A"},
+		},
+		{
+			name:    "every conflict is listed, not the first",
+			anchors: []Anchor{older, newer}, verdicts: []Verdict{broken},
+			wantStops: []string{"fix|undefined: Z|A", "fixb|undefined: Z|B"},
+		},
+		{
+			name:    "only the anchor that conflicts is listed",
+			anchors: []Anchor{older, newer}, verdicts: []Verdict{broken, built},
+			wantStops: []string{"fixb|undefined: Z|B"},
+		},
+		{
+			name:    "the global policy stops an anchor that names none",
+			anchors: []Anchor{{Rev: "fix", Position: 5}}, policy: PolicyStop,
+			verdicts: []Verdict{broken}, wantStops: []string{"fix|undefined: Z|A"},
+		},
+		{
+			name:    "an anchor policy overrides a global stop",
+			anchors: []Anchor{{Rev: "fix", Position: 5, Policy: PolicyFold}}, policy: PolicyStop,
+			verdicts: []Verdict{broken}, wantSize: 2,
+		},
+		{
+			name: "an unfit pre-image folds under stop", anchors: []Anchor{older},
+			verdicts: []Verdict{{IsUnfit: true, Detail: "cannot be rendered"}}, wantSize: 2,
+		},
+		{
+			name: "an unchecked pre-image is kept under stop", anchors: []Anchor{older},
+			verdicts: []Verdict{{IsUnchecked: true, Detail: "fails before any edit"}}, wantSize: 3,
+		},
+		{
+			name: "no conflict gives the plan fold gives",
+			anchors: []Anchor{
+				older,
+				newer,
+			},
+			verdicts: []Verdict{built},
+			wantSize: 4,
+			wantFold: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			runStop(t, testCase)
+		})
+	}
+}
+
+func checkStopped(t *testing.T, err error, want []string) {
+	t.Helper()
+
+	if !errors.Is(err, ErrStopped) {
+		t.Fatalf("Plan() error = %v, want ErrStopped", err)
+	}
+
+	stopped, isStopped := errors.AsType[*StoppedError](err)
+	if !isStopped {
+		t.Fatalf("Plan() error = %v, want a StoppedError", err)
+	}
+
+	got := make([]string, 0, len(stopped.Conflicts))
+
+	for _, conflict := range stopped.Conflicts {
+		names := make([]string, 0, len(conflict.Decls))
+		for _, decl := range conflict.Decls {
+			names = append(names, decl.Key.Name)
+		}
+
+		got = append(got, conflict.Rev+"|"+conflict.Detail+"|"+strings.Join(names, ","))
+	}
+
+	if !slices.Equal(got, want) {
+		t.Fatalf("conflicts = %q, want %q", got, want)
 	}
 }

@@ -151,7 +151,7 @@ func (planner Planner) settle(
 	list []found,
 	plan entities.Plan,
 ) ([]kept, error) {
-	judge := judgement{forced: map[string]string{}, memo: map[string]Verdict{}}
+	judge := newJudgement()
 	quiet := planner
 	quiet.cfg.Logger = slog.New(slog.DiscardHandler)
 
@@ -174,5 +174,5 @@ func (planner Planner) settle(
 		judge.forced[rev] = reason
 	}
 
-	return planner.decide(ctx, graph, list, judge)
+	return judge.finish(planner.decide(ctx, graph, list, judge))
 }

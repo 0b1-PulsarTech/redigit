@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	ErrProbe  = errors.New("pre-image probe failed")
-	ErrAnchor = errors.New("anchor cannot be placed")
+	ErrProbe   = errors.New("pre-image probe failed")
+	ErrAnchor  = errors.New("anchor cannot be placed")
+	ErrStopped = errors.New("anchors stopped for a decision")
 )
 
 type Policy string
@@ -22,6 +23,7 @@ type Policy string
 const (
 	PolicyFold Policy = "fold"
 	PolicyWIP  Policy = "wip"
+	PolicyStop Policy = "stop"
 )
 
 type (
@@ -58,6 +60,7 @@ type (
 	judgement struct {
 		forced map[string]string
 		memo   map[string]Verdict
+		stops  map[string]Conflict
 	}
 
 	Config struct {
@@ -88,18 +91,10 @@ func New(cfg Config) Planner {
 	return Planner{cfg: cfg}
 }
 
-type stopPolicyError struct{}
-
-func (stopPolicyError) Error() string { return "policy stop arrives in 24b" }
-
-func (stopPolicyError) Is(target error) bool { return target == ErrAnchor }
-
 func checkPolicy(policy Policy) error {
 	switch policy {
-	case "", PolicyFold, PolicyWIP:
+	case "", PolicyFold, PolicyWIP, PolicyStop:
 		return nil
-	case "stop":
-		return stopPolicyError{}
 	default:
 		return fmt.Errorf("%w: unknown policy %q", ErrAnchor, policy)
 	}
@@ -174,4 +169,10 @@ func (planner Planner) languageFor(path string) (lineage.Language, bool) {
 	}
 
 	return lineage.Language{}, false
+}
+
+func newJudgement() judgement {
+	return judgement{
+		forced: map[string]string{}, memo: map[string]Verdict{}, stops: map[string]Conflict{},
+	}
 }

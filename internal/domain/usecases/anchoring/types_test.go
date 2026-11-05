@@ -15,11 +15,10 @@ func TestValidate(t *testing.T) {
 	fix := Spec{Rev: "3d2d883", Kind: "fix"}
 
 	testCases := []struct {
-		name     string
-		specs    []Spec
-		policy   Policy
-		wantErr  string
-		wantText string
+		name    string
+		specs   []Spec
+		policy  Policy
+		wantErr string
 	}{
 		{name: "no anchor is fine"},
 		{name: "a fix and a perf", specs: []Spec{fix, {Rev: "0aab4c6", Kind: "perf"}}},
@@ -28,14 +27,10 @@ func TestValidate(t *testing.T) {
 			name:  "an anchor policy",
 			specs: []Spec{{Rev: "3d2d883", Kind: "fix", Policy: PolicyFold}},
 		},
+		{name: "a global stop policy", specs: []Spec{fix}, policy: PolicyStop},
 		{
-			name: "stop is for the next slice", policy: "stop",
-			wantErr: "arrives in 24b", wantText: "policy stop arrives in 24b",
-		},
-		{
-			name:    "stop on an anchor is for the next slice",
-			specs:   []Spec{{Rev: "3d2d883", Kind: "fix", Policy: "stop"}},
-			wantErr: "arrives in 24b", wantText: "policy stop arrives in 24b",
+			name:  "stop on one anchor",
+			specs: []Spec{{Rev: "3d2d883", Kind: "fix", Policy: PolicyStop}},
 		},
 		{name: "an unknown policy", policy: "maybe", wantErr: "unknown policy"},
 		{name: "a missing rev", specs: []Spec{{Kind: "fix"}}, wantErr: "rev"},
@@ -54,10 +49,6 @@ func TestValidate(t *testing.T) {
 
 			if err == nil {
 				return
-			}
-
-			if testCase.wantText != "" && err.Error() != testCase.wantText {
-				t.Fatalf("Validate() = %q, want exactly %q", err, testCase.wantText)
 			}
 
 			if !errors.Is(err, ErrAnchor) || !strings.Contains(err.Error(), testCase.wantErr) {

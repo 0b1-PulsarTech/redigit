@@ -1,12 +1,9 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/anchoring"
@@ -16,15 +13,10 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/anchorprobe"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore/batch"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore/preimage"
+	"github.com/wrapped-owls/redigit/internal/infra/lineageconf"
 )
 
 type (
-	lineageSection struct {
-		Follow  bool             `json:"follow"`
-		Policy  anchoring.Policy `json:"policy"`
-		Anchors []anchoring.Spec `json:"anchors"`
-	}
-
 	lineageScan func(context.Context, *Config, stageEnv, lineage.Config) (lineage.Result, error)
 
 	anchorOpen func(context.Context, *Config, stageEnv) (anchoring.Config, closers, error)
@@ -53,9 +45,9 @@ func lineageStage(
 	deps lineageDeps,
 ) error {
 	// Decoded in every mode, so a bad section fails before any indexing starts.
-	section, err := decodeLineageSection(cfg.Sections.Lineage)
+	section, err := lineageconf.Decode(cfg.Sections.Lineage)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrConfig, err)
 	}
 
 	anchors, err := anchoring.Locate(section.Anchors, env.opened.snapshot.History)
@@ -152,28 +144,4 @@ func lineageLanguages(specific []indexing.Language) []lineage.Language {
 	}
 
 	return languages
-}
-
-func decodeLineageSection(raw json.RawMessage) (lineageSection, error) {
-	section := lineageSection{Follow: true}
-	if len(raw) == 0 {
-		return section, nil
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&section); err != nil {
-		return lineageSection{}, fmt.Errorf("%w: lineage section: %w", ErrConfig, err)
-	}
-
-	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
-		return lineageSection{}, fmt.Errorf("%w: lineage section: trailing data", ErrConfig)
-	}
-
-	if err := anchoring.Validate(section.Anchors, section.Policy); err != nil {
-		return lineageSection{}, fmt.Errorf("%w: lineage section: %w", ErrConfig, err)
-	}
-
-	return section, nil
 }
