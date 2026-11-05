@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -341,38 +340,4 @@ func (p *Pipeline) Audit(graph entities.Graph, order entities.Ordering) (auditin
 	}
 
 	return result, nil
-}
-
-// Close stops what the hooks opened, the language server, the typed loads and the git reader, then
-// removes the throwaway checkout, folding every failure so one does not hide
-// another; the checkout is kept when the session or the loads fail to stop.
-// It is registered by the caller right after Start, so a failure later still
-// releases the process.
-func (p *Pipeline) Close(ctx context.Context) error {
-	// The session and typed loads read the checkout and stop first; one that fails keeps it.
-	// The resolver goes before them: its index build reads the loads, so closing them under it
-	// would log a skipped ad hoc pass that was only cancelled.
-	hooksErr := p.hooked.Close(ctx)
-	sessionErr := p.session.Close(ctx)
-	loadsErr := p.loads.Close(ctx)
-	closeErr := errors.Join(
-		stopped("close hook resources", hooksErr),
-		stopped("close language server", sessionErr),
-		stopped("stop typed loads", loadsErr),
-		stopped("close git reader", p.reader.Close(ctx)),
-	)
-
-	if keep := errors.Join(sessionErr, loadsErr); keep != nil {
-		return errors.Join(closeErr, fmt.Errorf("keep checkout %s: %w", p.snapshot.Root, keep))
-	}
-
-	return errors.Join(closeErr, stopped("remove checkout", p.checkout.Close(ctx)))
-}
-
-func stopped(name string, err error) error {
-	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
-	}
-
-	return nil
 }
