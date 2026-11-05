@@ -140,6 +140,17 @@ func IsHard(reason EdgeReason) bool {
 	}
 }
 
+// IsStructural is a reason that ties a declaration to the build around it (the
+// manifest, the workspace, the checksum), not to anything the program does.
+func IsStructural(reason EdgeReason) bool {
+	switch reason {
+	case ReasonModule, ReasonHosts, ReasonWorkspace, ReasonChecksum:
+		return true
+	default:
+		return false
+	}
+}
+
 func (kind DeclKind) IsCode() bool {
 	return slices.Contains([]DeclKind{KindFunc, KindMethod, KindType, KindValue, KindStmt}, kind)
 }

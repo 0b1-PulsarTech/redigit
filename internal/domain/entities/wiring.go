@@ -131,17 +131,6 @@ func IsTestSide(decl Decl) bool {
 	return decl.IsTest || strings.HasSuffix(decl.Key.File, "_test.go")
 }
 
-// IsStructural is a reason that ties a declaration to the build around it (the
-// manifest, the workspace, the checksum), not to anything the program does.
-func IsStructural(reason EdgeReason) bool {
-	switch reason {
-	case ReasonModule, ReasonHosts, ReasonWorkspace, ReasonChecksum:
-		return true
-	default:
-		return false
-	}
-}
-
 // ClosureSize counts the production declarations a declaration needs, itself
 // included. Manifest and dependency edges are left out: a go.mod line is not
 // something a capability is made of.
