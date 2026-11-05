@@ -1,4 +1,4 @@
-package gitstore
+package blobstore
 
 import (
 	"bufio"
@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+
+	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 )
 
 // BlobSink stores one file's content for a manifest to reference: either into
@@ -23,7 +25,12 @@ import (
 // disk-backed sink needs them to pick a destination and a permission bit, so
 // every implementation takes the same three arguments.
 type BlobSink interface {
-	Put(ctx context.Context, path string, mode FileMode, content []byte) (oid string, err error)
+	Put(
+		ctx context.Context,
+		path string,
+		mode gitstore.FileMode,
+		content []byte,
+	) (oid string, err error)
 }
 
 // hashObjectError is `git hash-object` exiting non-zero. Its stderr is kept
@@ -97,11 +104,11 @@ func NewDryRunBlobStore(repoPath string) *BlobStore {
 func (s *BlobStore) Put(
 	ctx context.Context,
 	path string,
-	mode FileMode,
+	mode gitstore.FileMode,
 	content []byte,
 ) (string, error) {
 	if !mode.Valid() {
-		return "", &UnsupportedModeError{Path: path, Mode: mode}
+		return "", &gitstore.UnsupportedModeError{Path: path, Mode: mode}
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -292,7 +299,7 @@ func NewDirSink(dir string) DirSink { return DirSink{Dir: dir} }
 func (s DirSink) Put(
 	_ context.Context,
 	path string,
-	mode FileMode,
+	mode gitstore.FileMode,
 	content []byte,
 ) (string, error) {
 	// Content-addressed, exactly like the object database this is the
@@ -312,7 +319,7 @@ func (s DirSink) Put(
 	full := filepath.Join(base, name)
 
 	if !mode.Valid() {
-		return "", &UnsupportedModeError{Path: path, Mode: mode}
+		return "", &gitstore.UnsupportedModeError{Path: path, Mode: mode}
 	}
 
 	if _, err := os.Stat(full); err == nil {
@@ -332,8 +339,8 @@ func (s DirSink) Put(
 	return name, nil
 }
 
-func filePermission(mode FileMode) os.FileMode {
-	if mode == ModeExecutable {
+func filePermission(mode gitstore.FileMode) os.FileMode {
+	if mode == gitstore.ModeExecutable {
 		return dirSinkExecFilePerm
 	}
 

@@ -1,10 +1,12 @@
-package gitstore
+package blobstore
 
 import (
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 )
 
 func TestBlobStorePutRefusesUnsupportedModeBeforeWriting(t *testing.T) {
@@ -17,7 +19,7 @@ func TestBlobStorePutRefusesUnsupportedModeBeforeWriting(t *testing.T) {
 
 	_, err := s.Put(t.Context(), "vendor/lib", "160000", []byte("x"))
 
-	var modeErr *UnsupportedModeError
+	var modeErr *gitstore.UnsupportedModeError
 	if !errors.As(err, &modeErr) {
 		t.Fatalf("Put() err = %v, want *UnsupportedModeError", err)
 	}
@@ -49,7 +51,7 @@ func TestDirSinkPutRefusesUnsupportedModeBeforeWriting(t *testing.T) {
 
 	_, err := sink.Put(t.Context(), "vendor/lib", "160000", []byte("x"))
 
-	var modeErr *UnsupportedModeError
+	var modeErr *gitstore.UnsupportedModeError
 	if !errors.As(err, &modeErr) {
 		t.Fatalf("Put() err = %v, want *UnsupportedModeError", err)
 	}
@@ -65,12 +67,12 @@ func TestDirSinkIsContentAddressed(t *testing.T) {
 	dir := t.TempDir()
 	sink := NewDirSink(dir)
 
-	first, err := sink.Put(t.Context(), "a/lead.go", ModeFile, []byte("one declaration"))
+	first, err := sink.Put(t.Context(), "a/lead.go", gitstore.ModeFile, []byte("one declaration"))
 	if err != nil {
 		t.Fatalf("Put() = %v", err)
 	}
 
-	second, err := sink.Put(t.Context(), "a/lead.go", ModeFile, []byte("one and two"))
+	second, err := sink.Put(t.Context(), "a/lead.go", gitstore.ModeFile, []byte("one and two"))
 	if err != nil {
 		t.Fatalf("Put() = %v", err)
 	}
@@ -92,7 +94,7 @@ func TestDirSinkIsContentAddressed(t *testing.T) {
 	}
 
 	// Identical content at a different path is one blob, stored once.
-	again, err := sink.Put(t.Context(), "b/other.go", ModeFile, []byte("one declaration"))
+	again, err := sink.Put(t.Context(), "b/other.go", gitstore.ModeFile, []byte("one declaration"))
 	if err != nil {
 		t.Fatalf("Put() = %v", err)
 	}

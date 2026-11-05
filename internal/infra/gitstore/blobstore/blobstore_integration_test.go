@@ -1,6 +1,6 @@
 //go:build integration
 
-package gitstore
+package blobstore
 
 import (
 	"bytes"
@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 )
 
 // emptyBlobOID is git's well-known object id for a zero-byte blob: the SHA-1
@@ -110,12 +112,12 @@ func TestBlobStorePutSameContentWritesOnce(t *testing.T) {
 
 	content := []byte("package a\n")
 
-	oid1, err := s.Put(t.Context(), "a.go", ModeFile, content)
+	oid1, err := s.Put(t.Context(), "a.go", gitstore.ModeFile, content)
 	if err != nil {
 		t.Fatalf("Put() err = %v", err)
 	}
 
-	oid2, err := s.Put(t.Context(), "b.go", ModeFile, content)
+	oid2, err := s.Put(t.Context(), "b.go", gitstore.ModeFile, content)
 	if err != nil {
 		t.Fatalf("Put() err = %v", err)
 	}
@@ -144,7 +146,7 @@ func TestBlobStorePutEmptyContentIsTheWellKnownID(t *testing.T) {
 
 	t.Cleanup(func() { _ = s.Close() })
 
-	oid, err := s.Put(t.Context(), "empty.go", ModeFile, nil)
+	oid, err := s.Put(t.Context(), "empty.go", gitstore.ModeFile, nil)
 	if err != nil {
 		t.Fatalf("Put() err = %v", err)
 	}
@@ -174,7 +176,7 @@ func TestBlobStorePutSurvivesNULAndNonUTF8Content(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			oid, err := s.Put(t.Context(), "bin", ModeFile, testCase.content)
+			oid, err := s.Put(t.Context(), "bin", gitstore.ModeFile, testCase.content)
 			if err != nil {
 				t.Fatalf("Put() err = %v", err)
 			}
@@ -209,7 +211,7 @@ func TestBlobStorePutAcceptsPathsWithSpaceAndQuote(t *testing.T) {
 
 			// path never enters the object's content or identity: a blob is
 			// content-addressed. This proves the store does not choke on it.
-			oid, err := s.Put(t.Context(), testCase.path, ModeFile, []byte(testCase.path))
+			oid, err := s.Put(t.Context(), testCase.path, gitstore.ModeFile, []byte(testCase.path))
 			if err != nil {
 				t.Fatalf("Put() err = %v", err)
 			}
@@ -231,7 +233,7 @@ func TestBlobStoreDryRunMatchesWriteAndWritesNothing(t *testing.T) {
 
 	t.Cleanup(func() { _ = dry.Close() })
 
-	dryOID, err := dry.Put(t.Context(), "a.go", ModeFile, content)
+	dryOID, err := dry.Put(t.Context(), "a.go", gitstore.ModeFile, content)
 	if err != nil {
 		t.Fatalf("dry run Put() err = %v", err)
 	}
@@ -244,7 +246,7 @@ func TestBlobStoreDryRunMatchesWriteAndWritesNothing(t *testing.T) {
 
 	t.Cleanup(func() { _ = write.Close() })
 
-	writeOID, err := write.Put(t.Context(), "a.go", ModeFile, content)
+	writeOID, err := write.Put(t.Context(), "a.go", gitstore.ModeFile, content)
 	if err != nil {
 		t.Fatalf("Put() err = %v", err)
 	}
@@ -273,7 +275,7 @@ func TestBlobStoreNeverTouchesRefIndexOrWorkingTree(t *testing.T) {
 
 	for i := range 50 {
 		content := fmt.Appendf(nil, "content %d\n", i)
-		if _, err = s.Put(t.Context(), fmt.Sprintf("f%d.go", i), ModeFile, content); err != nil {
+		if _, err = s.Put(t.Context(), fmt.Sprintf("f%d.go", i), gitstore.ModeFile, content); err != nil {
 			t.Fatalf("Put() err = %v", err)
 		}
 	}
@@ -314,7 +316,7 @@ func TestBlobStoreOnUnbornBranchTouchesNoRef(t *testing.T) {
 	dir := blobTestRepo(t)
 	s := NewBlobStore(dir)
 
-	if _, err := s.Put(t.Context(), "a.go", ModeFile, []byte("package a\n")); err != nil {
+	if _, err := s.Put(t.Context(), "a.go", gitstore.ModeFile, []byte("package a\n")); err != nil {
 		t.Fatalf("Put() err = %v", err)
 	}
 
@@ -367,7 +369,7 @@ func TestBlobStoreThroughputAgainstRealData(t *testing.T) {
 	oids := make([]string, blobCount)
 
 	for i, content := range contents {
-		oid, err := s.Put(t.Context(), fmt.Sprintf("pkg/p%d.go", i), ModeFile, content)
+		oid, err := s.Put(t.Context(), fmt.Sprintf("pkg/p%d.go", i), gitstore.ModeFile, content)
 		if err != nil {
 			t.Fatalf("Put(%d) err = %v", i, err)
 		}
@@ -420,7 +422,7 @@ func TestBlobStoreCloseReportsHashObjectFailure(t *testing.T) {
 
 	// Put's own return doesn't matter here: either the write to stdin fails
 	// because the process already exited, or the read of stdout hits EOF.
-	_, _ = s.Put(t.Context(), "a.go", ModeFile, []byte("x"))
+	_, _ = s.Put(t.Context(), "a.go", gitstore.ModeFile, []byte("x"))
 
 	err := s.Close()
 	if err == nil {

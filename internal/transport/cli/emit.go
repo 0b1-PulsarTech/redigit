@@ -8,6 +8,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/emitting"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
+	"github.com/wrapped-owls/redigit/internal/infra/gitstore/blobstore"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/manifest"
 )
 
@@ -120,12 +121,12 @@ type putter func(
 // guarantee that nothing is written into a repository somebody else is using.
 func openSink(cfg bootstrap.Config) (putter, func()) {
 	if cfg.BlobDir != "" {
-		sink := gitstore.NewDirSink(cfg.BlobDir)
+		sink := blobstore.NewDirSink(cfg.BlobDir)
 
 		return sink.Put, func() {}
 	}
 
-	store := gitstore.NewBlobStore(cfg.Repo)
+	store := blobstore.NewBlobStore(cfg.Repo)
 
 	return store.Put, func() { _ = store.Close() }
 }
