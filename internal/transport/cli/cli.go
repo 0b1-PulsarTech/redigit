@@ -12,6 +12,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/profiling"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/format"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/lint"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/report"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/resume"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/subjects"
@@ -148,7 +149,7 @@ func route(ctx context.Context, call invocation) error {
 	case cmdPlan:
 		return runPlan(ctx, call.cfg, call.stdout, call.start)
 	case cmdReport:
-		return RunReport(ctx, call.cfg, call.stdout, call.start)
+		return report.RunReport(ctx, call.cfg, call.stdout, call.start) //nolint:wrapcheck
 	case cmdEmit:
 		return runEmit(ctx, call.cfg, call.start, call.stdout)
 	case cmdChunks:
