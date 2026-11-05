@@ -8,7 +8,6 @@ import (
 	"maps"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -156,58 +155,4 @@ func importEdges(
 	}
 
 	return edges
-}
-
-// importsOf lists the import paths of a parsed file.
-func importsOf(parsed *ast.File) []string {
-	out := make([]string, 0, len(parsed.Imports))
-
-	for _, spec := range parsed.Imports {
-		if imported, err := strconv.Unquote(spec.Path.Value); err == nil {
-			out = append(out, imported)
-		}
-	}
-
-	return out
-}
-
-// providedRequires lists the require pieces of one go.mod that provide a
-// package among imports, each once.
-func providedRequires(imports []string, required map[string]entities.DeclKey) []entities.DeclKey {
-	seen := map[string]bool{}
-
-	var out []entities.DeclKey
-
-	for _, imported := range imports {
-		module, found := owningModule(imported, required)
-		if !found || seen[module] {
-			continue
-		}
-
-		seen[module] = true
-
-		out = append(out, required[module])
-	}
-
-	return out
-}
-
-// owningModule is the longest required module path that is imported, or
-// prefixes it at a path boundary. Longest, not first: "example.com/a" and
-// "example.com/a/b" can both be required, and the import belongs to the
-// deeper one.
-func owningModule(imported string, required map[string]entities.DeclKey) (string, bool) {
-	best := ""
-
-	for module := range required {
-		if imported != module && !strings.HasPrefix(imported, module+"/") {
-			continue
-		}
-
-		if len(module) > len(best) {
-			best = module
-		}
-	}
-
-	return best, best != ""
 }
