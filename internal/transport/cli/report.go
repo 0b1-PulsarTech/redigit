@@ -13,6 +13,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
 	"github.com/wrapped-owls/redigit/internal/domain/usecases/indexing"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
 
 // readerDTO is one declaration that reads another, dated in the SOURCE
@@ -79,7 +80,7 @@ type reportLine struct {
 // touch dates every declaration it ever gains to the moment it was created
 // nearly empty, which is precisely the measurement that breaks a move.
 func runReport(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
-	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+	return session.WithPipeline(ctx, cfg, start, func(pl pipeline) error { //nolint:wrapcheck
 		result, err := pl.Graph(ctx)
 		if err != nil {
 			return fmt.Errorf("build graph: %w", err)

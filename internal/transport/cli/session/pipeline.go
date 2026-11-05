@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/wrapped-owls/redigit/internal/bootstrap"
 	"github.com/wrapped-owls/redigit/internal/domain/entities"
@@ -32,3 +34,26 @@ type Pipeline interface {
 var _ Pipeline = (*bootstrap.Pipeline)(nil)
 
 type Starter func(ctx context.Context, cfg bootstrap.Config) (Pipeline, error)
+
+func WithPipeline(
+	ctx context.Context,
+	cfg bootstrap.Config,
+	start Starter,
+	run func(Pipeline) error,
+) error {
+	pl, err := start(ctx, cfg)
+	if errors.Is(err, bootstrap.ErrConfig) {
+		return err
+	}
+
+	if err != nil {
+		return fmt.Errorf("start pipeline: %w", err)
+	}
+
+	defer func() { WarnClosed(pl.Close(context.WithoutCancel(ctx))) }()
+
+	WarnUnseen(pl.Unseen())
+	WarnUnclaimed(pl.Unclaimed())
+
+	return run(pl)
+}

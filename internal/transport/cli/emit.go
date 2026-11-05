@@ -10,6 +10,7 @@ import (
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore"
 	"github.com/wrapped-owls/redigit/internal/infra/gitstore/blobstore"
 	"github.com/wrapped-owls/redigit/internal/transport/cli/manifest"
+	"github.com/wrapped-owls/redigit/internal/transport/cli/session"
 )
 
 // sinkAdapter carries a blob store behind the emitter's Sink, which knows only
@@ -35,7 +36,7 @@ func (s sinkAdapter) Write(
 }
 
 func runEmit(ctx context.Context, cfg bootstrap.Config, start starter, out io.Writer) error {
-	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+	return session.WithPipeline(ctx, cfg, start, func(pl pipeline) error { //nolint:wrapcheck
 		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err

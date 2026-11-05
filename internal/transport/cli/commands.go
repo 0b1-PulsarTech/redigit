@@ -53,29 +53,6 @@ func settled(ctx context.Context, pl pipeline) (entities.Graph, entities.Orderin
 	return graph, order, nil
 }
 
-func withPipeline(
-	ctx context.Context,
-	cfg bootstrap.Config,
-	start starter,
-	run func(pipeline) error,
-) error {
-	pl, err := start(ctx, cfg)
-	if errors.Is(err, bootstrap.ErrConfig) {
-		return err
-	}
-
-	if err != nil {
-		return fmt.Errorf("start pipeline: %w", err)
-	}
-
-	defer func() { session.WarnClosed(pl.Close(context.WithoutCancel(ctx))) }()
-
-	session.WarnUnseen(pl.Unseen())
-	session.WarnUnclaimed(pl.Unclaimed())
-
-	return run(pl)
-}
-
 func encode(out io.Writer, value any) error {
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", "  ")
@@ -88,7 +65,7 @@ func encode(out io.Writer, value any) error {
 }
 
 func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
-	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+	return session.WithPipeline(ctx, cfg, start, func(pl pipeline) error { //nolint:wrapcheck
 		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err
@@ -117,7 +94,7 @@ func runAudit(ctx context.Context, cfg bootstrap.Config, out io.Writer, start st
 }
 
 func runGraph(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
-	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+	return session.WithPipeline(ctx, cfg, start, func(pl pipeline) error { //nolint:wrapcheck
 		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err
@@ -148,7 +125,7 @@ func runGraph(ctx context.Context, cfg bootstrap.Config, out io.Writer, start st
 }
 
 func runPlan(ctx context.Context, cfg bootstrap.Config, out io.Writer, start starter) error {
-	return withPipeline(ctx, cfg, start, func(pl pipeline) error {
+	return session.WithPipeline(ctx, cfg, start, func(pl pipeline) error { //nolint:wrapcheck
 		graph, order, err := settled(ctx, pl)
 		if err != nil {
 			return err
